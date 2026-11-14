@@ -61,6 +61,7 @@ var aberto := false
 var fase_ui := "plano"      # a fase que a tela mostra (atrasa o fim do turno, por causa do fade)
 var aba := ""               # "" = a tela própria da fase; ou "cameras", "tarefas", "diario", "fontes"
 var card_aberto := false    # o card da Terra por cima do plano
+var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
 
 var _fase_logica := "plano"
 var _fade := 0.0
@@ -258,7 +259,8 @@ func _apertar_tecla(nome: String) -> void:
 
 func _t(s: String, x: float, y: float, tam: int = 11, cor: Color = Desenho.TEXTO, largura: float = -1.0,
 		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false) -> float:
-	_textos.append([s, roundi(x), roundi(y), tam])
+	if gravar_textos:
+		_textos.append([s, roundi(x), roundi(y), tam])
 	return Desenho.texto(self, s, Vector2(x, y), tam, cor, largura, alinh, negrito)
 
 

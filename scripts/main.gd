@@ -74,6 +74,9 @@ var _hover := ""
 var _estado := "normal"
 var _vista := "normal"  # a vista de poeira (vista_janela_poeira.png) entra no P1
 var _depurar := false
+# Só com ?sonda=1 na URL (Web): window.fsom para o Playwright e a tecla D da depuração.
+# Sem o parâmetro, o build que vai ao ar não expõe nada disso.
+var _sondar := false
 var _esq_pressionada := false
 var _dir_pressionada := false
 var _mouse_pos := Vector2.ZERO
@@ -84,6 +87,8 @@ var _mouse_dentro := true
 
 func _ready() -> void:
 	_parametros = _parametros_da_url()
+	_sondar = _parametros.get("sonda") == "1"
+	_terminal.gravar_textos = _sondar
 	_aplicar_stretch_da_url()
 	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
 	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
@@ -192,7 +197,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if nome != "":
 			_ao_clicar(nome)
 	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_D:
+		if event.keycode == KEY_D and _sondar:
 			_depurar = not _depurar
 			_contornos.visible = _depurar
 			_depuracao.visible = _depurar
@@ -502,7 +507,7 @@ func _ui_da_tela() -> Dictionary:
 
 
 func _sonda_se_mudou() -> void:
-	if not OS.has_feature("web"):
+	if not _sondar:
 		return
 	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
@@ -513,9 +518,9 @@ func _sonda_se_mudou() -> void:
 		_sonda_teste()
 
 
-## SONDA DE TESTE (só Web): expõe o estado em window.fsom para o Playwright.
+## SONDA DE TESTE (só Web, só com ?sonda=1): expõe o estado em window.fsom para o Playwright.
 func _sonda_teste() -> void:
-	if not OS.has_feature("web"):
+	if not _sondar:
 		return
 	_sonda_t = Time.get_ticks_msec() / 1000.0
 	var res := _resolucao_do_shader()
