@@ -15,6 +15,7 @@ const VELOCIDADE_BORDA := 600.0  # px/s, no limite da tela
 const VELOCIDADE_SETA := 400.0  # px/s, seta pressionada
 const LIMIAR_FECHAR_MONITOR := 24.0  # px de pan para a esquerda que fecham o monitor
 const JSON_REGIOES := "res://assets/comodo/regioes.json"
+const DadosDonki := preload("res://scripts/dados_donki.gd")
 
 const PANORAMAS := {
 	"normal": preload("res://assets/comodo/normal.png"),
@@ -59,6 +60,7 @@ const TELAS := {
 @onready var _monitor_abaixar_realce: ColorRect = $HUD/Monitor/Abaixar/Realce
 
 var _botoes := {}  # nome -> Rect2 no panorama
+var _donki := {}  # dado do DONKI embutido (dados_donki.gd), só para verificação
 var _rect_abaixar_monitor := Rect2()
 var _pan := 0.0
 var _pan_inteiro := 0
@@ -83,6 +85,7 @@ var _mouse_dentro := true
 func _ready() -> void:
 	_aplicar_stretch_da_url()
 	_depuracao.hide()
+	_donki = DadosDonki.carregar()
 	_carregar_regioes()
 
 	var tamanho := _panorama.texture.get_size()
@@ -390,9 +393,9 @@ func _atualizar_depuracao() -> void:
 	if not _depurar:
 		return
 	var res := _resolucao_do_shader()
-	_depuracao.text = "stretch: %s\nshader em: %dx%d zoom %d\npan: %d / %d\nestado: %s  hover: %s\ncliques: %d (%s)" % [
+	_depuracao.text = "stretch: %s\nshader em: %dx%d zoom %d\npan: %d / %d\nestado: %s  hover: %s\ncliques: %d (%s)\n%s" % [
 		_nome_do_modo(), res.x, res.y, int(_zoom()), _pan_inteiro, roundi(_alcance()),
-		_estado, _hover, _cliques, _ultimo_clique]
+		_estado, _hover, _cliques, _ultimo_clique, DadosDonki.resumo(_donki)]
 
 
 ## No Web, lê ?stretch=viewport|canvas_items e aplica em content_scale_mode.
@@ -418,5 +421,10 @@ func _sonda_teste() -> void:
 		"modo": _nome_do_modo(), "shader_em": [res.x, res.y], "zoom": _zoom(),
 		"estado": _estado, "vista": _vista, "monitor": _monitor_aberto, "camera": _camera,
 		"hover": _hover, "depurar": _depurar,
+		"donki": {
+			"historico": _donki["historico"], "chegadas": _donki["chegadas_marte"].size(),
+			"coletado_em": _donki.get("coletado_em"), "motivo_historico": _donki.get("motivo_historico"),
+			"texto": DadosDonki.resumo(_donki),
+		},
 	}
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)

@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 12:59. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 14:36. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -156,6 +156,8 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 - **[R]** O DONKI vai **embutido e atualizado no build**: um script baixa os últimos 60 dias do CCMC na hora do export, e o jogo mostra a data ("dados do DONKI de 15/11/2026").
 - **[R]** Há também a missão histórica de maio de 2024, com o RadLab.
 - **[R]** Dado estático nunca aparece como ao vivo (desafio).
+- **[P]** As chegadas a Marte que o DONKI prevê na janela de 60 dias costumam já ter passado na hora do build. O simulador reencena a CME real mais recente ("o DONKI previu esta CME chegando a Marte em 13/11; no simulador, ela chega no sol 3") e nunca apresenta a chegada como algo que ainda vai acontecer (dono, 14/11).
+- **[R]** O dado vem de `scripts/baixar_donki.py`, que o `scripts/publicar.sh` roda antes do export; o formato está no docstring do script.
 - **[R]** Se o filtro de impacto em Marte vier vazio na janela, vale o recorte histórico.
 - **[R]** Coleta zero:
   - sem analytics, cookies, login ou chamada a terceiros no código;
