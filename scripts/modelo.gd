@@ -13,8 +13,8 @@ extends RefCounted
 ## `st` é sempre o estado no começo do sol, ANTES do aquecimento da noite. `poeira` diz se o sol
 ## está dentro da tempestade de poeira; `solar`, se é o sol da tempestade solar.
 ##
-## O jogo P0 não tem tempestade de poeira nem acúmulo de poeira (são P1), mas o modelo já leva
-## `poeira` e `P` para o P1 só ligar.
+## A tempestade de poeira (`poeira`) já vale no P0, só como efeito na energia. O acúmulo de poeira
+## no painel (`P`) é do P1: o modelo já o leva, e ACUMULO fica em 0 até lá.
 ##
 ## Não há assert nas entradas: plano_cabe() diz se o plano cabe, e a UI só confirma plano que cabe.
 ## Um plano que não cabe dá bateria negativa, e o estado de falha sai como a conta deu
@@ -30,9 +30,11 @@ const N := {
 	"E0": 6.0,              # bateria no começo da missão
 	"O0": 4.0,              # oxigênio no começo da missão
 	"M0": 12.0,             # margem de radiação no começo da missão
-	"DOSE_NORMAL": 2.0,     # dose de um sol comum
-	"DOSE_TEMPESTADE": 6.0, # dose do sol da tempestade solar, sem abrigo
-	"FATOR_ABRIGO": 1.0 / 3.0, # parte da dose da tempestade que nem o abrigo tira
+	# A escala da radiação é do dono (14/11): a tempestade vale 15 sóis comuns, o abrigo tira 4/5 dela
+	# e só o fundo dos 5 sóis gasta 5 da margem. Abrigar na hora dá dose 3; sem abrigo, 15.
+	"DOSE_NORMAL": 1.0,     # dose de um sol comum
+	"DOSE_TEMPESTADE": 15.0, # dose do sol da tempestade solar, sem abrigo
+	"FATOR_ABRIGO": 0.2,    # parte da dose da tempestade que nem o abrigo tira (1/5)
 	"AQUEC": 1.0,           # aquecimento da noite, sai antes do plano
 	"TETO": 12.0,           # teto da bateria
 	"TANQUE_O2": 12.0,      # máximo do tanque de O2
@@ -122,9 +124,8 @@ static func fechar_sol(st: Dictionary, poeira: bool, q: int, n_ciencia: int, n_f
 	var o2_produzido := q
 	var gerador_quebrado: bool = st["gerador_quebrado"]
 	if gerador_quebrado and not consertou_gerador:
-		# [P] inferência: confirmar com o dono. Por analogia com a ciência não feita e com
-		# "a consequência vem pela própria barra", a energia que o plano deu ao gerador
-		# parado também volta à bateria.
+		# A energia que o plano deu ao gerador parado volta à bateria, como a da ciência não
+		# feita (confirmado pelo dono em 14/11).
 		o2_produzido = 0
 		devolvida += q * N.GEN_CUSTO
 	else:

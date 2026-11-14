@@ -399,7 +399,7 @@ func _ao_clicar(nome: String) -> void:
 	_ultimo_clique = nome
 	match nome:
 		"abrigo":
-			_missao.alternar_abrigo()
+			_missao.abrigar()
 		"estufa":
 			_missao.iniciar_tarefa("planta")
 		"glovebox":
@@ -441,7 +441,8 @@ func _atualizar_depuracao() -> void:
 
 # --- parâmetros da URL (só Web) -------------------------------------------------
 
-## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?semente=<int>, ?sol_solar=3|4, ?stretch=viewport|canvas_items.
+## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?semente=<int>, ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5,
+## ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):
 		return {}
@@ -462,6 +463,10 @@ func _opcoes_da_missao() -> Dictionary:
 	var sol_solar := int(_parametros.get("sol_solar", 0))
 	if sol_solar in Missao.SOLS_SOLAR:
 		opcoes["sol_solar"] = sol_solar
+	for chave: String in ["sol_poeira", "sol_quebra"]:
+		var sol_forcado := int(_parametros.get(chave, 0))
+		if sol_forcado in Missao.SOLS_EVENTO:
+			opcoes[chave] = sol_forcado
 	return opcoes
 
 
@@ -558,5 +563,7 @@ func _sonda_teste() -> void:
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(),
 		"ui": _ui_da_tela(),
+		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
+		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
 	}
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)

@@ -3,7 +3,8 @@ extends SceneTree
 ## Roda com: godot --headless --path . --script tests/test_modelo.gd
 ## Sai com código 1 se algo falhar e imprime cada falha. Os números esperados foram feitos à mão
 ## a partir dos números de partida (SOLAR 8, GEN_CUSTO 2, CREW_O2 2, CIENCIA_CUSTO 2, E0 6,
-## O0 4, M0 12, AQUEC 1, TETO 12, TANQUE_O2 12), não calculados pela fórmula do modelo.
+## O0 4, M0 12, AQUEC 1, TETO 12, TANQUE_O2 12, FATOR_POEIRA 0,1; doses: sol comum 1, tempestade 15,
+## abrigada na hora 3), não calculados pela fórmula do modelo.
 
 const Modelo := preload("res://scripts/modelo.gd")
 
@@ -118,17 +119,28 @@ func _oxigenio() -> void:
 
 
 func _radiacao() -> void:
-	# Margem 2 com dose 2: chega a 0, e 0 já é falha.
-	var r := Modelo.fechar_sol(_st(6, 4, 2), false, 0, 0, 0, 2.0, false)
+	# Margem 1 com a dose do sol comum (1): chega a 0, e 0 já é falha.
+	var r := Modelo.fechar_sol(_st(6, 4, 1), false, 0, 0, 0, Modelo.dose(false, 0.0), false)
 	_igual(r["st"]["M"], 0.0, "margem chega a 0")
 	_igual(r["falhas"], ["radiacao"], "margem 0 é falha de radiação")
-	# Margem 3: sobra 1, sem falha.
-	var s := Modelo.fechar_sol(_st(6, 4, 3), false, 0, 0, 0, 2.0, false)
-	_igual(s["st"]["M"], 1.0, "margem 3 - 2 = 1")
+	# Margem 2: sobra 1, sem falha.
+	var s := Modelo.fechar_sol(_st(6, 4, 2), false, 0, 0, 0, Modelo.dose(false, 0.0), false)
+	_igual(s["st"]["M"], 1.0, "margem 2 - 1 = 1")
 	_igual(s["falhas"].size(), 0, "margem 1 sem falha")
-	# Dose da tempestade sem abrigo: 12 - 6 = 6.
+	# Sol comum com margem cheia: 12 - 1 = 11.
+	var c := Modelo.fechar_sol(_st(6, 4, 12), false, 0, 0, 0, Modelo.dose(false, 0.0), false)
+	_igual(c["st"]["M"], 11.0, "sol comum: 12 - 1")
+	# Tempestade sem abrigo (dose 15): 12 - 15 = -3, falha de radiação.
 	var t := Modelo.fechar_sol(_st(6, 4, 12), false, 0, 0, 0, Modelo.dose(true, 1.0), false)
-	_igual(t["st"]["M"], 6.0, "tempestade sem abrigo: 12 - 6")
+	_igual(t["st"]["M"], -3.0, "tempestade sem abrigo: 12 - 15")
+	_igual(t["falhas"], ["radiacao"], "tempestade sem abrigo com margem 12: falha de radiação")
+	# Tempestade abrigada na hora (dose 3): 12 - 3 = 9.
+	var a := Modelo.fechar_sol(_st(6, 4, 12), false, 0, 0, 0, Modelo.dose(true, 0.0), false)
+	_igual(a["st"]["M"], 9.0, "tempestade abrigada na hora: 12 - 3")
+	_igual(a["falhas"].size(), 0, "tempestade abrigada na hora: sem falha")
+	# Margem 3 abrigada na hora: 3 - 3 = 0, e 0 é falha.
+	var z := Modelo.fechar_sol(_st(6, 4, 3), false, 0, 0, 0, Modelo.dose(true, 0.0), false)
+	_igual(z["falhas"], ["radiacao"], "tempestade abrigada com margem 3: zera")
 
 
 func _poeira_e_painel() -> void:
@@ -174,41 +186,60 @@ func _gerador() -> void:
 
 func _emergencia() -> void:
 	# Sol sem ar com gerador quebrado: O 0, 13 para dividir, q = 6. O conserto está no teste:
-	# O = 0 + 6 - 2 = 4. Bateria 13 - 12 = 1. Margem 12 - 2 = 10.
+	# O = 0 + 6 - 2 = 4. Bateria 13 - 12 = 1. Margem 12 - 1 = 11.
 	var sem_ar := _st(6, 0, 12, 1.0, true)
 	var e := Modelo.emergencia(sem_ar, false, false)
 	_igual(e["q"], 6, "emergência: q = 6")
 	_igual(e["falhas"].size(), 0, "emergência: sem falhas")
-	_estado(e["st"], 1.0, 4.0, 10.0, 1.0, false, "emergência com conserto")
+	_estado(e["st"], 1.0, 4.0, 11.0, 1.0, false, "emergência com conserto")
 	_igual(Modelo.algum_plano_salva(sem_ar, false, false), true, "sol sem ar com gerador quebrado tem salvação")
 	# Sem o conserto o mesmo sol falharia por oxigênio (é o que a spec evita no teste).
-	var sem_conserto := Modelo.fechar_sol(sem_ar, false, 6, 0, 0, 2.0, false)
+	var sem_conserto := Modelo.fechar_sol(sem_ar, false, 6, 0, 0, 1.0, false)
 	_igual(sem_conserto["falhas"], ["oxigenio"], "sem conserto o mesmo sol falha por O2")
-	# Tempestade solar com abrigo o tempo todo: dose 2. Margem 2.5 -> 0.5, salva.
-	_igual(Modelo.algum_plano_salva(_st(6, 4, 2.5), false, true), true, "tempestade, margem 2,5: abrigo salva")
-	# Margem 2 não aguenta nem a dose do abrigo (2): zera.
-	_igual(Modelo.algum_plano_salva(_st(6, 4, 2), false, true), false, "tempestade, margem 2: nem o abrigo salva")
-	_igual(Modelo.emergencia(_st(6, 4, 2), false, true)["falhas"], ["radiacao"], "tempestade, margem 2: falha de radiação")
+	# Tempestade solar com abrigo o tempo todo: dose 3. Margem 3,5 -> 0,5, salva.
+	_igual(Modelo.algum_plano_salva(_st(6, 4, 3.5), false, true), true, "tempestade, margem 3,5: abrigo salva")
+	# Margem 3 não aguenta nem a dose do abrigo (3): zera.
+	_igual(Modelo.algum_plano_salva(_st(6, 4, 3), false, true), false, "tempestade, margem 3: nem o abrigo salva")
+	_igual(Modelo.emergencia(_st(6, 4, 3), false, true)["falhas"], ["radiacao"], "tempestade, margem 3: falha de radiação")
+	# Sol comum (dose 1): margem 1,5 sobra 0,5; margem 1 zera.
+	_igual(Modelo.algum_plano_salva(_st(6, 4, 1.5), false, false), true, "sol comum, margem 1,5: salva")
+	_igual(Modelo.algum_plano_salva(_st(6, 4, 1), false, false), false, "sol comum, margem 1: zera, nenhum plano salva")
 	# Poeira com bateria vazia: nenhum plano paga o aquecimento.
 	_igual(Modelo.algum_plano_salva(_st(0, 4, 12), true, false), false, "poeira, bateria 0: nenhum plano salva")
-	# Seguir em segurança: bateria 0 na poeira, O 1 -> -1, M 1 - 2 = -1; os dois sobem ao piso 0.
-	var seg := Modelo.seguir_em_seguranca(_st(0, 1, 1), true, false)
+	# Poeira com bateria 6: renda 0,8, para dividir 6 + 0,8 - 1 = 5,8, q = 2 (4 de 5,8).
+	# O = 4 + 2 - 2 = 4, bateria 5,8 - 4 = 1,8, margem 12 - 1 = 11.
+	var ep := Modelo.emergencia(_st(6, 4, 12), true, false)
+	_igual(ep["q"], 2, "emergência na poeira: q = 2")
+	_igual(ep["falhas"].size(), 0, "emergência na poeira: sem falhas")
+	_estado(ep["st"], 1.8, 4.0, 11.0, 1.0, false, "emergência na poeira")
+	_igual(Modelo.algum_plano_salva(_st(6, 4, 12), true, false), true, "poeira, bateria 6: algum plano salva")
+	# Poeira com bateria 1,2 e O 1: para dividir 1,2 + 0,8 - 1 = 1, q = 0, O = 1 - 2 = -1: nenhum plano salva.
+	# Sem poeira o mesmo estado teria 8,2 para dividir, q = 4, O = 1 + 4 - 2 = 3, e salvaria.
+	_igual(Modelo.algum_plano_salva(_st(1.2, 1, 12), true, false), false, "poeira, bateria 1,2 e O2 1: nenhum plano salva")
+	_igual(Modelo.algum_plano_salva(_st(1.2, 1, 12), false, false), true, "sem poeira o mesmo estado tem salvação")
+	# Seguir em segurança: bateria 0 na poeira, O 1 -> -1, M 0,5 - 1 = -0,5; os dois sobem ao piso 0.
+	var seg := Modelo.seguir_em_seguranca(_st(0, 1, 0.5), true, false)
 	_estado(seg, 0.0, 0.0, 0.0, 1.0, false, "seguir em segurança com piso 0")
 	# Sem negativo, o piso não muda nada: o estado é o da emergência.
 	var seg2 := Modelo.seguir_em_seguranca(sem_ar, false, false)
-	_estado(seg2, 1.0, 4.0, 10.0, 1.0, false, "seguir em segurança sem piso")
+	_estado(seg2, 1.0, 4.0, 11.0, 1.0, false, "seguir em segurança sem piso")
 
 
 func _dose_e_estrelas() -> void:
-	_igual(Modelo.dose(false, 0.0), 2.0, "dose sol comum")
-	_igual(Modelo.dose(false, 1.0), 2.0, "dose sol comum ignora exposição")
-	_igual(Modelo.dose(true, 0.0), 2.0, "dose tempestade abrigada na hora")
-	_igual(Modelo.dose(true, 0.5), 4.0, "dose tempestade, meio")
-	_igual(Modelo.dose(true, 1.0), 6.0, "dose tempestade sem abrigo")
-	_igual(Modelo.dose(true, 0.1), 2.0, "dose tempestade 0,1: 2 + round(0,4)")
-	_igual(Modelo.dose(true, 0.2), 3.0, "dose tempestade 0,2: 2 + round(0,8)")
-	_igual(Modelo.dose(true, -1.0), 2.0, "dose tempestade limita em 0")
-	_igual(Modelo.dose(true, 2.0), 6.0, "dose tempestade limita em 1")
+	# Dose da tempestade = 3 (o que nem o abrigo tira) + round(12 * f), com f a fração exposta.
+	_igual(Modelo.dose(false, 0.0), 1.0, "dose sol comum")
+	_igual(Modelo.dose(false, 1.0), 1.0, "dose sol comum ignora exposição")
+	_igual(Modelo.dose(true, 0.0), 3.0, "dose tempestade abrigada na hora")
+	_igual(Modelo.dose(true, 0.5), 9.0, "dose tempestade, meio: 3 + round(6)")
+	_igual(Modelo.dose(true, 1.0), 15.0, "dose tempestade sem abrigo")
+	_igual(Modelo.dose(true, 0.04), 3.0, "dose tempestade 0,04: 3 + round(0,48)")
+	_igual(Modelo.dose(true, 0.05), 4.0, "dose tempestade 0,05: 3 + round(0,6)")
+	_igual(Modelo.dose(true, 0.1), 4.0, "dose tempestade 0,1: 3 + round(1,2)")
+	_igual(Modelo.dose(true, 0.125), 5.0, "dose tempestade 0,125: 3 + round(1,5) sobe")
+	_igual(Modelo.dose(true, 0.2), 5.0, "dose tempestade 0,2: 3 + round(2,4)")
+	_igual(Modelo.dose(true, 0.25), 6.0, "dose tempestade 0,25: 3 + round(3)")
+	_igual(Modelo.dose(true, -1.0), 3.0, "dose tempestade limita em 0")
+	_igual(Modelo.dose(true, 2.0), 15.0, "dose tempestade limita em 1")
 	# 70% de 14 = 9,8: precisa de 10.
 	_igual(Modelo.estrelas(0, 10), 3, "estrelas: 0 modos, ciência 10")
 	_igual(Modelo.estrelas(0, 9), 2, "estrelas: 0 modos, ciência 9")
@@ -224,7 +255,7 @@ func _previsao_e_plano_cabe() -> void:
 	var p := Modelo.previsao(ini, false, 2, 3)
 	_igual(p["bateria_apos_plano"], 3.0, "previsão q 2, ciência 3: bateria")
 	_igual(p["perdida_no_teto"], 0.0, "previsão q 2, ciência 3: perdida")
-	_estado(p["st"], 3.0, 4.0, 10.0, 1.0, false, "previsão q 2, ciência 3: estado")
+	_estado(p["st"], 3.0, 4.0, 11.0, 1.0, false, "previsão q 2, ciência 3: estado")
 	_igual(p["ciencia"], 3, "previsão q 2, ciência 3: ciencia")
 	# Plano vazio: 13 depois do plano, o teto guarda 12 e perde 1.
 	var v := Modelo.previsao(ini, false, 0, 0)
@@ -243,3 +274,13 @@ func _previsao_e_plano_cabe() -> void:
 	_igual(Modelo.plano_cabe(ini, false, 0, -1), false, "não cabe: ciência negativa")
 	_igual(Modelo.plano_cabe(_st(0, 4, 12), true, 1, 0), false, "poeira, bateria 0: q 1 não cabe")
 	_igual(Modelo.plano_cabe(_st(0, 4, 12), true, 0, 0), true, "poeira, bateria 0: plano vazio cabe")
+	# Poeira com bateria 6: 5,8 para dividir. q 2 (4) cabe; q 2 e 1 tarefa (6) não; sem poeira (13) cabe.
+	_igual(Modelo.plano_cabe(_st(6, 4, 12), true, 2, 0), true, "poeira, bateria 6: q 2 cabe (4 de 5,8)")
+	_igual(Modelo.plano_cabe(_st(6, 4, 12), true, 2, 1), false, "poeira, bateria 6: q 2 e 1 tarefa não cabe (6 de 5,8)")
+	_igual(Modelo.plano_cabe(_st(6, 4, 12), false, 2, 1), true, "sem poeira, bateria 6: q 2 e 1 tarefa cabe (6 de 13)")
+	# Previsão na poeira, bateria 12, q 1 e 1 tarefa: 12,8 - 1 = 11,8 para dividir; depois do plano 11,8 - 4 = 7,8.
+	# O = 4 + 1 - 2 = 3; margem 12 - 1 = 11.
+	var pp := Modelo.previsao(_st(12, 4, 12), true, 1, 1)
+	_igual(pp["para_dividir"], 11.8, "previsão na poeira: para dividir")
+	_igual(pp["bateria_apos_plano"], 7.8, "previsão na poeira: bateria depois do plano")
+	_estado(pp["st"], 7.8, 3.0, 11.0, 1.0, false, "previsão na poeira: estado")

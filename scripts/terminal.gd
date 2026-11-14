@@ -16,6 +16,10 @@ extends Control
 ##
 ## O card da Terra abre por cima do plano (card_aberto) e, enquanto aberto, só "Fechar" se clica.
 ##
+## No turno, "Encerrar o sol" (encerrar_sol) aparece quando Missao.pode_encerrar_sol(): no fim da lista da
+## aba tarefas e, com o terminal abaixado, ao lado do botão TERMINAL. "Consertar" (consertar_gerador) e
+## "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do terminal os substituem na próxima parte.
+##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
 
 const Missao := preload("res://scripts/missao.gd")
@@ -27,6 +31,9 @@ const DadosDonki := preload("res://scripts/dados_donki.gd")
 signal desenhou
 
 const BOTAO := Rect2(260, 328, 120, 28)
+# "Encerrar o sol" com o terminal abaixado: ao lado do botão TERMINAL, na faixa de baixo, longe das
+# setas do pan (meio das bordas), do medidor, das barras e dos chips do HUD.
+const BOTAO_ENCERRAR := Rect2(388, 328, 164, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
@@ -52,8 +59,11 @@ const CARD := Rect2(147, 74, 420, 180)
 # Tela cheia (relatório).
 const X_ESQ := 14.0
 
-const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA"}
-const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "PAINEL", "ATRASO"]
+const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA",
+	"gerador": "TAREFA_GERADOR"}
+const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
+const SEM_FONTE := ["ESCALA"]  # fatos do jogo que não levam linha de fonte
+const PASSO_LINHA := 42.0      # altura de uma linha da lista de tarefas, com o espaço entre elas
 
 var missao: Missao
 var donki := {}
@@ -234,6 +244,10 @@ func _acionar(nome: String) -> void:
 			missao.confirmar_plano()
 		"iniciar_chemcam":
 			missao.iniciar_tarefa("chemcam")
+		"consertar_gerador":
+			missao.iniciar_tarefa("gerador")
+		"encerrar_sol":
+			missao.encerrar_sol()
 		"enviar":
 			missao.enviar_a_terra()
 		"reiniciar":
@@ -354,6 +368,17 @@ func _numero(x: float) -> String:
 	return ("−%d" % -n) if n < 0 else str(n)
 
 
+## Inteiro quando é inteiro; senão uma casa decimal, com vírgula em português.
+func _decimal(x: float) -> String:
+	var d := snappedf(x, 0.1)
+	if is_equal_approx(d, roundf(d)):
+		return _numero(d)
+	var s := "%.1f" % absf(d)
+	if TranslationServer.get_locale().begins_with("pt"):
+		s = s.replace(".", ",")
+	return ("−" + s) if d < 0.0 else s
+
+
 func _nome_tarefa(nome: String) -> String:
 	return tr(ROTULOS_TAREFA[nome])
 
@@ -373,6 +398,9 @@ func _draw() -> void:
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
+	# Terminal abaixado: o "Encerrar o sol" fica ao lado do botão, enquanto valer.
+	if fase_ui == "turno" and not aberto and livre and not card and missao.pode_encerrar_sol():
+		_botao("encerrar_sol", BOTAO_ENCERRAR, tr("ENCERRAR_O_SOL"), "sol", true, 12)
 	if card:
 		# O plano fica atrás, escurecido; só o "Fechar" se clica.
 		draw_rect(TELA, Color(Desenho.NOITE, 0.6))
@@ -473,41 +501,44 @@ func _coluna_energia(r: Rect2) -> void:
 	var w := r.size.x - 16
 	var y := r.position.y + 10
 
-	# A. Aquecimento da noite: fixo, sem botão.
+	# A. Aquecimento da noite: fixo, sem botão. Na tempestade de poeira, logo abaixo, a linha da poeira.
 	_cabeca_linha(x, y, "noite", tr("AQUECIMENTO_DA_NOITE"))
 	var num := _numero(-Modelo.N.AQUEC)
 	var l_num := Desenho.largura_texto(num, 13, true)
 	_t(num, x + w - l_num - 16, y - 1, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 	Desenho.icone(self, "energia", Rect2(x + w - 12, y + 2, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
-	y += 30
+	y += 26
+	if missao.eh_poeira():
+		Desenho.icone(self, "poeira", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+		y += _t(tr("PLANO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), x + 16, y, 11, Desenho.TEXTO, w - 16) + 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
-	y += 11
+	y += 9
 
 	# B. Oxigênio: − q +.
 	_cabeca_linha(x, y, "oxigenio", tr("OXIGENIO"))
 	_custo_cada(x + w, y, Modelo.N.GEN_CUSTO)
-	y += 26
+	y += 24
 	var q := missao.plano_q
 	var n := missao.plano_tarefas.size()
-	_botao("o2_menos", Rect2(x, y, 64, 46), "−", "", q > 0, 22)
-	_t(str(q), x + 64, y + (46.0 - Desenho.fonte().get_height(24)) / 2.0, 24, Desenho.TEXTO, w - 128, HORIZONTAL_ALIGNMENT_CENTER, true)
-	_botao("o2_mais", Rect2(x + w - 64, y, 64, 46), "+", "", missao.plano_cabe(q + 1, n), 22)
-	y += 54
+	_botao("o2_menos", Rect2(x, y, 64, 42), "−", "", q > 0, 22)
+	_t(str(q), x + 64, y + (42.0 - Desenho.fonte().get_height(24)) / 2.0, 24, Desenho.TEXTO, w - 128, HORIZONTAL_ALIGNMENT_CENTER, true)
+	_botao("o2_mais", Rect2(x + w - 64, y, 64, 42), "+", "", missao.plano_cabe(q + 1, n), 22)
+	y += 48
 	if missao.st["gerador_quebrado"]:
 		Desenho.icone(self, "alerta", Rect2(x, y + 1, 12, 12), Desenho.AMARELO, Desenho.FUNDO_TELA)
 		y += _t(tr("GERADOR_QUEBRADO"), x + 16, y, 11, Desenho.AMARELO, w - 16) + 6
 	else:
 		y += 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
-	y += 11
+	y += 9
 
 	# C. Ciência: três cartões liga/desliga.
 	_cabeca_linha(x, y, "ciencia", tr("CIENCIA"))
 	_custo_cada(x + w, y, Modelo.N.CIENCIA_CUSTO)
-	y += 26
+	y += 24
 	var cx := x
 	for nome in Missao.TAREFAS:
-		_cartao_tarefa(nome, Rect2(cx, y, 78, 66))
+		_cartao_tarefa(nome, Rect2(cx, y, 78, 60))
 		cx += 84
 
 
@@ -665,7 +696,7 @@ func _desenhar_cameras() -> void:
 ## O que saiu do plano (a conta da energia e o tanque de O2) e de onde vêm os números.
 func _desenhar_fontes() -> void:
 	_cabecalho_aba("fontes", missao.sol)
-	var m := Modelo.manha(missao.st, false)
+	var m := Modelo.manha(missao.st, missao.eh_poeira())
 	var rl := Rect2(X0, Y_CORPO, 180, Y_FIM - Y_CORPO)
 	_caixa(rl)
 	var x := rl.position.x + 8
@@ -675,37 +706,74 @@ func _desenhar_fontes() -> void:
 	# Energia do sol: bateria + painel − aquecimento = para dividir.
 	Desenho.icone(self, "energia", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
 	y += _t(tr("ENERGIA_DO_SOL") % missao.sol, x + 16, y, 12, Desenho.TEXTO, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true) + 4
+	# Uma casa decimal quando a conta não é inteira (o painel na poeira rende 0,8): a conta tem de fechar.
 	var linhas := [
-		[tr("LINHA_BATERIA"), roundi(missao.st["E"])],
-		[tr("LINHA_PAINEL"), roundi(m["renda"])],
-		[tr("LINHA_AQUECIMENTO"), roundi(Modelo.N.AQUEC)],
+		[tr("LINHA_BATERIA"), _decimal(missao.st["E"])],
+		[tr("LINHA_PAINEL"), _decimal(m["renda"])],
+		[tr("LINHA_AQUECIMENTO"), _decimal(Modelo.N.AQUEC)],
 	]
 	for l in linhas:
 		var h := _t(l[0], x, y, 11, Desenho.TEXTO, w - 24)
-		_t(str(l[1]), x, y, 11, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_RIGHT, true)
+		_t(l[1], x, y, 11, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_RIGHT, true)
 		y += maxf(h, 14.0)
 	draw_line(Vector2(x, y + 1), Vector2(x + w, y + 1), Desenho.BORDA, 1.0)
 	y += 5
 	var h_dividir := _t(tr("LINHA_PARA_DIVIDIR"), x, y, 12, Desenho.TEXTO, w - 24, HORIZONTAL_ALIGNMENT_LEFT, true)
-	_t(str(roundi(m["para_dividir"])), x, y, 12, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	_t(_decimal(m["para_dividir"]), x, y, 12, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_RIGHT, true)
 	y += h_dividir + 10
 
 	# Tanque de O2.
 	Desenho.icone(self, "oxigenio", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
 	y += _t(tr("TANQUE_O2"), x + 16, y, 12, Desenho.TEXTO, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	_tanque(Rect2(x, y, w, rl.end.y - 8 - y))
+	var h_nota := Desenho.altura_texto(tr("FONTE_UNIDADES_FATO"), 10, w)
+	_tanque(Rect2(x, y, w, rl.end.y - 8 - y - h_nota - 8))
+	_t(tr("FONTE_UNIDADES_FATO"), x, rl.end.y - 8 - h_nota, 10, Desenho.TEXTO_SUAVE, w)
 
 	# De onde vêm os números.
 	var rr := Rect2(X0 + 186, Y_CORPO, X1 - X0 - 186, Y_FIM - Y_CORPO)
 	_caixa(rr)
 	x = rr.position.x + 8
 	w = rr.size.x - 16
-	y = rr.position.y + 8
-	y += _t(tr("FONTES_TITULO"), x, y, 12, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 2
-	for par in _pares_fontes():
-		y += _t(par[0], x, y, 11, Desenho.TEXTO, w) - 1
-		if par[1] != "":
-			y += _t(par[1], x, y, 10, Desenho.TEXTO_SUAVE, w) + 2
+	y = rr.position.y + 7
+	var pares := _pares_fontes()
+	# O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px.
+	var tam := 10
+	if _altura_pares(pares, w, 10) > rr.end.y - 7 - y:
+		tam = 9
+	for par in pares:
+		y += _par_fonte(x, y, w, par[0], par[1], tam) + (2.0 if tam == 10 else 5.0)
+
+
+## Um fato (`tam` px) e a fonte dele (9 px, suave). Se a fonte cabe na última linha do fato, vai ali
+## mesmo, ao lado; senão, embaixo. Assim a lista cabe na tela em inglês e em português.
+## Devolve a altura ocupada. Com `desenhar` falso só mede.
+func _par_fonte(x: float, y: float, w: float, fato: String, fonte: String, tam: int, desenhar: bool = true) -> float:
+	var par := TextParagraph.new()
+	par.add_string(fato, Desenho.fonte(), tam)
+	par.width = w
+	var h_fato := Desenho.altura_texto(fato, tam, w)
+	var ao_lado := false
+	var l_ultima := par.get_line_width(par.get_line_count() - 1)
+	if fonte != "":
+		ao_lado = l_ultima + 6.0 + Desenho.largura_texto(fonte, 9) <= w
+	if desenhar:
+		_t(fato, x, y, tam, Desenho.TEXTO, w)
+		if ao_lado:
+			# Alinha as linhas de base: a fonte de 9 px fica na base da última linha do fato.
+			var dy := Desenho.fonte().get_ascent(tam) - Desenho.fonte().get_ascent(9)
+			_t(fonte, x + l_ultima + 6.0, y + h_fato - Desenho.fonte().get_height(tam) + dy, 9, Desenho.TEXTO_SUAVE)
+		elif fonte != "":
+			_t(fonte, x, y + h_fato, 9, Desenho.TEXTO_SUAVE, w)
+	if fonte != "" and not ao_lado:
+		h_fato += Desenho.altura_texto(fonte, 9, w)
+	return h_fato
+
+
+func _altura_pares(pares: Array, w: float, tam: int) -> float:
+	var total := 0.0
+	for par in pares:
+		total += _par_fonte(0.0, 0.0, w, par[0], par[1], tam, false) + 2.0
+	return total
 
 
 ## [fato, fonte] de cada número do jogo; a fonte é "" quando o fato não leva.
@@ -717,8 +785,7 @@ func _pares_fontes() -> Array:
 		pares.append([tr("FONTE_DONKI_FATO") % DadosDonki.data_br(_chegada_mais_recente()),
 			tr("FONTE_DONKI_FONTE") % DadosDonki.data_br(str(donki.get("coletado_em", "")))])
 	for k in PARES_FONTES:
-		pares.append([tr("FONTE_%s_FATO" % k), tr("FONTE_%s_FONTE" % k)])
-	pares.append([tr("FONTE_UNIDADES_FATO"), ""])
+		pares.append([tr("FONTE_%s_FATO" % k), "" if k in SEM_FONTE else tr("FONTE_%s_FONTE" % k)])
 	return pares
 
 
@@ -754,14 +821,19 @@ func _desenhar_tarefas() -> void:
 	_caixa(r)
 	var x := r.position.x + 10
 	var y := r.position.y + 10
+	var lista := missao.lista_do_turno()
 	if missao.medidor() > Missao.LIMIAR_ABRIGO:
 		_linha_abrigo(Rect2(x, y, r.size.x - 20, 40))
-		y += 46
-	for nome in missao.plano_tarefas:
+		y += PASSO_LINHA
+	for nome in lista:
 		_linha_tarefa(nome, Rect2(x, y, r.size.x - 20, 40))
-		y += 46
-	if missao.plano_tarefas.is_empty() and missao.medidor() <= Missao.LIMIAR_ABRIGO:
+		y += PASSO_LINHA
+	if lista.is_empty() and missao.medidor() <= Missao.LIMIAR_ABRIGO:
 		_t(tr("SEM_TAREFAS"), x, y + 6, 12, Desenho.TEXTO_SUAVE)
+		y += 30
+	# No fim da lista, "Encerrar o sol", enquanto valer.
+	if fase_ui == "turno" and missao.pode_encerrar_sol():
+		_botao("encerrar_sol", Rect2(x, y + 4, 240, 36), tr("ENCERRAR_O_SOL"), "sol", true, 13)
 
 
 func _linha_base(r: Rect2) -> void:
@@ -793,10 +865,13 @@ func _linha_tarefa(nome: String, r: Rect2) -> void:
 		_:
 			Desenho.icone(self, "circulo", Rect2(xe, r.position.y + 12, 16, 16), Desenho.TEXTO_SUAVE, Desenho.FUNDO_TERMINAL)
 			_t(_estado_texto("pendente"), xe + 22, r.position.y + 13, 13, Desenho.TEXTO_SUAVE, 120)
+	var livre := missao.fase == "turno" and estado == "pendente" and not missao.abrigado and missao.tarefa_rodando == ""
 	if nome == "chemcam":
 		# Placeholder: o ChemCam de verdade se faz pelas câmeras do terminal (P1).
-		_botao("iniciar_chemcam", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("INICIAR"), "",
-			missao.fase == "turno" and estado == "pendente" and not missao.abrigado and missao.tarefa_rodando == "", 12)
+		_botao("iniciar_chemcam", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("INICIAR"), "", livre, 12)
+	elif nome == "gerador":
+		# Placeholder: o conserto de verdade se faz pela câmera do MOXIE (próxima parte). Não gasta energia.
+		_botao("consertar_gerador", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("CONSERTAR"), "", livre, 12)
 
 
 func _linha_abrigo(r: Rect2) -> void:
@@ -836,42 +911,7 @@ func _desenhar_diario() -> void:
 	# Esquerda: o que se escreveu sozinho.
 	var r := Rect2(X0, Y_CORPO, 306, Y_FIM - Y_CORPO)
 	_caixa(r)
-	var x := r.position.x + 10
-	var w := r.size.x - 20
-	var y := r.position.y + 9
-	# 1. O que aconteceu.
-	if reg["seguranca"]:
-		Desenho.icone(self, "alerta", Rect2(x, y + 1, 12, 12), Desenho.AMARELO, Desenho.FUNDO_TELA)
-		y += _t(tr("DIARIO_SEGURANCA"), x + 16, y, 12, Desenho.AMARELO, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	elif reg["tempestade"]:
-		y += _t(tr("DIARIO_TEMPESTADE"), x, y, 12, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 2
-		var chave := "DIARIO_ABRIGO_A_TEMPO"
-		if not reg["abrigou"]:
-			chave = "DIARIO_SEM_ABRIGO"
-		elif reg["f_exposto"] > 0.0:
-			chave = "DIARIO_ABRIGO_TARDE"
-		y += _t(tr(chave) % roundi(reg["dose"]), x, y, 12, Desenho.TEXTO, w) + 6
-	else:
-		y += _t(tr("DIARIO_CALMO"), x, y, 12, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	# 2. Ciência.
-	if not reg["seguranca"]:
-		Desenho.icone(self, "ciencia", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
-		y += _t(tr("DIARIO_CIENCIA") % [reg["ciencia"], missao.ciencia_total()], x + 16, y, 12, Desenho.TEXTO, w - 16) + 4
-		# 3. Tarefa não feita: a reserva volta à bateria (e o que passou do teto se perdeu).
-		for nome in reg["nao_feitas"]:
-			y += _t(tr("DIARIO_NAO_FEITA") % [_nome_tarefa(nome), roundi(Modelo.N.CIENCIA_CUSTO)], x, y, 11,
-				Desenho.TEXTO, w) + 2
-		if reg["perdida_no_teto"] > 0.0:
-			y += _t(tr("DIARIO_PERDIDA") % roundi(reg["perdida_no_teto"]), x, y, 11, Desenho.TEXTO, w) + 2
-		y += 4
-	# 4. A mensagem recebida.
-	if reg["aviso"]:
-		draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
-		y += 6
-		Desenho.icone(self, "terra", Rect2(x, y, 12, 12), Desenho.AZUL, Desenho.FUNDO_TELA)
-		_t(tr("DIARIO_MENSAGEM"), x + 16, y, 11, Desenho.AZUL, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true)
-		y += 14
-		_t(tr("AVISO_TEMPESTADE"), x + 16, y, 11, Desenho.TEXTO, w - 16)
+	_pintar_itens(_itens_diario(reg), r.position.x + 10, r.position.y + 9, r.size.x - 20, r.end.y - 6)
 
 	# Direita: as barras, antes e depois.
 	var rb := Rect2(r.end.x + 6, Y_CORPO, X1 - r.end.x - 6, 214)
@@ -892,6 +932,88 @@ func _desenhar_diario() -> void:
 		by += 44
 	if fase_ui == "fim_do_sol":
 		_botao("enviar", Rect2(rb.position.x, Y_FIM - 50, rb.size.x, 50), tr("ENVIAR_A_TERRA"), "terra", true, 14)
+
+
+## As linhas do diário do sol, na ordem: o que aconteceu, a poeira, a ciência, a tarefa não feita, a
+## manutenção e a mensagem recebida. Cada uma: ícone (opcional), texto, tamanho, cor e espaço depois.
+func _itens_diario(reg: Dictionary) -> Array:
+	var itens: Array = []
+	# 1. O que aconteceu.
+	if reg["seguranca"]:
+		itens.append({"icone": "alerta", "cor_icone": Desenho.AMARELO, "texto": tr("DIARIO_SEGURANCA"), "tam": 12,
+			"negrito": true, "cor": Desenho.AMARELO, "gap": 6})
+	elif reg["tempestade"]:
+		itens.append({"texto": tr("DIARIO_TEMPESTADE"), "tam": 12, "negrito": true, "gap": 2})
+		var chave := "DIARIO_ABRIGO_A_TEMPO"
+		if not reg["abrigou"]:
+			chave = "DIARIO_SEM_ABRIGO"
+		elif reg["f_exposto"] > 0.0:
+			chave = "DIARIO_ABRIGO_TARDE"
+		itens.append({"texto": tr(chave) % roundi(reg["dose"]), "tam": 12, "gap": 6})
+	else:
+		itens.append({"texto": tr("DIARIO_CALMO"), "tam": 12, "negrito": true, "gap": 6})
+	if reg["poeira"]:
+		itens.append({"icone": "poeira", "texto": tr("DIARIO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), "tam": 12,
+			"gap": 4})
+	if not reg["seguranca"]:
+		# 2. Ciência.
+		itens.append({"icone": "ciencia", "texto": tr("DIARIO_CIENCIA") % [reg["ciencia"], missao.ciencia_total()],
+			"tam": 12, "gap": 4})
+		# 3. Tarefa não feita: a reserva volta à bateria (e o que passou do teto se perdeu).
+		var nao_feitas: Array = reg["nao_feitas"]
+		if nao_feitas.size() == 1:
+			itens.append({"texto": tr("DIARIO_NAO_FEITA") % [_nome_tarefa(nao_feitas[0]), roundi(Modelo.N.CIENCIA_CUSTO)],
+				"tam": 11, "gap": 2})
+		elif nao_feitas.size() > 1:
+			var nomes: Array = []
+			for nome in nao_feitas:
+				nomes.append(_nome_tarefa(nome))
+			itens.append({"texto": tr("DIARIO_NAO_FEITAS") % [", ".join(nomes),
+				roundi(Modelo.N.CIENCIA_CUSTO * nao_feitas.size())], "tam": 11, "gap": 2})
+		if reg["perdida_no_teto"] > 0.0:
+			itens.append({"texto": tr("DIARIO_PERDIDA") % roundi(reg["perdida_no_teto"]), "tam": 11, "gap": 2})
+		# A manutenção: a consequência da que não foi feita, antes de ela pesar.
+		if reg["gerador_quebrado"]:
+			var consertou: bool = reg["consertou"]
+			var cor := Desenho.TEXTO if consertou else Desenho.AMARELO
+			itens.append({"icone": "gerador", "cor_icone": cor, "cor": cor, "tam": 11, "gap": 2,
+				"texto": tr("DIARIO_GERADOR_CONSERTADO" if consertou else "DIARIO_GERADOR_QUEBRADO")})
+		itens[itens.size() - 1]["gap"] += 4
+	# 4. A mensagem recebida.
+	if reg["aviso"]:
+		itens.append({"linha": true, "icone": "terra", "cor_icone": Desenho.AZUL, "texto": tr("DIARIO_MENSAGEM"), "tam": 11,
+			"negrito": true, "cor": Desenho.AZUL, "gap": 0})
+		itens.append({"texto": tr("AVISO_TEMPESTADE"), "tam": 11, "recuo": true, "gap": 0})
+	return itens
+
+
+## Desenha as linhas de `_itens_diario` de `y` até `y_max`. Se não couberem, desce 1 px no tamanho de todas.
+func _pintar_itens(itens: Array, x: float, y: float, w: float, y_max: float) -> void:
+	var menos := 0
+	if _altura_itens(itens, w, 0) > y_max - y:
+		menos = 1
+	for it in itens:
+		var tam: int = int(it["tam"]) - menos
+		var recuo: bool = it.has("icone") or it.get("recuo", false)
+		var larg := w - (16.0 if recuo else 0.0)
+		var cor: Color = it.get("cor", Desenho.TEXTO)
+		if it.get("linha", false):
+			draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
+			y += 6.0
+		if it.has("icone"):
+			Desenho.icone(self, it["icone"], Rect2(x, y + 1, 12, 12), it.get("cor_icone", Desenho.TEXTO), Desenho.FUNDO_TELA)
+		y += _t(it["texto"], x + (16.0 if recuo else 0.0), y, tam, cor, larg, HORIZONTAL_ALIGNMENT_LEFT,
+			it.get("negrito", false)) + float(it["gap"])
+
+
+func _altura_itens(itens: Array, w: float, menos: int) -> float:
+	var total := 0.0
+	for it in itens:
+		var recuo: bool = it.has("icone") or it.get("recuo", false)
+		total += (6.0 if it.get("linha", false) else 0.0)
+		total += Desenho.altura_texto(it["texto"], int(it["tam"]) - menos, w - (16.0 if recuo else 0.0),
+			it.get("negrito", false)) + float(it["gap"])
+	return total
 
 
 # --- noite -----------------------------------------------------------------------
@@ -1005,6 +1127,9 @@ func _desenhar_relatorio() -> void:
 			xi -= 20
 		if reg["tempestade"]:
 			Desenho.icone(self, "tempestade", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
+			xi -= 20
+		if reg["poeira"]:
+			Desenho.icone(self, "poeira", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
 
 	# O que aconteceu de verdade.
 	y = 166.0
