@@ -34,6 +34,12 @@
       "y": 49,
       "w": 129,
       "h": 77
+    },
+    "comunicacao": {
+      "x": 319,
+      "y": 138,
+      "w": 88,
+      "h": 65
     }
   },
   "botoes": {
@@ -43,41 +49,17 @@
       "w": 90,
       "h": 90
     },
-    "terra": {
-      "x": 293,
-      "y": 167,
-      "w": 65,
-      "h": 82
-    },
-    "camera_painel": {
-      "x": 962,
+    "estufa": {
+      "x": 1116,
       "y": 121,
-      "w": 85,
-      "h": 62
+      "w": 102,
+      "h": 125
     },
-    "camera_rocha": {
-      "x": 1047,
-      "y": 121,
-      "w": 85,
-      "h": 62
-    },
-    "camera_amostra": {
+    "glovebox": {
       "x": 962,
-      "y": 186,
-      "w": 85,
-      "h": 62
-    },
-    "camera_moxie": {
-      "x": 1047,
-      "y": 186,
-      "w": 85,
-      "h": 62
-    },
-    "planta": {
-      "x": 1142,
-      "y": 126,
-      "w": 77,
-      "h": 118
+      "y": 129,
+      "w": 137,
+      "h": 120
     }
   },
   "janela": {
@@ -92,23 +74,5 @@
       "poeira": "assets/exterior/vista_janela_poeira.png"
     },
     "nota": "1280x360, mesma câmera do panorama; vai atrás dele. O vidro do panorama tem alpha 0, menos no estado abrigo (persiana fechada)."
-  },
-  "monitor_portatil": {
-    "arquivo": "monitor_portatil.png",
-    "largura": 400,
-    "altura": 300,
-    "tela": {
-      "x": 40,
-      "y": 30,
-      "w": 320,
-      "h": 180
-    },
-    "abaixar": {
-      "x": 271,
-      "y": 215,
-      "w": 113,
-      "h": 74
-    },
-    "tela_proporcao": "16:9 (320x180: a câmera externa de 640x360 cabe a 50%)"
   }
 }

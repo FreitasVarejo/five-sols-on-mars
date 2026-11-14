@@ -13,7 +13,6 @@ extends Control
 
 const VELOCIDADE_BORDA := 600.0  # px/s, no limite da tela
 const VELOCIDADE_SETA := 400.0  # px/s, seta pressionada
-const LIMIAR_FECHAR_MONITOR := 24.0  # px de pan para a esquerda que fecham o monitor
 const JSON_REGIOES := "res://assets/comodo/regioes.json"
 const DadosDonki := preload("res://scripts/dados_donki.gd")
 
@@ -30,19 +29,14 @@ const VISTAS := {
 	"normal": preload("res://assets/exterior/vista_janela_normal.png"),
 	"poeira": preload("res://assets/exterior/vista_janela_poeira.png"),
 }
-const EXTERIOR := {
-	"painel": preload("res://assets/exterior/painel_normal.png"),
-	"rocha": preload("res://assets/exterior/rocha_normal.png"),
-	"amostra": preload("res://assets/exterior/amostra_normal.png"),
-	"moxie": preload("res://assets/exterior/moxie_normal.png"),
-}
-
 # Valores de teste das telas: nome, ícone, valor, máximo, cor.
 const TELAS := {
 	"energia": ["ENERGIA", "energia", 9, 12, Color("#f2b631")],
 	"oxigenio": ["OXIGÊNIO", "oxigenio", 6, 8, Color("#5fc8e8")],
 	"radiacao": ["RADIAÇÃO", "radiacao", 3, 5, Color("#7ed957")],
 }
+# Tela de comunicação com a Terra: por enquanto só apagada, na cor única das telas em branco.
+const COR_TELA_APAGADA := Color("#202e37")
 
 @onready var _sala: Control = $Sala
 @onready var _vista_janela: TextureRect = $Sala/Vista
@@ -54,14 +48,10 @@ const TELAS := {
 @onready var _seta_dir: TextureButton = $HUD/SetaDireita
 @onready var _depuracao: Label = $HUD/Depuracao
 @onready var _contornos: Control = $HUD/Contornos
-@onready var _monitor: Control = $HUD/Monitor
-@onready var _monitor_tela: TextureRect = $HUD/Monitor/Tela
-@onready var _monitor_abaixar: TextureButton = $HUD/Monitor/Abaixar
-@onready var _monitor_abaixar_realce: ColorRect = $HUD/Monitor/Abaixar/Realce
 
-var _botoes := {}  # nome -> Rect2 no panorama
+var _botoes := {}  # nome -> Rect2 no panorama (o que se clica)
+var _regioes_telas := {}  # nome -> Rect2 no panorama (telas: só para os contornos de depuração)
 var _donki := {}  # dado do DONKI embutido (dados_donki.gd), só para verificação
-var _rect_abaixar_monitor := Rect2()
 var _pan := 0.0
 var _pan_inteiro := 0
 var _cliques := 0
@@ -70,9 +60,6 @@ var _hover := ""
 var _estado := "normal"
 var _estado_antes_do_abrigo := "normal"
 var _vista := "normal"
-var _camera := ""
-var _monitor_aberto := false
-var _pan_ao_abrir := 0.0
 var _depurar := false
 var _esq_pressionada := false
 var _dir_pressionada := false
@@ -101,9 +88,6 @@ func _ready() -> void:
 	_seta_esq.button_up.connect(func() -> void: _esq_pressionada = false)
 	_seta_dir.button_down.connect(func() -> void: _dir_pressionada = true)
 	_seta_dir.button_up.connect(func() -> void: _dir_pressionada = false)
-	_monitor_abaixar.pressed.connect(_fechar_monitor)
-	_monitor_abaixar.mouse_entered.connect(func() -> void: _monitor_abaixar_realce.show())
-	_monitor_abaixar.mouse_exited.connect(func() -> void: _monitor_abaixar_realce.hide())
 
 	_pan = _alcance() / 2.0
 	_pan_inteiro = roundi(_pan)
@@ -115,12 +99,15 @@ func _ready() -> void:
 	_sonda_teste()
 
 
-## Lê regioes.json: botões, telas de barras e o bloco do monitor portátil.
+## Lê regioes.json: os botões clicáveis e as telas (barras e comunicação).
 func _carregar_regioes() -> void:
 	var dados = JSON.parse_string(FileAccess.get_file_as_string(JSON_REGIOES))
 	assert(dados is Dictionary, "regioes.json não carregou")
 	for nome: String in dados["botoes"]:
 		_botoes[nome] = _rect(dados["botoes"][nome])
+
+	for nome: String in dados["telas"]:
+		_regioes_telas[nome] = _rect(dados["telas"][nome])
 
 	for nome: String in TELAS:
 		var t: Array = TELAS[nome]
@@ -136,17 +123,13 @@ func _carregar_regioes() -> void:
 		tela.cor = t[4]
 		_telas.add_child(tela)
 
-	var mon: Dictionary = dados["monitor_portatil"]
-	var tela_mon := _rect(mon["tela"])
-	_monitor_tela.position = tela_mon.position
-	_monitor_tela.size = tela_mon.size
-	_rect_abaixar_monitor = _rect(mon["abaixar"])
-	_monitor_abaixar.position = _rect_abaixar_monitor.position
-	_monitor_abaixar.size = _rect_abaixar_monitor.size
-	_monitor_abaixar_realce.size = _rect_abaixar_monitor.size
-	_monitor.size = Vector2(mon["largura"], mon["altura"])
-	# Lateral direita da tela, encostado embaixo.
-	_monitor.position = get_viewport_rect().size - _monitor.size
+	var comunicacao := ColorRect.new()
+	var rc: Rect2 = _regioes_telas["comunicacao"]
+	comunicacao.position = rc.position
+	comunicacao.size = rc.size
+	comunicacao.color = COR_TELA_APAGADA
+	comunicacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_telas.add_child(comunicacao)
 
 
 func _rect(d: Dictionary) -> Rect2:
@@ -164,7 +147,7 @@ func _input(event: InputEvent) -> void:
 			_mouse_real = true
 
 
-## Só chega aqui o que nenhum Control (setas, monitor) consumiu.
+## Só chega aqui o que nenhum Control (as setas) consumiu.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var nome := _regiao_em(event.position)
@@ -192,16 +175,12 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	var velocidade := _velocidade_seta() if (_esq_pressionada or _dir_pressionada) else _velocidade_mouse()
-	if _monitor_aberto:
-		velocidade = minf(velocidade, 0.0)  # com o monitor aberto, só se vira para a esquerda
 	if velocidade != 0.0:
 		_pan = clampf(_pan + velocidade * delta, 0.0, _alcance())
 	var novo := roundi(_pan)
 	_sala.position.x = -novo
 	var mudou := novo != _pan_inteiro
 	_pan_inteiro = novo
-	if _monitor_aberto and _pan < _pan_ao_abrir - LIMIAR_FECHAR_MONITOR:
-		_fechar_monitor()
 
 	var hover := _regiao_em(_mouse_pos) if (_mouse_real and _mouse_dentro) else ""
 	if hover != _hover:
@@ -225,11 +204,8 @@ func _velocidade_seta() -> float:
 
 
 ## Zonas de borda de 1/3 da tela; a velocidade cresce da fronteira (0) até a borda.
-## Com o monitor aberto, o mouse sobre ele não faz pan.
 func _velocidade_mouse() -> float:
 	if not (_mouse_real and _mouse_dentro):
-		return 0.0
-	if _monitor_aberto and _monitor.get_global_rect().has_point(_mouse_pos):
 		return 0.0
 	var largura := get_viewport_rect().size.x
 	var zona := largura / 3.0
@@ -267,10 +243,8 @@ func _panorama_para_tela(q: Vector2) -> Vector2:
 	return Vector2(x, meio + (q.y - meio) / _fator(x))
 
 
-## Nome do botão sob o ponto p da tela ("" se nenhum). O monitor e as setas tapam.
+## Nome do botão sob o ponto p da tela ("" se nenhum). As setas tapam.
 func _regiao_em(p: Vector2) -> String:
-	if _monitor_aberto and _monitor.get_global_rect().has_point(p):
-		return ""
 	for seta in [_seta_esq, _seta_dir]:
 		if seta.is_visible_in_tree() and seta.get_global_rect().has_point(p):
 			return ""
@@ -292,15 +266,14 @@ func _desenhar_realce() -> void:
 	_realce.draw_rect(r, Color(1, 1, 1, 0.6), false, 1.0)
 
 
-## No HUD, depois do shader: o contorno do que é clicável, pela fórmula direta.
+## No HUD, depois do shader: o contorno do que é clicável (magenta) e o das telas (ciano), pela
+## fórmula direta.
 func _desenhar_contornos() -> void:
 	for nome: String in _botoes:
 		var cor := Color(1, 0.2, 1) if nome != _hover else Color(1, 1, 0)
 		_contornos.draw_polyline(_contorno_na_tela(_botoes[nome]), cor, 1.0)
-	if _monitor_aberto:
-		var r := Rect2(_monitor.position + _rect_abaixar_monitor.position, _rect_abaixar_monitor.size)
-		_contornos.draw_rect(r, Color(0, 1, 1), false, 1.0)
-		_contornos.draw_rect(Rect2(_monitor.position + _monitor_tela.position, _monitor_tela.size), Color(0, 1, 1), false, 1.0)
+	for nome: String in _regioes_telas:
+		_contornos.draw_polyline(_contorno_na_tela(_regioes_telas[nome]), Color(0, 1, 1), 1.0)
 
 
 func _contorno_na_tela(r: Rect2) -> PackedVector2Array:
@@ -333,11 +306,8 @@ func _ao_clicar(nome: String) -> void:
 			else:
 				_estado_antes_do_abrigo = _estado
 				_definir_estado("abrigo")
-		"terra", "planta":
-			print("clique: ", nome)
-		_:
-			if nome.begins_with("camera_"):
-				_abrir_monitor(nome.trim_prefix("camera_"))
+		"estufa", "glovebox":
+			print("clique: ", nome)  # o jogo vem na próxima fatia: por ora só registra
 	_sonda_teste()
 
 
@@ -350,24 +320,6 @@ func _definir_estado(estado: String) -> void:
 func _definir_vista(vista: String) -> void:
 	_vista = vista
 	_vista_janela.texture = VISTAS[vista]
-	_sonda_teste()
-
-
-func _abrir_monitor(camera: String) -> void:
-	_camera = camera
-	_monitor_tela.texture = EXTERIOR[camera]
-	_monitor_aberto = true
-	_monitor.show()
-	_seta_dir.hide()
-	_dir_pressionada = false
-	_pan_ao_abrir = _pan
-	_monitor_abaixar_realce.hide()
-
-
-func _fechar_monitor() -> void:
-	_monitor_aberto = false
-	_monitor.hide()
-	_seta_dir.show()
 	_sonda_teste()
 
 
@@ -419,7 +371,7 @@ func _sonda_teste() -> void:
 	var estado := {
 		"cliques": _cliques, "ultimo_clique": _ultimo_clique, "pan": _pan_inteiro,
 		"modo": _nome_do_modo(), "shader_em": [res.x, res.y], "zoom": _zoom(),
-		"estado": _estado, "vista": _vista, "monitor": _monitor_aberto, "camera": _camera,
+		"estado": _estado, "vista": _vista,
 		"hover": _hover, "depurar": _depurar,
 		"donki": {
 			"historico": _donki["historico"], "chegadas": _donki["chegadas_marte"].size(),

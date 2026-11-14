@@ -2,7 +2,7 @@
 
 Uso (da raiz do repo):
     blender -b --factory-startup -P $PWD/arte/blender/comodo.py
-    blender -b --factory-startup -P $PWD/arte/blender/comodo.py -- --estados normal --sem-monitor
+    blender -b --factory-startup -P $PWD/arte/blender/comodo.py -- --estados normal
 (o `blender` do PATH é o Flatpak: passe o script por caminho absoluto.)
 
 Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
@@ -14,8 +14,9 @@ A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG 
 vem do exterior.py, que usa a mesma câmera (OLHO, PANORAMA) deste script.
 
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
-calculados pela projeção real da câmera sobre os vértices) e o monitor portátil
-assets/comodo/monitor_portatil.png (render separado, com a área da tela em alpha 0).
+calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa e glovebox.
+Telas: energia, oxigenio, radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o
+Godot). O terminal não é render: é camada de tela no Godot.
 Uma imagem de depuração com os retângulos fica em arte/blender/.render/regioes_debug.png.
 
 Paleta: Apollo, de AdamCYounis (https://lospec.com/palette-list/apollo).
@@ -25,7 +26,6 @@ import argparse
 import json
 import math
 import sys
-import types
 from pathlib import Path
 
 import bmesh
@@ -68,7 +68,6 @@ def args():
     p.add_argument("--saida", default="assets/comodo")
     p.add_argument("--sufixo", default="")
     p.add_argument("--amostras", type=int, default=64)
-    p.add_argument("--sem-monitor", action="store_true", help="não renderiza o monitor portátil")
     return p.parse_args(argv)
 
 
@@ -274,7 +273,8 @@ JANELA_OBJS = ("janela_moldura_topo", "janela_moldura_base", "janela_moldura_esq
                "janela_moldura_dir", "janela_moldura_montante", "janela")
 
 COR_TELA_APAGADA = "202e37"          # cor única das telas em branco (Apollo)
-TELAS_APAGADAS = ("energia_tela", "oxigenio_tela", "radiacao_tela")
+TELAS_APAGADAS = ("energia_tela", "oxigenio_tela", "radiacao_tela", "comunicacao_tela")
+AZUL_TERRA = "73bed3"                # azul é só do que vem da Terra (moldura da tela de comunicação)
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
 
 
@@ -286,79 +286,15 @@ def botao(nome, cor):
     return mb
 
 
-def icone_camera(r, nome, a_, z_, escuro, tampa, ix):
-    """Pictograma em relevo sobre a tampa do botão de câmera (a_, z_: centro da tampa).
-
-    Peças escuras em relevo; onde precisa de "furo" claro, a peça usa o material da própria
-    tampa (mesma cor e mesma emissão), então a cor do botão continua a mesma em todos os
-    estados. Todas as peças de um ícone dividem o índice de objeto: sem contorno entre elas.
-    """
-    n = [0]
-
-    def caixa_(da, dz, larg, alt, nivel=0, m=None):
-        n[0] += 1
-        return r.caixa(f"icone_{nome}_{n[0]}", a_ + da, 0.27 + 0.012 * nivel, z_ + dz, larg, 0.03,
-                       alt, m or escuro, ix)
-
-    def disco(da, dz, raio, nivel=0, m=None, segs=24):
-        n[0] += 1
-        return r.cil(f"icone_{nome}_{n[0]}", a_ + da, 0.27 + 0.012 * nivel, z_ + dz, raio, 0.03,
-                     m or escuro, ix, segs=segs)
-
-    def vertical(da, d, dz, raio, comp, m=None):          # cilindro em pé (eixo z)
-        n[0] += 1
-        return cilindro(f"icone_{nome}_{n[0]}", r.pos(a_ + da, d, z_ + dz), raio, comp, m or escuro,
-                        ix, segs=20)
-
-    def esfera(da, d, dz, raio, m=None):
-        n[0] += 1
-        me = bpy.data.meshes.new(f"icone_{nome}_{n[0]}")
-        bm = bmesh.new()
-        bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=10, radius=raio)
-        bm.to_mesh(me)
-        bm.free()
-        ob = _objeto(f"icone_{nome}_{n[0]}", me, m or escuro, ix)
-        ob.location = r.pos(a_ + da, d, z_ + dz)
-        return ob
-
-    if nome == "painel":                                  # painel solar: grade 3x2 e pé
-        for lin in (0, 1):
-            for col in (-1, 0, 1):
-                caixa_(col * 0.099, 0.025 + (0.5 - lin) * 0.079, 0.085, 0.065)
-        for sinal in (-1, 1):
-            caixa_(sinal * 0.09, -0.077, 0.028, 0.065)
-    elif nome == "rocha":                                 # rocha com ponto de mira
-        disco(-0.035, -0.005, 0.115, segs=7)
-        disco(0.105, -0.055, 0.065, segs=5)
-        disco(-0.035, -0.005, 0.062, 1, tampa, segs=20)
-        disco(-0.035, -0.005, 0.046, 2, segs=20)
-        disco(-0.035, -0.005, 0.02, 3, tampa, segs=12)
-        for sinal in (-1, 1):
-            caixa_(-0.035 + sinal * 0.078, -0.005, 0.035, 0.016, 1, tampa)
-            caixa_(-0.035, -0.005 + sinal * 0.078, 0.016, 0.035, 1, tampa)
-    elif nome == "amostra":                               # tubo de ensaio com um pouco de líquido
-        vertical(0, 0.255, 0.0275, 0.052, 0.135)
-        esfera(0, 0.255, -0.04, 0.052)
-        caixa_(0, 0.093, 0.13, 0.022, 2)
-        vertical(0, 0.29, 0.0375, 0.032, 0.115, tampa)
-        esfera(0, 0.29, -0.0225, 0.032, tampa)
-        vertical(0, 0.30, -0.035, 0.032, 0.04)
-        esfera(0, 0.30, -0.055, 0.032)
-    elif nome == "moxie":                                 # molécula de O2: dois átomos colados
-        for sinal in (-1, 1):
-            disco(sinal * 0.065, 0, 0.088)
-            disco(sinal * 0.065 - 0.035, 0.035, 0.024, 1, tampa, segs=12)
-
-
 def construir():
     """Gray-box do módulo de comando. Unidades em metros; o olho fica em OLHO.
 
     Esquerda (x<320 no panorama): porta, suporte de vida com a tela de radiação e a alavanca
-    do abrigo; na parede da frente, o botão da Terra.
+    do abrigo; na parede da frente, a tela de comunicação com a Terra (apagada, moldura azul).
     Centro (320-960): a janela larga para Marte e, abaixo dela, a rampa com as telas de energia
-    e oxigênio e a bancada. Direita (>960): o console das câmeras e a estufa da planta.
+    e oxigênio e a bancada. Direita (>960): a parede da ciência de dentro, com a glovebox e a
+    estufa lado a lado, em destaque.
     Todo botão clicável fica entre x 60 e 1220 (ZONA_LIVRE_X), fora das setas de pan do jogo.
-    Os quatro botões de câmera levam um pictograma em relevo (icone_camera).
     """
     W = 2.6       # meia largura (paredes laterais em x = ±W)
     F = 2.2       # parede da frente em y = F
@@ -379,8 +315,8 @@ def construir():
     janela = tela_horizonte("janela", "de9e41", "be772b", 0.35)
     ecra = tela_apagada("ecra_apagado", COR_TELA_APAGADA)
     amarelo = material("amarelo_aviso", hexrgb("e8c170"))
+    caixa_c = material("caixa_ciencia", hexrgb("c7cfcc"))
     blindagem = material("blindagem", hexrgb("577277"))
-    estufa = material("estufa", hexrgb("a8b5b2"))
     vidro_estufa = tela_apagada("vidro_estufa", "25562e")
     solo = material("solo", hexrgb("7a4841"))
     folha = material("folha", hexrgb("75a743"))
@@ -479,43 +415,59 @@ def construir():
     s.cil("abrigo_anel", 0, 0.2, 1.10, 0.215, 0.05, moldura, next(i))
     s.cil("abrigo_botao", 0, 0.25, 1.10, 0.17, 0.12, MATS["botao_abrigo"], next(i))
 
-    # parede da frente, à esquerda: o botão da Terra (a janela agora é a do centro)
-    tx, tz = -2.05, 1.0
-    botao("botao_terra", "73bed3")
-    caixa("terra_placa", (tx, F - 0.04, tz), (0.62, 0.08, 0.62), console, next(i))
-    cilindro("terra_aro", (tx, F - 0.105, tz), 0.29, 0.05, amarelo, next(i), rot=(90, 0, 0))
-    cilindro("terra_anel", (tx, F - 0.13, tz), 0.25, 0.05, moldura, next(i), rot=(90, 0, 0))
-    cilindro("terra_botao", (tx, F - 0.18, tz), 0.19, 0.1, MATS["botao_terra"], next(i), rot=(90, 0, 0))
+    # parede da frente, à esquerda: a tela de comunicação com a Terra, num pilar voltado para o
+    # olho (como o suporte de vida) e encostado na parede da frente. O miolo fica apagado, na cor
+    # única das outras telas: quem a acende é o Godot. Azul é a cor do que vem da Terra, então só
+    # a moldura leva azul (a mesma emissão em todos os estados, como a dos botões).
+    botao("moldura_terra", AZUL_TERRA)
+    t = Painel(-1.47, 1.82)
+    t.caixa("comunicacao_base", 0, 0, 0.06, 0.74, 0.34, 0.12, moldura, next(i))
+    t.caixa("comunicacao_corpo", 0, 0, 0.90, 0.60, 0.30, 1.68, console, next(i))
+    t.caixa("comunicacao_moldura", 0, 0.17, 1.25, 0.52, 0.04, 0.40, MATS["moldura_terra"], next(i))
+    t.caixa("comunicacao_tela", 0, 0.195, 1.25, 0.46, 0.01, 0.34, ecra, next(i))
+    # antena de prato em cima do pilar (só enfeite; o ícone da Terra vem na tela, pelo Godot)
+    t.cil("comunicacao_mastro", 0, 0.0, 1.80, 0.025, 0.16, blindagem, next(i))
+    t.cil("comunicacao_prato", 0, 0.05, 1.92, 0.11, 0.04, nervura, next(i))
 
-    # ---- direita: console das 4 câmeras (voltado para o olho) e a estufa da planta.
-    # Tudo clicável fica entre x 60 e 1220 do panorama (as setas de pan cobrem as pontas), então
-    # o console encosta no centro e a estufa, também voltada para o olho, fica logo depois dele.
-    r = Painel(2.014, 1.296)
-    r.caixa("cameras_base", 0, 0, 0.06, 1.02, 0.42, 0.12, moldura, next(i))
-    r.caixa("cameras_corpo", 0, 0, 0.93, 0.95, 0.30, 1.62, console, next(i))
-    r.caixa("cameras_lampadas", 0, 0.17, 1.66, 0.8, 0.04, 0.1, moldura, next(i))
-    cores = {"painel": "75a743", "rocha": "4f8fba", "amostra": "c65197", "moxie": "be772b"}
-    icone = material("icone_camera", hexrgb("10141f"), 0.9)
-    for k, (nome, cor) in enumerate(cores.items()):
-        a_ = -0.235 if k % 2 == 0 else 0.235
-        z_ = 1.35 if k < 2 else 1.0
-        botao(f"botao_camera_{nome}", cor)
-        r.caixa(f"camera_{nome}_aro", a_, 0.17, z_, 0.46, 0.04, 0.33, moldura, next(i))
-        r.caixa(f"camera_{nome}_botao", a_, 0.22, z_, 0.40, 0.07, 0.27, MATS[f"botao_camera_{nome}"], next(i))
-        icone_camera(r, nome, a_, z_, icone, MATS[f"botao_camera_{nome}"], next(i))
+    # ---- direita: a parede da ciência de dentro, com a estufa (cultivar planta) e a glovebox
+    # (selar a amostra), lado a lado e voltadas para o olho. São os dois objetos maiores e mais
+    # claros da parede: moldura clara e uma faixa de luz própria cada. Verde só no que se clica
+    # (o vidro e a planta). Tudo clicável fica entre x 60 e 1220 do panorama (as setas de pan
+    # cobrem as pontas) e na faixa y 120..250.
+    vidro_gb = tela_apagada("vidro_glovebox", "468232")
+    luva = material("luva", hexrgb("819796"))
+    tubo = material("tubo", hexrgb("ebede9"))
+    tampa = material("tampa_tubo", hexrgb("c65197"))
 
-    # estufa da planta: encostada na parede direita, depois do console
-    e = Painel(2.329, 0.580)
-    e.caixa("estufa_corpo", 0, 0, 0.85, 0.44, 0.40, 1.7, estufa, next(i))
-    pz = 1.175                                   # vidro todo dentro da faixa de clique
-    e.caixa("planta_moldura", 0, 0.22, pz, 0.40, 0.04, 0.62, moldura, next(i))
-    e.caixa("planta_vidro", 0, 0.24, pz, 0.32, 0.01, 0.54, vidro_estufa, next(i))
-    e.caixa("planta_luz", 0, 0.25, pz + 0.23, 0.30, 0.02, 0.05, luz_cultivo, next(i))
-    e.caixa("planta_solo", 0, 0.26, pz - 0.22, 0.30, 0.04, 0.08, solo, next(i))
-    e.caixa("planta_caule", 0, 0.26, pz - 0.06, 0.04, 0.03, 0.28, folha, next(i))
-    for k, (da, dz, giro) in enumerate(((-0.075, pz + 0.04, 25), (0.075, pz - 0.02, -25), (0.0, pz + 0.12, 0))):
-        f_ = caixa(f"planta_folha{k}", e.pos(da, 0.26, dz), (0.12, 0.03, 0.06), folha, next(i),
-                   rot=(0, giro, e.yaw))
+    g = Painel(2.087, 1.466)
+    g.caixa("glovebox_base", 0, 0, 0.40, 0.70, 0.40, 0.80, console, next(i))
+    g.caixa("glovebox_moldura", 0, 0.05, 1.15, 0.78, 0.34, 0.68, caixa_c, next(i))
+    g.caixa("glovebox_vidro", 0, 0.225, 1.17, 0.68, 0.01, 0.52, vidro_gb, next(i))
+    for k, da in enumerate((-0.18, 0.18)):                  # as duas luvas: aro, borracha, boca
+        g.cil(f"glovebox_aro{k}", da, 0.24, 0.99, 0.115, 0.03, moldura, next(i))
+        g.cil(f"glovebox_luva{k}", da, 0.26, 0.99, 0.085, 0.03, luva, next(i))
+        g.cil(f"glovebox_boca{k}", da, 0.28, 0.99, 0.050, 0.03, painel, next(i))
+    # o tubo de amostra, deitado num suporte dentro da câmara: vidro, faixa rosa e tampa escura
+    g.caixa("glovebox_suporte", 0, 0.24, 1.17, 0.40, 0.02, 0.03, moldura, next(i))
+    ix_tubo = next(i)
+    for nome, da, raio, comp, mat in (("glovebox_tubo", 0.0, 0.040, 0.34, tubo),
+                                      ("glovebox_liquido", -0.07, 0.044, 0.13, tampa),
+                                      ("glovebox_tampa", 0.19, 0.046, 0.05, painel)):
+        cilindro(nome, g.pos(da, 0.265, 1.245), raio, comp, mat, ix_tubo, rot=(0, 90, g.yaw),
+                 segs=16)
+
+    e = Painel(2.315, 0.66)
+    e.caixa("estufa_corpo", 0, 0, 0.88, 0.66, 0.40, 1.76, caixa_c, next(i))
+    pz = 1.18
+    e.caixa("estufa_moldura", 0, 0.22, pz, 0.54, 0.04, 0.66, moldura, next(i))
+    e.caixa("estufa_vidro", 0, 0.24, pz, 0.46, 0.01, 0.58, vidro_estufa, next(i))
+    e.caixa("estufa_luz", 0, 0.25, pz + 0.255, 0.40, 0.02, 0.05, luz_cultivo, next(i))
+    e.caixa("estufa_solo", 0, 0.26, pz - 0.23, 0.40, 0.04, 0.09, solo, next(i))
+    e.caixa("estufa_caule", 0, 0.26, pz - 0.04, 0.045, 0.03, 0.34, folha, next(i))
+    for k, (da, dz, giro) in enumerate(((-0.10, pz + 0.05, 25), (0.10, pz - 0.03, -25),
+                                         (0.0, pz + 0.15, 0))):
+        caixa(f"estufa_folha{k}", e.pos(da, 0.26, dz), (0.15, 0.03, 0.075), folha, next(i),
+              rot=(0, giro, e.yaw))
 
     # alarmes nos cantos de cima da frente
     for x in (-2.3, 2.3):
@@ -598,7 +550,7 @@ def aplicar_estado(estado, luzes):
     for n, m in MATS.items():
         if n.startswith("tela_"):
             emissao(m, None, E["telas"])
-        elif n.startswith("botao_"):
+        elif n in COR_BOTAO:
             emissao(m, COR_BOTAO[n], E["botoes"])
     emissao(MATS["janela"], None, E["janela"])
     for ob in PERSIANA:                  # única diferença de geometria entre estados
@@ -720,8 +672,8 @@ PALETA_LAB = srgb_para_oklab(PALETA_SRGB / 255.0)
 # Verde é sinal (abrigo, painel ok): a rampa verde da Apollo só vale nos objetos verdes
 # e no estado abrigo, para a mistura de luz âmbar com parede cinza não virar verde.
 VERDES = np.array([6, 7, 8, 9, 10, 11])
-OBJETOS_VERDES = ("botao_camera_painel", "camera_painel_botao", "porta_lampada", "planta_caule",
-                  "planta_folha0", "planta_folha1", "planta_folha2", "vidro_estufa")
+OBJETOS_VERDES = ("porta_lampada", "estufa_vidro", "estufa_caule", "estufa_folha0",
+                  "estufa_folha1", "estufa_folha2", "glovebox_vidro")
 
 
 def quantizar(lin, verde_ok=True):
@@ -808,19 +760,16 @@ REGIOES = {
     "energia": ["energia_tela"],
     "oxigenio": ["oxigenio_tela"],
     "radiacao": ["radiacao_tela"],
+    "comunicacao": ["comunicacao_tela"],
     "abrigo": ["abrigo_aro", "abrigo_anel", "abrigo_botao"],
-    "terra": ["terra_aro", "terra_anel", "terra_botao"],
-    "camera_painel": ["camera_painel_aro", "camera_painel_botao"],
-    "camera_rocha": ["camera_rocha_aro", "camera_rocha_botao"],
-    "camera_amostra": ["camera_amostra_aro", "camera_amostra_botao"],
-    "camera_moxie": ["camera_moxie_aro", "camera_moxie_botao"],
-    "planta": ["planta_moldura", "planta_vidro"],
+    "estufa": ["estufa_moldura", "estufa_vidro"],
+    "glovebox": ["glovebox_moldura", "glovebox_vidro", "glovebox_aro0", "glovebox_aro1"],
     "janela": list(JANELA_OBJS),
 }
-TELAS = ("energia", "oxigenio", "radiacao")
-BOTOES = ("abrigo", "terra", "camera_painel", "camera_rocha", "camera_amostra", "camera_moxie",
-          "planta")
+TELAS = ("energia", "oxigenio", "radiacao", "comunicacao")
+BOTOES = ("abrigo", "estufa", "glovebox")
 FAIXA_CLIQUE = (120, 250)
+LARG_CIENCIA = 70              # estufa e glovebox: largura-alvo no panorama, em px
 ZONA_LIVRE_X = (60, 1220)      # fora das setas de pan (~50 px em cada ponta da tela)
 
 
@@ -901,11 +850,19 @@ def validar_regioes(reg):
         r = reg[n]
         checa(r["x"] >= 320 and r["x"] + r["w"] <= 960,
               f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de 320..960")
-    for n in ("camera_painel", "camera_rocha", "camera_amostra", "camera_moxie", "planta"):
+    for n in ("estufa", "glovebox"):
         r = reg[n]
-        checa(r["x"] >= 960, f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de x>960")
-    r = reg["terra"]
-    checa(r["x"] + r["w"] <= 420, f"terra: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
+        checa(r["x"] >= 960, f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de x>=960")
+        # destaque da parede da ciência: bem maiores que o mínimo de 24 px, para a criança
+        checa(r["w"] >= LARG_CIENCIA, f"{n}: largura {r['w']} px (alvo >= {LARG_CIENCIA})")
+    e, g = reg["estufa"], reg["glovebox"]
+    checa(g["x"] + g["w"] <= e["x"] or e["x"] + e["w"] <= g["x"],
+          f"glovebox x {g['x']}..{g['x'] + g['w']} e estufa x {e['x']}..{e['x'] + e['w']} "
+          f"não se sobrepõem")
+    r = reg["comunicacao"]
+    checa(r["x"] + r["w"] <= 420, f"comunicacao: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
+    checa(r["w"] >= 70 and r["h"] >= 50,
+          f"comunicacao: tamanho {r['w']}x{r['h']} px (alvo >= 70x50, cabe ícone e número)")
     r = reg["janela"]
     checa(r["x"] >= 320 and r["x"] + r["w"] <= 960,
           f"janela: x {r['x']}..{r['x'] + r['w']} no centro, dentro de 320..960")
@@ -927,10 +884,11 @@ def conferir_projecao(reg, passes, estado):
         vis = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
         proj = (r["x"], r["y"], r["x"] + r["w"], r["y"] + r["h"])
         folga = max(abs(p - v) for p, v in zip(proj, vis))
-        print(f"[comodo]   {nome}: {proj} | {vis}  (maior diferença {folga} px)")
+        vis = tuple(int(v) for v in vis)
+        print(f"[comodo]   {nome}: {proj} | {vis}  (maior diferença {int(folga)} px)")
 
 
-def desenhar_regioes(rgb, reg, monitor=None):
+def desenhar_regioes(rgb, reg):
     """Imagem de depuração em 2x: retângulos, faixa de clique (y 120..250) e as divisas x=320/960."""
     img = np.repeat(np.repeat(rgb, 2, 0), 2, 1).copy()
     cores = {"tela": (255, 255, 0), "botao": (255, 0, 255), "janela": (0, 255, 255)}
@@ -946,160 +904,6 @@ def desenhar_regioes(rgb, reg, monitor=None):
     return img
 
 
-# ---------------------------------------------------------------- monitor portátil
-
-MON_PX = 0.01                  # 1 px do PNG = 1 cm; o PNG tem 400x300
-MON_W, MON_H = 400, 300
-MON_TELA = (-160, 160, -60, 120)      # x0, x1, z0, z1 em px: 320x180, uma imagem 16:9
-
-
-def _prisma_triangulo(nome, pontos_xz, y_frente, prof, mat, indice):
-    """Prisma triangular (setinha): triângulo no plano xz, extrudado em y."""
-    me = bpy.data.meshes.new(nome)
-    vs = []
-    for y in (y_frente, y_frente + prof):
-        vs += [(x * MON_PX, y, z * MON_PX) for x, z in pontos_xz]
-    fs = [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3), (1, 2, 5, 4), (2, 0, 3, 5)]
-    me.from_pydata(vs, [], fs)
-    me.update()
-    return _objeto(nome, me, mat, indice)
-
-
-def _caixa_bisel(nome, centro, tamanho, mat, indice, bisel):
-    me = bpy.data.meshes.new(nome)
-    bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.0)
-    bmesh.ops.scale(bm, vec=tamanho, verts=bm.verts)
-    if bisel > 0:
-        bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bisel, segments=1, profile=0.5,
-                        affect="EDGES")
-    bm.to_mesh(me)
-    bm.free()
-    ob = _objeto(nome, me, mat, indice)
-    ob.location = centro
-    return ob
-
-
-def construir_monitor():
-    """Monitor portátil de frente, em ortográfica. Medidas em px do PNG (x para a direita,
-    z para cima, origem no centro); a câmera olha para +y e a frente fica em y negativo.
-    """
-    MATS.clear()
-    INDICE.clear()
-    COR_BOTAO.clear()
-    carcaca = material("m_carcaca", hexrgb("a8b5b2"))
-    painel_b = material("m_painel", hexrgb("819796"))
-    aro = material("m_aro", hexrgb("394a50"))
-    escuro = material("m_escuro", hexrgb("151d28"))
-    amarelo = material("m_aviso", hexrgb("e8c170"))
-    parafuso = material("m_parafuso", hexrgb("577277"))
-    borracha = material("m_borracha", hexrgb("be772b"))
-    branco = material("m_branco", hexrgb("ebede9"))
-    verde = material("m_lampada_verde", hexrgb("75a743"))
-    ambar = material("m_lampada_ambar", hexrgb("de9e41"))
-    emissao(verde, hexrgb("75a743"), 2.0)
-    emissao(ambar, hexrgb("de9e41"), 2.0)
-    cap = material("m_botao_abaixar", tuple(c * 0.35 for c in hexrgb("cf573c")), 0.9)
-    cap.node_tree.nodes["Principled BSDF"].inputs["Specular IOR Level"].default_value = 0.0
-    emissao(cap, hexrgb("cf573c"), 0.6)
-
-    i = iter(range(1, 200))
-    T = MON_PX
-
-    def barra(nome, x0, x1, z0, z1, yf, prof, mat, bisel=0.0):
-        return _caixa_bisel(nome, ((x0 + x1) / 2 * T, yf + prof / 2, (z0 + z1) / 2 * T),
-                            ((x1 - x0) * T, prof, (z1 - z0) * T), mat, next(i), bisel)
-
-    tx0, tx1, tz0, tz1 = MON_TELA
-    # carcaça: quatro peças em volta do vazio da tela (não há nada atrás dele: alpha 0)
-    barra("m_topo", -195, 195, tz1, 145, -0.10, 0.20, carcaca, 0.03)
-    barra("m_base", -195, 195, -145, tz0, -0.10, 0.20, painel_b, 0.03)
-    barra("m_esq", -195, tx0, tz0, tz1, -0.10, 0.20, carcaca, 0.03)
-    barra("m_dir", tx1, 195, tz0, tz1, -0.10, 0.20, carcaca, 0.03)
-    # aro da tela, fora do vazio
-    barra("m_aro_topo", tx0 - 8, tx1 + 8, tz1, tz1 + 8, -0.14, 0.05, aro)
-    barra("m_aro_base", tx0 - 8, tx1 + 8, tz0 - 8, tz0, -0.14, 0.05, aro)
-    barra("m_aro_esq", tx0 - 8, tx0, tz0, tz1, -0.14, 0.05, aro)
-    barra("m_aro_dir", tx1, tx1 + 8, tz0, tz1, -0.14, 0.05, aro)
-    # pára-choques de borracha nos quatro cantos
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            xa, xb = (165, 195) if sx > 0 else (-195, -165)
-            za, zb = (115, 145) if sz > 0 else (-145, -115)
-            barra(f"m_canto_{sx}_{sz}", xa, xb, za, zb, -0.14, 0.05, borracha, 0.04)
-    # parafusos
-    for x, z in ((-181, 132), (181, 132), (-181, -132), (181, -132), (-120, 132), (120, 132)):
-        cilindro(f"m_parafuso_{x}_{z}", (x * T, -0.115, z * T), 0.05, 0.03, parafuso, next(i),
-                 rot=(90, 0, 0), segs=6)
-    # lâmpadas de estado, à esquerda da faixa de baixo
-    for k, m_ in enumerate((verde, ambar, verde)):
-        cilindro(f"m_lampada_{k}", ((-165 + k * 30) * T, -0.12, -80 * T), 0.10, 0.04, m_,
-                 next(i), rot=(90, 0, 0), segs=12)
-    barra("m_placa_lampadas", -182, -78, -100, -62, -0.105, 0.015, escuro)
-    # grade de ventilação
-    barra("m_vent_fundo", -60, 40, -134, -70, -0.105, 0.015, escuro)
-    for k in range(5):
-        z = -125 + k * 12
-        barra(f"m_vent_{k}", -54, 34, z, z + 5, -0.125, 0.03, parafuso)
-    # botão "abaixar": aro de aviso, anel escuro, tampa vermelha e seta para baixo
-    barra("abaixar_aro", 72, 184, -139, -66, -0.13, 0.04, amarelo, 0.02)
-    barra("abaixar_anel", 78, 178, -133, -72, -0.15, 0.04, escuro, 0.01)
-    barra("abaixar_botao", 84, 172, -127, -78, -0.18, 0.06, cap, 0.025)
-    _prisma_triangulo("abaixar_seta", [(106, -92), (150, -92), (128, -116)], -0.20, 0.03,
-                      branco, next(i))
-
-
-def monitor(a, saida):
-    """Renderiza o monitor portátil e devolve (retângulos, rgba)."""
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    construir_monitor()
-    s = bpy.context.scene
-    configurar(types.SimpleNamespace(amostras=a.amostras, largura=MON_W, altura=MON_H,
-                                     camera="perspectiva", yaw=0.0, graus=180.0, rad_por_px=None))
-    s.render.film_transparent = True
-    cam = s.camera
-    cam.location = (0.0, -6.0, 0.0)
-    cam.rotation_euler = (math.radians(90), 0, 0)
-    cam.data.type = "ORTHO"
-    cam.data.sensor_fit = "HORIZONTAL"
-    cam.data.ortho_scale = MON_W * MON_PX          # largura inteira do PNG
-    cam.data.clip_start = 0.1
-    cam.data.clip_end = 20.0
-    # luz: ambiente suave e uma luz de área do alto à esquerda, na frente
-    w = s.world.node_tree.nodes["Background"]
-    w.inputs["Color"].default_value = (1, 1, 1, 1)
-    w.inputs["Strength"].default_value = 0.45
-    ld = bpy.data.lights.new("luz_monitor", "AREA")
-    ld.shape = "RECTANGLE"
-    ld.size, ld.size_y = 6.0, 4.0
-    ld.energy = 260
-    ld.color = hexrgb("ebede9")
-    lo = bpy.data.objects.new("luz_monitor", ld)
-    lo.location = (-2.5, -4.0, 3.0)
-    lo.rotation_euler = (math.radians(65), 0, math.radians(-30))
-    s.collection.objects.link(lo)
-
-    exr = CACHE / "monitor_portatil.exr"
-    s.render.filepath = str(exr)
-    bpy.ops.render.render(write_still=True)
-    p = ler_exr(exr)
-    alfa = p["alfa"] if p["alfa"] is not None else np.ones_like(p["z"])
-    opaco = alfa > 0.5
-    p["z"] = np.where(opaco, p["z"], 1e4)
-    borda = contorno(p) & opaco
-    verde_ok = np.isin(p["indice"], [INDICE[n] for n in INDICE if "lampada" in n and "ambar" not in n])
-    cor = np.where(opaco[..., None], p["cor"] / np.maximum(alfa[..., None], 1e-3), 0.0)
-    q = quantizar(cor, verde_ok)
-    escura = quantizar(PALETA_LAB_LIN[q] * 0.25, verde_ok)
-    q = np.where(borda, escura, q)
-    rgba = np.zeros((MON_H, MON_W, 4), np.uint8)
-    rgba[..., :3] = PALETA_SRGB[q]
-    rgba[..., 3] = np.where(opaco, 255, 0)
-    rgba[~opaco, :3] = 0
-    bpy.context.view_layer.update()
-    return rgba, p
-
-
 def salvar_png_rgba(caminho, rgba):
     caminho.parent.mkdir(parents=True, exist_ok=True)
     h, w, _ = rgba.shape
@@ -1107,20 +911,6 @@ def salvar_png_rgba(caminho, rgba):
     out.open(str(caminho), oiio.ImageSpec(w, h, 4, "uint8"))
     out.write_image(np.ascontiguousarray(rgba))
     out.close()
-
-
-def regioes_monitor(rgba, p):
-    """Retângulos do monitor, lidos da projeção ortográfica e conferidos com o alfa e o índice."""
-    def proj(objs):
-        pts = np.concatenate([pontos_do_objeto(o) for o in objs])
-        x = MON_W / 2 + pts[:, 0] / (MON_W * MON_PX) * MON_W
-        y = MON_H / 2 - pts[:, 2] / (MON_W * MON_PX) * MON_W
-        return retangulo((x, y), MON_W, MON_H)
-
-    tx0, tx1, tz0, tz1 = MON_TELA
-    tela = {"x": MON_W // 2 + tx0, "y": MON_H // 2 - tz1, "w": tx1 - tx0, "h": tz1 - tz0}
-    abaixar = proj(["abaixar_aro", "abaixar_anel", "abaixar_botao"])
-    return tela, abaixar
 
 
 def main():
@@ -1194,7 +984,7 @@ def main():
     print(f"[comodo] depuração: {CACHE / 'regioes_debug.png'}")
 
     # tamanho em px dos botões na escala 1x (a região inclui o aro)
-    for nome in BOTOES:
+    for nome in BOTOES + ("comunicacao",):
         print(f"[comodo] {nome}: {reg[nome]['w']}x{reg[nome]['h']} px")
     print(f"[comodo] rad_por_px={rad_px:.6f} câmera={a.camera} yaw={a.yaw}")
 
@@ -1213,32 +1003,6 @@ def main():
             "nota": "1280x360, mesma câmera do panorama; vai atrás dele. O vidro do panorama "
                     "tem alpha 0, menos no estado abrigo (persiana fechada)."},
     }
-
-    if not a.sem_monitor:
-        rgba, pm = monitor(a, saida)
-        tela, abaixar = regioes_monitor(rgba, pm)
-        salvar_png_rgba(saida / f"monitor_portatil{a.sufixo}.png", rgba)
-        alfa0 = np.nonzero(rgba[..., 3] == 0)
-        mt = (rgba[tela["y"]:tela["y"] + tela["h"], tela["x"]:tela["x"] + tela["w"], 3] == 0).all()
-        print(f"[monitor] tela {tela} toda em alfa 0: {bool(mt)}; "
-              f"px com alfa 0 no PNG: {len(alfa0[0])} (a tela tem {tela['w'] * tela['h']})")
-        ys, xs = np.nonzero(np.isin(pm["indice"], [INDICE[n] for n in ("abaixar_aro", "abaixar_anel", "abaixar_botao")]))
-        print(f"[monitor] abaixar projetado {abaixar} | visível "
-              f"({xs.min()}, {ys.min()}, {xs.max() + 1}, {ys.max() + 1})")
-        print(f"[monitor] tela {tela['w']}x{tela['h']} (16:9); abaixar {abaixar['w']}x{abaixar['h']} px")
-        doc["monitor_portatil"] = {
-            "arquivo": f"monitor_portatil{a.sufixo}.png", "largura": MON_W, "altura": MON_H,
-            "tela": tela, "abaixar": abaixar,
-            "tela_proporcao": "16:9 (320x180: a câmera externa de 640x360 cabe a 50%)"}
-        fundo = np.where(rgba[..., 3:4] > 0, rgba[..., :3], 40).astype(np.uint8)
-        dbg = np.repeat(np.repeat(fundo, 2, 0), 2, 1)
-        for r_, cor in ((tela, (255, 255, 0)), (abaixar, (255, 0, 255))):
-            x0, y0 = r_["x"] * 2, r_["y"] * 2
-            x1, y1 = (r_["x"] + r_["w"]) * 2 - 1, (r_["y"] + r_["h"]) * 2 - 1
-            dbg[y0:y1 + 1, [x0, x0 + 1, x1 - 1, x1]] = cor
-            dbg[[y0, y0 + 1, y1 - 1, y1], x0:x1 + 1] = cor
-        salvar_png(CACHE / "monitor_debug.png", dbg)
-        print(f"[monitor] depuração: {CACHE / 'monitor_debug.png'}")
 
     (saida / f"regioes{a.sufixo}.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
     print(f"[comodo] regiões: {saida / f'regioes{a.sufixo}.json'}")
