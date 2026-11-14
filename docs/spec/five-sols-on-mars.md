@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 14:36, com as linhas da tela (escala, aviso de girar e menu inicial) de 14/11/2026 15:48. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 15:52. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -10,7 +10,7 @@ Desenho fechado pelo dono em 13/11/2026, antes do hackathon, como base para o pr
 
 Nada de código, cena nem asset antes de 14/11 (regulamento).
 
-Wireframe das telas (14/11): https://claude.ai/artifact/QotyJYnZuz6gMMqdJPpPHE. As marcas R e P dele seguem esta spec; W é escolha do wireframe, que o primo troca livremente. O turno do wireframe ainda mostra o HUD fixo; o mapa da sala em "Onde a criança está" vale acima dele.
+Wireframe das telas (14/11): https://claude.ai/artifact/QotyJYnZuz6gMMqdJPpPHE. As marcas R e P dele seguem esta spec; W é escolha do wireframe, que o primo troca livremente. O turno do wireframe ainda mostra o HUD fixo; o mapa da sala em "Onde a criança está" vale acima dele. O wireframe também é anterior ao terminal, aos cards da Terra e ao fim do sol (14/11, à tarde), e nisso esta spec vale acima dele.
 
 ## O jogo
 
@@ -56,11 +56,28 @@ A troca com custo, decidida pelo dono em 14/11:
 
 - **[P]** A missão tem 5 sóis.
 - **[R]** O sol 1 é guiado, um passo por vez, sem evento. Do 2º ao 5º ano, instruir antes funciona melhor que deixar tentar (jogos-educativos-7-a-12-anos (pesquisa no vault do dono)).
-- **[P]** A voz do tutorial é a mensagem do controle da missão.
-- Cada sol tem duas fases:
-  - **[R] Fase de plano**, sem relógio. A criança lê o aviso do clima espacial, divide a energia entre oxigênio, tarefas de ciência e bateria, e vê o efeito previsto de cada escolha antes de confirmar. Todo texto mora aqui.
+- **[P]** O tutorial do sol 1 é um roteiro gravado que a Terra manda no pacote da manhã. A base mostra um passo por vez, conforme a criança termina o anterior, porque com o atraso a Terra não vê o clique.
+- Cada sol tem duas fases e o fim do sol:
+  - **[R] Fase de plano**, sem relógio. A criança lê o aviso do clima espacial e os pedidos da Terra, divide a energia entre oxigênio, tarefas de ciência e bateria, e vê o efeito previsto de cada escolha antes de confirmar.
   - **[R] Fase de turno**, curta e em tempo real, só clique e sem texto para ler. Aparecem as tarefas de ciência escolhidas no plano mais as tarefas de manutenção que a base pede, numa lista como a do Among Us.
-  - **[P]** O turno dura de 60 a 90 s, com 1 s = 1 min de tempo real.
+  - **[R] Fim do sol**, sem relógio: o diário do sol e o envio à Terra.
+- **[R]** Todo texto mora fora do turno: no plano e no fim do sol.
+- **[P]** O plano acontece dentro do terminal, aberto em tela cheia.
+- **[P]** O turno dura de 60 a 90 s, com 1 s = 1 min de tempo real.
+- **[P]** O que encerra o turno:
+  - o relógio, que começa em "Confirmar plano". O Sol andando no céu é esse relógio desenhado: na faixa do Sol, na janela (dia, pôr do Sol, escuro) e na luz da sala, que esquenta nos últimos ~10 s sem piscar. Quando o Sol se põe, o turno acaba sozinho;
+  - ou a criança, pelo botão "Encerrar o sol", que só aparece quando todas as tarefas da lista acabaram;
+  - o modo de segurança no meio do turno também encerra o turno ali.
+- **[P]** O pico de um evento é sorteado só até ~70% do turno, para nunca coincidir com o pôr do Sol.
+- **[P]** No sol 1, o Sol fica parado enquanto o card do tutorial espera o passo da criança.
+- **[P]** Fim do sol:
+  - o diário do sol se escreve sozinho: o que aconteceu, as barras antes e depois, a ciência, as mensagens recebidas e a consequência da manutenção não feita;
+  - a criança lê e aperta "Enviar à Terra";
+  - vem a noite, numa transição curta, e o aquecimento sai da bateria;
+  - o pacote da Terra da manhã abre o plano do sol seguinte.
+
+  Base: o rover manda os dados à Terra num contato à tarde e recebe o plano de manhã; no MDRS, a tripulação manda um relatório por sol (comunicacao-com-atraso-terra-marte (pesquisa no vault do dono), terminais-de-tripulacao (pesquisa no vault do dono)).
+- **[P]** A história anda por três botões, sempre o mesmo gesto: "Confirmar plano", "Encerrar o sol" (opcional) e "Enviar à Terra".
 - **[R]** Um evento por vez. A crise permanente cansa, e a Innersloth a tirou do Among Us (referencias-de-jogos-de-gestao (pesquisa no vault do dono)).
 - **[R]** Critério da calibração (14/11): nenhuma estratégia pode ser melhor ou igual às outras duas em ciência e em modos de segurança em todos os cenários. Uma estratégia cautelosa demais pode sair perdendo: cautela que custa caro também é lição, e não viola "nenhuma escolha segura sem custo".
 
@@ -68,7 +85,7 @@ A troca com custo, decidida pelo dono em 14/11:
 
 - **[P]** Um cômodo, o módulo de comando, em panorama com o shader CC0 de falso 3D. Os estados são luz normal, tempestade, abrigo e modo de segurança.
 - **[P]** A criança nunca sai da nave (dono e primo, 14/11, para caber no tempo). O lado de fora só aparece pelas câmeras.
-- **[P]** De 3 a 4 câmeras para fora (painel solar, rocha, área de amostra, MOXIE). As tarefas de fora são feitas por braço robótico ou rover, como o InSight limpou o painel com a pá.
+- **[P]** As câmeras para fora abrem só pelo terminal: painel solar, rocha, MOXIE e visão geral, mais uma do céu, apontada para o Sol, onde se vê a poeira escurecer o céu. Cada câmera custa um render por clima (normal e poeira). As tarefas de fora são feitas por braço robótico ou rover, como o InSight limpou o painel com a pá.
 - **[R]** Os botões ficam fora do espaço distorcido pelo shader: grandes, na faixa vertical central, com no mínimo 24 × 24 px pela WCAG e maiores para criança.
 - **[R]** Setas grandes para o pan, porque toque não tem mouse.
 - **[P]** Em celular em pé, a página mostra um aviso para deitar o aparelho, em inglês e português, por cima de tudo e desde o carregamento (dono, 14/11). Em pé, o jogo ocupa no máximo um terço da tela em qualquer escala.
@@ -83,15 +100,27 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 - **[P]** Na esquerda:
   - a porta e o botão do abrigo;
   - a tela do medidor e da margem de radiação;
-  - o botão "Perguntar à Terra".
-- **[P]** Na direita: os botões das câmeras, por onde se fazem as tarefas de fora, e a estufa da planta.
+  - a tela de comunicação com a Terra, no lugar do antigo botão azul (ver "Comunicação com a Terra").
+- **[P]** Na direita, a parede da ciência de dentro, em destaque: a estufa (cultivar planta) e a glovebox (selar a amostra).
 - **[R]** As barras na sala seguem as regras das barras (ícone, texto e número) e curvam junto com a parede: são desenhadas antes do shader.
 - **[P]** No canto superior esquerdo da tela, fixo em qualquer ângulo: as notificações do sol atual, do evento em curso e dos alertas. São só ícones, porque o turno não tem texto para ler, e cumprem o equivalente visual do alarme.
-- **[P]** Câmera como no FNAF, sem nenhum asset dele:
-  - o botão da câmera faz um monitor portátil subir na hora na lateral direita, numa janela menor que a tela;
-  - ele fecha pelo botão "abaixar" ou quando a criança vira para a esquerda;
-  - com o monitor aberto, o pan pela borda só funciona do lado oposto a ele.
 - **[P]** As posições exatas de cada botão e de cada tela vêm de `assets/comodo/regioes.json`, gerado pelo `arte/blender/comodo.py` a partir da câmera do render.
+
+## Terminal
+
+O computador da base, que reúne o que a criança consulta e faz pela tela. Base: terminais-de-tripulacao (pesquisa no vault do dono).
+
+- **[P]** Um botão único, fixo embaixo da tela, faz o terminal subir na hora, como camada de tela por cima do panorama, sem a curva do shader. O mesmo botão o abaixa. Atrás dele fica o que a criança estava olhando, que muda com o pan.
+- **[P]** Abas:
+  - **câmeras**, escolhidas num mapa de Gale, com sobreposição de alvo e telemetria, como as vistas da estação robótica da ISS;
+  - **tarefas**, a lista do turno;
+  - **diário**, o registro do que passou: os diários dos sóis anteriores e as mensagens da Terra que já venceram;
+  - **fontes**, com o número, a fonte e a data do DONKI. Atende à regra de que a fonte de cada número aparece no jogo.
+- **[R]** No máximo 4 abas e nenhuma sub-aba, porque a tela leva só o necessário e a navegação é rasa (NASA-STD-3001 [V2 10040] e [V2 10043]).
+- **[P]** As abas são teclas grandes na moldura, como as bezel keys das telas da Orion.
+- **[R]** Cores: verde só no que se clica, como na Orion; vermelho e amarelo só em alerta (NASA-STD-3001 [V2 10118] e [V2 10119]); azul só no que vem da Terra.
+- **[R]** O terminal não guarda as ordens da Terra que ainda valem: elas ficam na tela de comunicação. Quando vencem, vão para o diário.
+- **[P]** O tamanho do terminal e se o pan funciona com ele aberto ficam com o primo.
 
 ## Tarefas (minigames)
 
@@ -107,7 +136,17 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 | Cultivar planta | ciência | Energia → ciência | Regular luz e água | Veggie e APH na ISS; material da CSA citado no desafio |
 
 - **[P]** As interações e a dificuldade de cada tarefa.
+- **[P]** Onde cada tarefa se faz: painel, gerador (MOXIE) e ChemCam pelas câmeras do terminal; amostra na glovebox e planta na estufa, na parede direita; abrigo na porta da esquerda.
 - **[R]** O abrigo custa tempo: no turno em que a tripulação se abriga, não rende ciência. Abrigar cedo demais perde ciência à toa, e tarde demais recebe dose.
+- **[R]** Tarefa de ciência não feita até o fim do turno: o plano só reserva a energia, e a tarefa a gasta quando roda, como o instrumento real só gasta quando liga. A reserva da tarefa não feita volta à bateria, respeitando o teto (o excedente se perde).
+  - O porquê: perder a energia puniria a habilidade motora em vez da escolha, e faria o abrigo custar energia, não só tempo.
+  - Consequência para a calibração: ela supõe toda tarefa escolhida feita, então vale como teto.
+- **[R]** Tarefa de manutenção não feita: a consequência vem pela própria barra, e a tarefa continua na lista no sol seguinte. O diário registra a consequência antes de ela pesar.
+  - painel sujo rende menos no sol seguinte;
+  - gerador quebrado produz zero O2. O plano mostra "gerador quebrado: 0 O2, conserte no turno";
+  - abrigo não montado recebe a dose no próprio turno.
+- **[P]** O conserto do gerador no turno libera a produção de O2 do mesmo sol.
+- **[R]** Pedido de ciência da Terra não feito vence no fim do sol e vai para o diário.
 
 ## Eventos
 
@@ -127,13 +166,22 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 - **Poeira acumulando** **[R]**: o painel rende um pouco menos a cada sol, e a tarefa "limpar o painel" devolve.
 - **[R]** Explosão solar sem aviso fica fora: sem aviso, não há decisão.
 
-## Atraso de comunicação
+## Comunicação com a Terra
 
-- **[R]** Uma mensagem leva de 3 a 22 min por sentido, então a resposta chega no mesmo sol. O atraso pesa nos minutos de uma emergência, em que a tripulação decide sozinha.
-- **[P]** Rótulo no aviso ("enviado da Terra há 14 min").
-- **[P]** Botão "Perguntar à Terra": a resposta chega depois da ida e volta, na escala do turno.
-- **[P]** O medidor da base acusa o pico antes do aviso da Terra.
-- **[P]** O detalhe dessa mecânica se fecha com o dono no sábado, como ele pediu.
+Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
+
+- **[R]** Uma mensagem leva de 3 a 22 min por sentido, e pergunta e resposta levam no mínimo o dobro. O atraso pesa nos minutos de uma emergência, em que a tripulação decide sozinha.
+- **[R]** A comunicação é de mão única e sem conversa: a Terra manda pacotes e avisos, e a base relata no diário. Não há assistente de IA a bordo. Nos análogos, a comunicação com atraso é mensagem gravada ou escrita, e o atraso aumenta a autonomia da tripulação; é a independência que o jogo quer dar à criança.
+- **[R]** A Terra pede ciência, com o valor de cada pedido, e a criança escolhe o que aceitar no plano. A manutenção quem pede é a própria base, pelos sensores.
+- **[P]** A **tela de comunicação** fica na parede esquerda, no lugar do antigo botão azul. Ela acende quando chega mensagem (no máximo 3 flashes por segundo) e guarda as ordens ativas.
+- **[P]** As mensagens aparecem como **cards azuis**, como os tutoriais de jogo de celular:
+  - o card nasce da tela de comunicação, ou entra pela borda esquerda se ela estiver fora da vista, e pode apontar e destacar qualquer lugar da tela;
+  - o card mora na camada de tela, depois do shader, para não curvar nem sumir com o pan. Para apontar um alvo da sala, ele calcula onde o alvo está agora, a partir de `regioes.json` passado pela mesma conta do shader. Se o alvo está fora da vista, ele aponta para a seta do pan;
+  - no plano e no fim do sol, o card tem texto e pode escurecer o resto da tela e travar até a criança fazer o passo;
+  - no turno, o card leva só ícone e "há N min", não escurece nem trava nada, e nunca cobre o medidor nem as barras (exceção: o sol 1, em que o Sol para enquanto o card espera);
+  - fechado, o card volta para a tela de comunicação como ordem ativa. Quando a ordem vence, vai para o diário do terminal.
+- **[P]** Rótulo no card: "enviado da Terra há 14 min".
+- **[P]** O medidor da base acusa o pico antes do aviso da Terra. Com 1 s = 1 min, o card do pico chega de 3 a 22 s depois do medidor, e quem espera a Terra leva mais dose.
 
 ## Falha e relatório
 
@@ -145,7 +193,7 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 - **[R]** Depois do modo de segurança, a saída depende de o sol ter conserto (14/11):
   - se algum plano salva o sol, o botão "o simulador reinicia o sol" volta ao começo da fase de plano do mesmo sol;
   - se nenhum plano salva, porque a causa veio de sóis anteriores (por exemplo, a bateria vazia quando a poeira chegou), o botão vira "seguir em modo de segurança": a base sobrevive com o mínimo, o sol passa sem ciência, conta 1 modo de segurança, e a tela diz que a causa veio antes;
-  - o teste de "algum plano salva" é rodar o plano de emergência: tudo ao gerador e abrigo no sol da tempestade solar;
+  - o teste de "algum plano salva" é rodar o plano de emergência: tudo ao gerador, consertar o que estiver quebrado e abrigo no sol da tempestade solar. Sem o conserto no teste, o gerador quebrado daria zero e mandaria para "seguir em modo de segurança" um sol que tinha salvação;
   - o porquê: sem a segunda saída, a criança recomeça um sol impossível sem fim, e o desafio pede aprender com a falha sem punição.
 - **[R]** Nada de tela piscando: no máximo 3 flashes por segundo, transição suave e som sempre com equivalente visual.
 - **[R]** No fim da missão vem o relatório, o debriefing:
@@ -183,21 +231,25 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 - **P0, o jogo inteiro e mínimo (sábado):**
   - export Web vazio no ar na primeira hora, testado na máquina do playtest (risco do WASM SIMD em máquina velha);
   - um cômodo com arte provisória;
-  - a fase de plano com as três barras;
-  - avançar sol, modo de segurança e relatório;
-  - a tempestade solar com o dado embutido;
+  - o terminal com o botão único e a fase de plano dentro dele, com as três barras;
+  - o fim do turno pelo relógio, um diário mínimo com "Enviar à Terra", modo de segurança e relatório;
+  - a tempestade solar com o dado embutido, com o aviso da Terra num card azul simples;
   - a tarefa do abrigo.
 - **P1, o que dá o desenho (sábado à noite e domingo de manhã):**
+  - as abas de câmeras e de tarefas do terminal;
   - tempestade de poeira e limpar o painel;
   - consertar o gerador;
   - ChemCam;
+  - os cards azuis com destaque e a tela de comunicação;
   - sol 1 guiado;
+  - o diário completo e a aba de fontes;
+  - "Encerrar o sol" e a sala acompanhando o pôr do Sol;
   - menu inicial com o botão Jogar;
   - português e inglês;
   - arte final.
-- **P2, se sobrar:** amostra, planta, "Perguntar à Terra" e estática nas câmeras.
+- **P2, se sobrar:** amostra na glovebox, planta na estufa, câmera do céu e estática nas câmeras.
 
-Se atrasar, corta-se nesta ordem: planta → amostra → Perguntar à Terra → estática. O P0 nunca se corta.
+Se atrasar, corta-se nesta ordem: planta → amostra → câmera do céu → estática. O P0 nunca se corta.
 
 O código congela no domingo, horas antes do fim do evento, para sobrar tempo para o vídeo de 30 s e o formulário.
 
@@ -215,7 +267,8 @@ Nome, voz e imagem de menor ficam fora da submissão.
 - Quem faz o quê. O dono ainda não quer fechar as funções. Rascunho:
   - o primo faz as cenas, o loop, as barras, as tarefas, o shader e o ajuste dos números;
   - o dono faz a arte, o script do DONKI, os textos com fonte, o deploy, a submissão e os créditos.
-- O detalhe do atraso de comunicação e do "Perguntar à Terra", a fechar com o dono.
+- A cor do pôr do Sol em Marte (azulada nas fotos dos rovers): conferir a fonte antes de entrar no jogo.
+- O espaço do plano no terminal: o plano do wireframe ocupa os 640 px, e os cards azuis precisam caber por cima sem cobrir o que apontam.
 
 ## O que não faz (propostas recusadas)
 
@@ -229,4 +282,8 @@ Nome, voz e imagem de menor ficam fora da submissão.
 - DONKI ao vivo do navegador: mandaria o IP da criança à NASA e dependeria do Wi-Fi.
 - itch.io: Google Analytics e cookies na página do jogo.
 - 3D ao vivo no Godot e IA de imagem para gerar os estados: [0002](decisoes/0002-a-arte-e-renderizada-antes-no-blender-e-entra-como-panorama-2d.md).
-- A resposta da Terra "só no sol seguinte": a ida e volta cabe no mesmo sol.
+- Botão "Perguntar à Terra" e qualquer conversa com a Terra: pergunta e resposta levam no mínimo o dobro do atraso, os análogos usam mensagem gravada, e a mão única dá à criança a independência que o atraso real impõe. Por isso a variante "a resposta só no sol seguinte" também saiu.
+- Assistente de IA a bordo: existe só como experimento (o CIMON na ISS, o assistente médico NASA/Google em prova de conceito), não como retrato de hoje (comunicacao-com-atraso-terra-marte (pesquisa no vault do dono)).
+- A Terra designar as tarefas: tiraria a escolha com custo. A Terra pede, e a criança escolhe.
+- Energia de ciência perdida quando a tarefa não é feita: puniria a habilidade motora em vez da escolha e faria o abrigo custar energia.
+- Monitor das câmeras subindo como no FNAF e os 4 botões de câmera na parede direita: substituídos pelo terminal.
