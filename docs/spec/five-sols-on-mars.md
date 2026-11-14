@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 15:52. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 17:15. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -63,6 +63,13 @@ A troca com custo, decidida pelo dono em 14/11:
   - **[R] Fim do sol**, sem relógio: o diário do sol e o envio à Terra.
 - **[R]** Todo texto mora fora do turno: no plano e no fim do sol.
 - **[P]** O plano acontece dentro do terminal, aberto em tela cheia.
+- **[R]** A tela do plano é uma só e enxuta, porque a primeira versão jogável (P0, 14/11) chegou a 36 linhas, 103 palavras e 53 números numa tela, com o mesmo número repetido até três vezes. Abas no plano não servem: o terminal já tem as 4 abas do limite, e o efeito previsto precisa ficar ao lado do controle. As regras:
+  - cada número aparece uma vez, e as barras mostram "antes → depois";
+  - ficam na tela os dois controles (oxigênio e ciência), as três barras com a previsão e o botão "Confirmar plano";
+  - ficam também, porque são restrição: a linha fixa do aquecimento da noite, o aviso do excedente que se perde com a bateria cheia (é o custo de guardar) e "ar para N sóis" na barra de oxigênio (a troca entre reserva de oxigênio e pesquisa);
+  - a conta da energia (bateria + painel − aquecimento) e o detalhe do tanque vão para a aba fontes do terminal;
+  - o card da Terra abre por cima do plano, a criança lê e fecha, e ele sai do plano. A data do DONKI fica no card do aviso, não só nas fontes, porque dado estático nunca parece ao vivo.
+- **[P]** No sol 1 guiado, o plano vem em passos, uma decisão por tela: a mensagem, o oxigênio, a ciência e o resumo com "Confirmar plano". Nos sóis 2 a 5, a tela única, porque separar oxigênio e ciência esconderia a troca entre eles.
 - **[P]** O turno dura de 60 a 90 s, com 1 s = 1 min de tempo real.
 - **[P]** O que encerra o turno:
   - o relógio, que começa em "Confirmar plano". O Sol andando no céu é esse relógio desenhado: na faixa do Sol, na janela (dia, pôr do Sol, escuro) e na luz da sala, que esquenta nos últimos ~10 s sem piscar. Quando o Sol se põe, o turno acaba sozinho;
@@ -115,7 +122,7 @@ O computador da base, que reúne o que a criança consulta e faz pela tela. Base
   - **câmeras**, escolhidas num mapa de Gale, com sobreposição de alvo e telemetria, como as vistas da estação robótica da ISS;
   - **tarefas**, a lista do turno;
   - **diário**, o registro do que passou: os diários dos sóis anteriores e as mensagens da Terra que já venceram;
-  - **fontes**, com o número, a fonte e a data do DONKI. Atende à regra de que a fonte de cada número aparece no jogo.
+  - **fontes**, com o número, a fonte e a data do DONKI, mais o detalhe que sai do plano: a conta da energia e o tanque de O2. Atende à regra de que a fonte de cada número aparece no jogo.
 - **[R]** No máximo 4 abas e nenhuma sub-aba, porque a tela leva só o necessário e a navegação é rasa (NASA-STD-3001 [V2 10040] e [V2 10043]).
 - **[P]** As abas são teclas grandes na moldura, como as bezel keys das telas da Orion.
 - **[R]** Cores: verde só no que se clica, como na Orion; vermelho e amarelo só em alerta (NASA-STD-3001 [V2 10118] e [V2 10119]); azul só no que vem da Terra.
@@ -236,13 +243,14 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
   - a tempestade solar com o dado embutido, com o aviso da Terra num card azul simples;
   - a tarefa do abrigo.
 - **P1, o que dá o desenho (sábado à noite e domingo de manhã):**
-  - as abas de câmeras e de tarefas do terminal;
+  - primeiro, o plano enxuto, o card por cima do plano e as 4 abas do terminal, com a de fontes já preenchida (o plano enxuto depende dela);
+  - o conteúdo das abas de câmeras e de tarefas;
   - tempestade de poeira e limpar o painel;
   - consertar o gerador;
   - ChemCam;
   - os cards azuis com destaque e a tela de comunicação;
-  - sol 1 guiado;
-  - o diário completo e a aba de fontes;
+  - sol 1 guiado, com o plano em passos;
+  - o diário completo;
   - "Encerrar o sol" e a sala acompanhando o pôr do Sol;
   - menu inicial com o botão Jogar;
   - português e inglês;
@@ -268,10 +276,10 @@ Nome, voz e imagem de menor ficam fora da submissão.
   - o primo faz as cenas, o loop, as barras, as tarefas, o shader e o ajuste dos números;
   - o dono faz a arte, o script do DONKI, os textos com fonte, o deploy, a submissão e os créditos.
 - A cor do pôr do Sol em Marte (azulada nas fotos dos rovers): conferir a fonte antes de entrar no jogo.
-- O espaço do plano no terminal: o plano do wireframe ocupa os 640 px, e os cards azuis precisam caber por cima sem cobrir o que apontam.
-
 ## O que não faz (propostas recusadas)
 
+- Plano dividido em abas: o terminal já tem as 4 abas do limite, e o efeito previsto sairia de perto do controle.
+- Plano em passos nos sóis 2 a 5: separar oxigênio e ciência esconderia a troca entre eles, que é a lição do jogo. Fica só no sol 1.
 - Lua como cenário: [0001](decisoes/0001-o-posto-do-jogo-fica-em-marte-nao-na-lua.md).
 - Blindagem como barra que acaba: não corresponde a nada físico. O recurso é a margem de radiação, e o abrigo é a ação.
 - Escudo que gasta energia: não tem respaldo no que a NASA faz, e o abrigo custa tempo.
