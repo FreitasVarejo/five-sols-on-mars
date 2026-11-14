@@ -24,12 +24,14 @@ const Desenho := preload("res://scripts/desenho.gd")
 const TelaBarra := preload("res://scripts/tela_barra.gd")
 const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
 const Estacoes := preload("res://scripts/estacoes.gd")
+const Persiana := preload("res://scripts/persiana.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
 	"normal": preload("res://assets/comodo/normal.png"),
 	"tempestade": preload("res://assets/comodo/tempestade.png"),
-	"abrigo": preload("res://assets/comodo/abrigo.png"),
+	# O vidro aberto: a persiana vem da camada Sala/Persiana (persiana.gd), não do panorama.
+	"abrigo": preload("res://assets/comodo/abrigo_aberto.png"),
 	"modo_seguranca": preload("res://assets/comodo/modo_seguranca.png"),
 }
 # Telas de barra da sala: nome (chave de tradução), ícone.
@@ -45,6 +47,8 @@ const COR_TELA_APAGADA := Color("#202e37")
 @onready var _sala: Control = $Sala
 @onready var _vista_janela: TextureRect = $Sala/Vista
 @onready var _panorama: TextureRect = $Sala/Panorama
+@onready var _panorama_anterior: TextureRect = $Sala/PanoramaAnterior
+@onready var _persiana: Persiana = $Sala/Persiana
 @onready var _telas: Control = $Sala/Telas
 @onready var _realce: Control = $Sala/Realce
 @onready var _distorcao: ColorRect = $Distorcao
@@ -103,6 +107,10 @@ func _ready() -> void:
 	var tamanho := _panorama.texture.get_size()
 	_panorama.size = tamanho
 	_vista_janela.size = tamanho
+	_panorama_anterior.size = tamanho
+	_persiana.size = tamanho
+	_persiana.configurar(_panorama, _panorama_anterior, Persiana.duracao_da_url(_parametros.get("persiana")))
+	_persiana.mudou.connect(_sonda_persiana)
 	_sala.size = tamanho
 	_telas.size = tamanho
 	_realce.size = tamanho
@@ -201,6 +209,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_depurar = not _depurar
 			_contornos.visible = _depurar
 			_depuracao.visible = _depurar
+		elif event.keycode == KEY_P and _sondar and not _persiana.animando:
+			# Teste: abre ou fecha a persiana só no visual e no som, sem mudar a missão.
+			_persiana.ir_para(not _persiana.fechada(), PANORAMAS["abrigo" if not _persiana.fechada() else _estado])
 
 
 func _notification(what: int) -> void:
@@ -409,7 +420,11 @@ func _ao_clicar(nome: String) -> void:
 
 func _definir_estado(estado: String) -> void:
 	_estado = estado
-	_panorama.texture = PANORAMAS[estado]
+	# Entrar no abrigo fecha a persiana (com cross-fade da luz); sair do abrigo abre.
+	if (estado == "abrigo") != _persiana.fechada():
+		_persiana.ir_para(estado == "abrigo", PANORAMAS[estado])
+	else:
+		_panorama.texture = PANORAMAS[estado]
 
 
 func _nome_do_modo() -> String:
@@ -441,8 +456,8 @@ func _atualizar_depuracao() -> void:
 
 # --- parâmetros da URL (só Web) -------------------------------------------------
 
-## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?semente=<int>, ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5,
-## ?stretch=viewport|canvas_items.
+## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?semente=<int>,
+## ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):
 		return {}
@@ -511,6 +526,17 @@ func _ui_da_tela() -> Dictionary:
 	return ui
 
 
+## Só o bloco da persiana, a cada passo da animação (o resto da sonda não precisa de tanta pressa).
+func _sonda_persiana() -> void:
+	if _sondar:
+		JavaScriptBridge.eval("window.fsom = window.fsom || {}; window.fsom.persiana = %s;" % JSON.stringify(_dados_persiana()), true)
+
+
+func _dados_persiana() -> Dictionary:
+	return {"progresso": _persiana.progresso, "animando": _persiana.animando, "laminas": _persiana.laminas(),
+		"fechada": _persiana.fechada(), "duracao": _persiana.duracao}
+
+
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
@@ -537,7 +563,7 @@ func _sonda_teste() -> void:
 	var estado := {
 		"cliques": _cliques, "ultimo_clique": _ultimo_clique, "pan": _pan_inteiro,
 		"modo": _nome_do_modo(), "shader_em": [res.x, res.y], "zoom": _zoom(),
-		"estado": _estado, "vista": _vista,
+		"estado": _estado, "vista": _vista, "persiana": _dados_persiana(),
 		"hover": _hover, "depurar": _depurar,
 		"donki": {
 			"historico": _donki["historico"], "chegadas": _donki["chegadas_marte"].size(),
