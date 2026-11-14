@@ -10,11 +10,21 @@ extends Control
 ## as telas de barras ficam na Sala (antes do shader) e curvam junto com a arte;
 ## os contornos de depuração (tecla D) são desenhados no HUD, depois do shader,
 ## a partir da fórmula direta, para conferir o alinhamento.
+##
+## O jogo em si mora em missao.gd (lógica pura). Aqui ficam a sala, a câmera e a ligação: a cada
+## quadro a missão avança, a sala se redesenha com o estado dela (barras, medidor, estações,
+## panorama) e o terminal (terminal.gd) e o HUD do turno desenham a parte de tela.
 
 const VELOCIDADE_BORDA := 600.0  # px/s, no limite da tela
 const VELOCIDADE_SETA := 400.0  # px/s, seta pressionada
 const JSON_REGIOES := "res://assets/comodo/regioes.json"
 const DadosDonki := preload("res://scripts/dados_donki.gd")
+const Missao := preload("res://scripts/missao.gd")
+const Desenho := preload("res://scripts/desenho.gd")
+const TelaBarra := preload("res://scripts/tela_barra.gd")
+const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
+const Estacoes := preload("res://scripts/estacoes.gd")
+const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
 	"normal": preload("res://assets/comodo/normal.png"),
@@ -22,19 +32,13 @@ const PANORAMAS := {
 	"abrigo": preload("res://assets/comodo/abrigo.png"),
 	"modo_seguranca": preload("res://assets/comodo/modo_seguranca.png"),
 }
-const ORDEM_ESTADOS := ["normal", "tempestade", "abrigo", "modo_seguranca"]
-# Vista de Marte pela janela: fica atrás do panorama (o vidro dele tem alpha 0, menos no
-# abrigo, em que a persiana cobre). A vista é independente do estado da sala: P alterna.
-const VISTAS := {
-	"normal": preload("res://assets/exterior/vista_janela_normal.png"),
-	"poeira": preload("res://assets/exterior/vista_janela_poeira.png"),
-}
-# Valores de teste das telas: nome, ícone, valor, máximo, cor.
+# Telas de barra da sala: nome (chave de tradução), ícone.
 const TELAS := {
-	"energia": ["ENERGIA", "energia", 9, 12, Color("#f2b631")],
-	"oxigenio": ["OXIGÊNIO", "oxigenio", 6, 8, Color("#5fc8e8")],
-	"radiacao": ["RADIAÇÃO", "radiacao", 3, 5, Color("#7ed957")],
+	"energia": ["ENERGIA", "energia"],
+	"oxigenio": ["OXIGENIO", "oxigenio"],
 }
+# Estação de cada tarefa de ciência: tarefa -> botão da sala.
+const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
 # Tela de comunicação com a Terra: por enquanto só apagada, na cor única das telas em branco.
 const COR_TELA_APAGADA := Color("#202e37")
 
@@ -48,18 +52,27 @@ const COR_TELA_APAGADA := Color("#202e37")
 @onready var _seta_dir: TextureButton = $HUD/SetaDireita
 @onready var _depuracao: Label = $HUD/Depuracao
 @onready var _contornos: Control = $HUD/Contornos
+@onready var _hud_turno: Control = $HUD/HudTurno
+@onready var _terminal: Control = $Terminal
 
 var _botoes := {}  # nome -> Rect2 no panorama (o que se clica)
 var _regioes_telas := {}  # nome -> Rect2 no panorama (telas: só para os contornos de depuração)
-var _donki := {}  # dado do DONKI embutido (dados_donki.gd), só para verificação
+var _donki := {}  # dado do DONKI embutido (dados_donki.gd)
+var _missao: Missao
+var _tela_energia: Control
+var _tela_oxigenio: Control
+var _tela_radiacao: Control
+var _estacoes: Control
+var _parametros := {}  # parâmetros da URL (só Web)
+var _sonda_chave := ""
+var _sonda_t := 0.0
 var _pan := 0.0
 var _pan_inteiro := 0
 var _cliques := 0
 var _ultimo_clique := ""
 var _hover := ""
 var _estado := "normal"
-var _estado_antes_do_abrigo := "normal"
-var _vista := "normal"
+var _vista := "normal"  # a vista de poeira (vista_janela_poeira.png) entra no P1
 var _depurar := false
 var _esq_pressionada := false
 var _dir_pressionada := false
@@ -70,10 +83,17 @@ var _mouse_dentro := true
 
 
 func _ready() -> void:
+	_parametros = _parametros_da_url()
 	_aplicar_stretch_da_url()
+	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
+	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
 	_depuracao.hide()
 	_donki = DadosDonki.carregar()
+	_missao = Missao.new(int(_parametros.get("semente", -1)), _opcoes_da_missao())
 	_carregar_regioes()
+	_hud_turno.missao = _missao
+	_terminal.iniciar(_missao, _donki)
+	_terminal.desenhou.connect(_sonda_se_mudou)
 
 	var tamanho := _panorama.texture.get_size()
 	_panorama.size = tamanho
@@ -111,17 +131,27 @@ func _carregar_regioes() -> void:
 
 	for nome: String in TELAS:
 		var t: Array = TELAS[nome]
-		var tela: Control = preload("res://scripts/tela_barra.gd").new()
+		var tela: Control = TelaBarra.new()
 		var r := _rect(dados["telas"][nome])
 		tela.position = r.position
 		tela.size = r.size
 		tela.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tela.nome = t[0]
+		tela.nome = tr(t[0])
 		tela.icone = t[1]
-		tela.valor = t[2]
-		tela.maximo = t[3]
-		tela.cor = t[4]
+		tela.maximo = 12
 		_telas.add_child(tela)
+		if nome == "energia":
+			_tela_energia = tela
+		else:
+			_tela_oxigenio = tela
+
+	# A tela de radiação leva a margem e o medidor (separado dela).
+	_tela_radiacao = TelaRadiacao.new()
+	var rr: Rect2 = _regioes_telas["radiacao"]
+	_tela_radiacao.position = rr.position
+	_tela_radiacao.size = rr.size
+	_tela_radiacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_telas.add_child(_tela_radiacao)
 
 	var comunicacao := ColorRect.new()
 	var rc: Rect2 = _regioes_telas["comunicacao"]
@@ -130,6 +160,14 @@ func _carregar_regioes() -> void:
 	comunicacao.color = COR_TELA_APAGADA
 	comunicacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_telas.add_child(comunicacao)
+
+	# Andamento das tarefas nas estações.
+	_estacoes = Estacoes.new()
+	_estacoes.size = _panorama.texture.get_size()
+	_estacoes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for tarefa: String in ESTACOES:
+		_estacoes.regioes[tarefa] = _botoes[ESTACOES[tarefa]]
+	_telas.add_child(_estacoes)
 
 
 func _rect(d: Dictionary) -> Rect2:
@@ -154,16 +192,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if nome != "":
 			_ao_clicar(nome)
 	elif event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_1, KEY_2, KEY_3, KEY_4:
-				_definir_estado(ORDEM_ESTADOS[event.keycode - KEY_1])
-			KEY_P:
-				_definir_vista("poeira" if _vista == "normal" else "normal")
-			KEY_D:
-				_depurar = not _depurar
-				_contornos.visible = _depurar
-				_depuracao.visible = _depurar
-				_sonda_teste()
+		if event.keycode == KEY_D:
+			_depurar = not _depurar
+			_contornos.visible = _depurar
+			_depuracao.visible = _depurar
 
 
 func _notification(what: int) -> void:
@@ -174,24 +206,83 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
-	var velocidade := _velocidade_seta() if (_esq_pressionada or _dir_pressionada) else _velocidade_mouse()
+	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro.
+	_missao.avancar(minf(delta, 0.25))
+	var tapa: bool = _terminal.tapa_a_sala()
+	if tapa:
+		_esq_pressionada = false
+		_dir_pressionada = false
+	_seta_esq.visible = not tapa
+	_seta_dir.visible = not tapa
+
+	var velocidade := 0.0
+	if not tapa:
+		velocidade = _velocidade_seta() if (_esq_pressionada or _dir_pressionada) else _velocidade_mouse()
 	if velocidade != 0.0:
 		_pan = clampf(_pan + velocidade * delta, 0.0, _alcance())
 	var novo := roundi(_pan)
 	_sala.position.x = -novo
-	var mudou := novo != _pan_inteiro
 	_pan_inteiro = novo
 
 	var hover := _regiao_em(_mouse_pos) if (_mouse_real and _mouse_dentro) else ""
 	if hover != _hover:
 		_hover = hover
 		_realce.queue_redraw()
-		mudou = true
-	if mudou:
-		_sonda_teste()
+	_atualizar_sala()
 	if _depurar:
 		_contornos.queue_redraw()
 	_atualizar_depuracao()
+	_sonda_se_mudou()
+
+
+## A sala e o HUD do jogo, a partir do estado da missão.
+func _atualizar_sala() -> void:
+	var fase_ui: String = _terminal.fase_ui
+	var barras := _missao.barras_na_fase(fase_ui)
+	_tela_energia.atualizar(roundi(barras["E"]))
+	_tela_oxigenio.atualizar(roundi(barras["O"]))
+	_tela_radiacao.atualizar(barras["M"], _missao.medidor() if fase_ui == "turno" else Missao.MEDIDOR_BAIXO)
+	# Panorama: normal; da tempestade em diante, tempestade; abrigado, abrigo; modo de segurança.
+	var estado := "normal"
+	if fase_ui == "seguranca":
+		estado = "modo_seguranca"
+	elif fase_ui == "turno":
+		if _missao.abrigado:
+			estado = "abrigo"
+		elif _missao.tempestade_em_curso():
+			estado = "tempestade"
+	if estado != _estado:
+		_definir_estado(estado)
+	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto
+	var estados := {}
+	var progresso := {}
+	var clicaveis := {}
+	if fase_ui == "turno":
+		for tarefa: String in ESTACOES:
+			if _missao.tarefas.has(tarefa):
+				estados[tarefa] = _missao.tarefas[tarefa]
+				progresso[tarefa] = _missao.progresso_tarefa(tarefa)
+				clicaveis[tarefa] = _clicavel(ESTACOES[tarefa])
+	_estacoes.atualizar(estados, progresso, clicaveis)
+
+
+## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
+## delas está escolhida, pendente, sem outra rodando e fora do abrigo.
+func _clicavel(nome: String) -> bool:
+	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala():
+		return false
+	match nome:
+		"abrigo":
+			return true
+		"estufa":
+			return _pode_iniciar("planta")
+		"glovebox":
+			return _pode_iniciar("amostra")
+	return false
+
+
+func _pode_iniciar(tarefa: String) -> bool:
+	return _missao.tarefas.get(tarefa, "") == "pendente" and not _missao.abrigado and _missao.tarefa_rodando == ""
 
 
 ## Alcance do pan: largura da textura menos a largura visível da tela.
@@ -245,12 +336,14 @@ func _panorama_para_tela(q: Vector2) -> Vector2:
 
 ## Nome do botão sob o ponto p da tela ("" se nenhum). As setas tapam.
 func _regiao_em(p: Vector2) -> String:
+	if _terminal.tapa_a_sala():
+		return ""
 	for seta in [_seta_esq, _seta_dir]:
 		if seta.is_visible_in_tree() and seta.get_global_rect().has_point(p):
 			return ""
 	var q := _tela_para_panorama(p)
 	for nome: String in _botoes:
-		if _botoes[nome].has_point(q):
+		if _botoes[nome].has_point(q) and _clicavel(nome):
 			return nome
 	return ""
 
@@ -301,26 +394,17 @@ func _ao_clicar(nome: String) -> void:
 	_ultimo_clique = nome
 	match nome:
 		"abrigo":
-			if _estado == "abrigo":
-				_definir_estado(_estado_antes_do_abrigo)
-			else:
-				_estado_antes_do_abrigo = _estado
-				_definir_estado("abrigo")
-		"estufa", "glovebox":
-			print("clique: ", nome)  # o jogo vem na próxima fatia: por ora só registra
+			_missao.alternar_abrigo()
+		"estufa":
+			_missao.iniciar_tarefa("planta")
+		"glovebox":
+			_missao.iniciar_tarefa("amostra")
 	_sonda_teste()
 
 
 func _definir_estado(estado: String) -> void:
 	_estado = estado
 	_panorama.texture = PANORAMAS[estado]
-	_sonda_teste()
-
-
-func _definir_vista(vista: String) -> void:
-	_vista = vista
-	_vista_janela.texture = VISTAS[vista]
-	_sonda_teste()
 
 
 func _nome_do_modo() -> String:
@@ -345,29 +429,100 @@ func _atualizar_depuracao() -> void:
 	if not _depurar:
 		return
 	var res := _resolucao_do_shader()
-	_depuracao.text = "stretch: %s\nshader em: %dx%d zoom %d\npan: %d / %d\nestado: %s  hover: %s\ncliques: %d (%s)\n%s" % [
+	_depuracao.text = "stretch: %s\nshader em: %dx%d zoom %d\npan: %d / %d\nestado: %s  hover: %s\ncliques: %d (%s)\nfase: %s  sol %d  t %.1f\n%s" % [
 		_nome_do_modo(), res.x, res.y, int(_zoom()), _pan_inteiro, roundi(_alcance()),
-		_estado, _hover, _cliques, _ultimo_clique, DadosDonki.resumo(_donki)]
+		_estado, _hover, _cliques, _ultimo_clique, _missao.fase, _missao.sol, _missao.t, DadosDonki.resumo(_donki)]
+
+
+# --- parâmetros da URL (só Web) -------------------------------------------------
+
+## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?semente=<int>, ?sol_solar=3|4, ?stretch=viewport|canvas_items.
+func _parametros_da_url() -> Dictionary:
+	if not OS.has_feature("web"):
+		return {}
+	var texto = JavaScriptBridge.eval(
+		"JSON.stringify(Object.fromEntries(new URLSearchParams(window.location.search)))", true)
+	var dados = JSON.parse_string(str(texto))
+	return dados if dados is Dictionary else {}
+
+
+func _opcoes_da_missao() -> Dictionary:
+	var opcoes := {}
+	var turno := float(_parametros.get("turno", 0.0))
+	if turno > 0.0:
+		opcoes["turno_s"] = turno
+	var tarefa := float(_parametros.get("tarefa", 0.0))
+	if tarefa > 0.0:
+		opcoes["tarefa_s"] = tarefa
+	var sol_solar := int(_parametros.get("sol_solar", 0))
+	if sol_solar in Missao.SOLS_SOLAR:
+		opcoes["sol_solar"] = sol_solar
+	return opcoes
 
 
 ## No Web, lê ?stretch=viewport|canvas_items e aplica em content_scale_mode.
 ## Sem parâmetro (ou valor desconhecido) vale o project.godot.
 func _aplicar_stretch_da_url() -> void:
-	if not OS.has_feature("web"):
-		return
-	var valor = JavaScriptBridge.eval("new URLSearchParams(window.location.search).get('stretch')", true)
-	match valor:
+	match _parametros.get("stretch"):
 		"viewport":
 			get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 		"canvas_items":
 			get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 
 
+# --- sonda de teste -------------------------------------------------------------
+
+## Retângulo, em px da tela, que o retângulo r do panorama ocupa agora (já com a curva do shader),
+## cortado na tela. Vazio se está fora da vista.
+func _rect_na_tela(r: Rect2) -> Rect2:
+	var pts := _contorno_na_tela(r)
+	var minimo := pts[0]
+	var maximo := pts[0]
+	for q in pts:
+		minimo = Vector2(minf(minimo.x, q.x), minf(minimo.y, q.y))
+		maximo = Vector2(maxf(maximo.x, q.x), maxf(maximo.y, q.y))
+	var tela := Rect2(Vector2.ZERO, get_viewport_rect().size)
+	return Rect2(minimo, maximo - minimo).intersection(tela)
+
+
+## Tudo que se clica agora, nome -> [x, y, w, h] em px da tela de 640x360: o terminal e o que ele
+## mostra, mais a sala (abrigo, estufa, glovebox) e as setas, quando valem.
+func _ui_da_tela() -> Dictionary:
+	var ui: Dictionary = _terminal.ui()
+	for nome: String in _botoes:
+		if _clicavel(nome):
+			var r := _rect_na_tela(_botoes[nome])
+			if r.size.x >= 4.0 and r.size.y >= 4.0:
+				ui[nome] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	for par in [["seta_esq", _seta_esq], ["seta_dir", _seta_dir]]:
+		if par[1].is_visible_in_tree():
+			var r: Rect2 = par[1].get_global_rect()
+			ui[par[0]] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	return ui
+
+
+func _sonda_se_mudou() -> void:
+	if not OS.has_feature("web"):
+		return
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui())]
+	var agora := Time.get_ticks_msec() / 1000.0
+	if chave != _sonda_chave or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
+		_sonda_chave = chave
+		_sonda_teste()
+
+
 ## SONDA DE TESTE (só Web): expõe o estado em window.fsom para o Playwright.
 func _sonda_teste() -> void:
 	if not OS.has_feature("web"):
 		return
+	_sonda_t = Time.get_ticks_msec() / 1000.0
 	var res := _resolucao_do_shader()
+	var m := _missao
+	var prev := m.previsao()
+	var tarefas := {}
+	for nome in m.tarefas:
+		tarefas[nome] = m.tarefas[nome]
 	var estado := {
 		"cliques": _cliques, "ultimo_clique": _ultimo_clique, "pan": _pan_inteiro,
 		"modo": _nome_do_modo(), "shader_em": [res.x, res.y], "zoom": _zoom(),
@@ -378,5 +533,23 @@ func _sonda_teste() -> void:
 			"coletado_em": _donki.get("coletado_em"), "motivo_historico": _donki.get("motivo_historico"),
 			"texto": DadosDonki.resumo(_donki),
 		},
+		"fase": m.fase, "fase_ui": _terminal.fase_ui, "sol": m.sol,
+		"st": {"E": m.st["E"], "O": m.st["O"], "M": m.st["M"]},
+		"barras": m.barras_na_fase(_terminal.fase_ui),
+		"margem_ao_vivo": m.margem_ao_vivo(),
+		"plano": {"q": m.plano_q, "tarefas": m.plano_tarefas},
+		"para_dividir": m.para_dividir(),
+		"previsao": {"E": prev["st"]["E"], "O": prev["st"]["O"], "M": prev["st"]["M"], "falhas": prev["falhas"]},
+		"relogio": m.relogio(), "turno_s": m.turno_s, "tarefa_s": m.tarefa_s,
+		"t_pico": m.t_pico if m.t_pico >= 0.0 else null,
+		"sol_solar": m.sol_solar, "atraso_min": m.atraso_min, "aviso_ativo": m.aviso_ativo(),
+		"medidor": m.medidor(), "abrigado": m.abrigado, "tarefas": tarefas,
+		"ciencia": m.ciencia_ate_agora(), "ciencia_sol": m.ciencia_do_sol(), "modos": m.modos,
+		"tem_conserto": m.tem_conserto if m.fase == "seguranca" else null,
+		"causa": m.causa if m.fase == "seguranca" else null,
+		"estrelas": m.estrelas(),
+		"terminal_aberto": _terminal.aberto,
+		"idioma": TranslationServer.get_locale(),
+		"ui": _ui_da_tela(),
 	}
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)

@@ -8,6 +8,8 @@
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_direita.png" id="9_dn"]
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_direita_pressed.png" id="10_dp"]
 [ext_resource type="Texture2D" path="res://assets/exterior/vista_janela_normal.png" id="12_vista"]
+[ext_resource type="Script" path="res://scripts/hud_turno.gd" id="13_hud"]
+[ext_resource type="Script" path="res://scripts/terminal.gd" id="14_terminal"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_pan"]
 shader = ExtResource("6_shader")
@@ -67,6 +69,17 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="HudTurno" type="Control" parent="HUD"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("13_hud")
+
 [node name="SetaEsquerda" type="TextureButton" parent="HUD"]
 layout_mode = 1
 anchors_preset = 4
@@ -117,3 +130,13 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_font_sizes/font_size = 10
 text = "depuracao"
+
+[node name="Terminal" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("14_terminal")

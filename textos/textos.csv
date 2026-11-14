@@ -1,0 +1,95 @@
+keys,en,pt
+TERMINAL,Terminal,Terminal
+ENERGIA,Energy,Energia
+OXIGENIO,Oxygen,Oxigênio
+MARGEM,Margin,Margem
+CIENCIA,Science,Ciência
+MEDIDOR,Radiation,Radiação
+CAB_SOL,Sol %d of %d,Sol %d de %d
+CAB_PLANO,· Plan,· Plano
+CAB_TURNO,· Shift,· Turno
+SOL_N,Sol %d,Sol %d
+AVISO_TEMPESTADE,A storm from the Sun is coming. It should arrive between sol 3 and sol 4.,Uma tempestade do Sol vem aí. Deve chegar entre o sol 3 e o sol 4.
+DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
+DONKI_FRASE_HISTORICO,"In May 2024, DONKI predicted CMEs arriving at Mars. The simulator replays one.","Em maio de 2024, o DONKI previu CMEs chegando a Marte. O simulador reencena uma."
+ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
+DONKI_DADO_DE,DONKI data from %s,Dados do DONKI de %s
+DONKI_DADO_HISTORICO,Historical data: May 2024,Dado histórico: maio de 2024
+TANQUE_O2,O2 tank,Tanque de O2
+TANQUE_AGORA,Now: %d of %d,Agora: %d de %d
+TANQUE_DEPOIS,After the plan: %s,Depois do plano: %s
+AR_PARA_1,Air for 1 sol,Ar para 1 sol
+AR_PARA_N,Air for %d sols,Ar para %d sóis
+TRIPULACAO_RESPIRA,The crew breathes %d per sol.,A tripulação respira %d por sol.
+UM_SOL,1 sol,1 sol
+ENERGIA_DO_SOL,Energy for sol %d,Energia do sol %d
+LINHA_BATERIA,Battery,Bateria
+LINHA_PAINEL,+ Solar panel,+ Painel solar
+LINHA_AQUECIMENTO,− Night heating (fixed),− Aquecimento da noite (fixo)
+LINHA_PARA_DIVIDIR,= To divide,= Para dividir
+O2_CUSTO,−%d energy for +1 O2,−%d energia por +1 O2
+GERADOR_QUEBRADO,"generator broken: 0 O2, fix it in the shift","gerador quebrado: 0 O2, conserte no turno"
+TAREFA_CHEMCAM,ChemCam,ChemCam
+TAREFA_AMOSTRA,Sample,Amostra
+TAREFA_PLANTA,Plant,Planta
+TAREFAS_RESUMO,%d of %d tasks · +%d science,%d de %d tarefas · +%d de ciência
+VAI_PARA_BATERIA,Goes to the battery on its own,Vai sozinha para a bateria
+SOBRA_BATERIA,Left %d: battery %d of %d,Sobra %d: bateria %d de %d
+SE_PERDE,%d is lost,%d se perde
+SE_CONFIRMAR,If you confirm,Se você confirmar
+SOL_SEM_TEMPESTADE,(sol without a storm),(sol sem tempestade)
+FALHA_ENERGIA,Not enough energy,Falta energia
+FALHA_OXIGENIO,Out of oxygen,Falta oxigênio
+FALHA_MARGEM,The margin runs out,A margem acaba
+ATENCAO_OXIGENIO,No air for the next sol,Sem ar para o próximo sol
+CONFIRMAR_PLANO,Confirm plan,Confirmar plano
+LISTA_TAREFAS,Tasks,Tarefas
+SEM_TAREFAS,None,Nenhuma
+ESTADO_PENDENTE,Pending,Pendente
+ESTADO_RODANDO,Running,Rodando
+ESTADO_FEITA,Done,Feita
+INICIAR,Start,Iniciar
+ABRIGO,Shelter,Abrigo
+DIARIO_DO_SOL,Log of sol %d,Diário do sol %d
+DIARIO_CALMO,A calm sol.,Um sol calmo.
+DIARIO_TEMPESTADE,The storm from the Sun arrived.,A tempestade do Sol chegou.
+DIARIO_ABRIGO_A_TEMPO,The crew sheltered in time. It cost %d of margin.,A tripulação foi para o abrigo a tempo. Gastou %d de margem.
+DIARIO_ABRIGO_TARDE,The crew sheltered late. It cost %d of margin.,A tripulação foi para o abrigo tarde. Gastou %d de margem.
+DIARIO_SEM_ABRIGO,The crew did not shelter. It cost %d of margin.,A tripulação não foi para o abrigo. Gastou %d de margem.
+DIARIO_CIENCIA,"Science: +%d this sol, %d in all.","Ciência: +%d neste sol, %d no total."
+DIARIO_NAO_FEITA,%s not done: %d of energy went back to the battery.,Tarefa %s não feita: %d de energia voltaram à bateria.
+DIARIO_PERDIDA,%d of energy was lost: the battery was full.,%d de energia se perdeu: a bateria estava cheia.
+DIARIO_MENSAGEM,Message from Earth,Mensagem da Terra
+DIARIO_SEGURANCA,"This sol passed in safe mode, with no science.","Este sol passou em modo de segurança, sem ciência."
+DIARIO_BARRAS,Bars: before and after,Barras: antes e depois
+ENVIAR_A_TERRA,Send to Earth,Enviar à Terra
+NOITE_AQUECIMENTO,Night heating: −%d energy,Aquecimento da noite: −%d de energia
+MODO_SEGURANCA,Safe mode,Modo de segurança
+CAUSA_ENERGIA,There was not enough energy for the heating.,Faltou energia para o aquecimento.
+CAUSA_OXIGENIO,The oxygen ran out.,O oxigênio acabou.
+CAUSA_RADIACAO,The radiation margin ran out.,A margem de radiação acabou.
+CAUSA_SEM_ABRIGO,The crew did not shelter in time.,A tripulação não foi para o abrigo a tempo.
+SEM_CONSERTO,"This came from earlier sols, so no plan today saves this sol.",Isso veio dos sóis anteriores. Nenhum plano de hoje salva este sol.
+CASO_REAL_ENERGIA,Real case · 2018,Caso real · 2018
+CASO_TEXTO_ENERGIA,"In 2018, Opportunity stopped like this, in a dust storm. Its panel fell from 645 to 22 Wh.","Em 2018, o Opportunity parou assim, numa tempestade de poeira. O painel caiu de 645 para 22 Wh."
+CASO_REAL_RADIACAO,Real case · May 2024,Caso real · maio de 2024
+CASO_TEXTO_RADIACAO,"In May 2024, Curiosity measured the biggest radiation spike at Mars since landing.","Em maio de 2024, o Curiosity mediu em Marte o maior pico de radiação desde o pouso."
+CASO_REAL_OXIGENIO,Real number,Número real
+CASO_TEXTO_OXIGENIO,Each person breathes about 0.9 kg of oxygen per day.,"Cada pessoa respira cerca de 0,9 kg de oxigênio por dia."
+MODOS_NA_MISSAO,Safe modes in this mission: %d,Modos de segurança nesta missão: %d
+REINICIA_O_SOL,The simulator restarts the sol,O simulador reinicia o sol
+VOLTA_AO_PLANO,Back to the plan for sol %d.,Volta ao plano do sol %d.
+SEGUIR_EM_SEGURANCA,Continue in safe mode,Seguir em modo de segurança
+SEGUIR_NOTA,This sol passes with no science and counts 1 safe mode.,Este sol passa sem ciência e conta 1 modo de segurança.
+RELATORIO_TITULO,Mission report,Relatório da missão
+RELATORIO_SUB,%d sols at Gale crater,%d sóis na cratera Gale
+N_DE_3_ESTRELAS,%d of 3 stars,%d de 3 estrelas
+ESTRELAS_NOTA,Each safe mode counts against.,Cada modo de segurança conta contra.
+N_PONTOS,%d points,%d pontos
+MARGEM_FINAL,Final margin,Margem final
+N_DE_12,%d of 12,%d de 12
+MODOS_SEGURANCA,Safe modes,Modos de segurança
+DE_VERDADE,What really happened,O que aconteceu de verdade
+DE_VERDADE_DATA,May 2024,Maio de 2024
+DE_VERDADE_TEXTO,"DONKI predicted CMEs arriving at Mars, and Curiosity measured the biggest radiation spike since landing.","O DONKI previu CMEs chegando a Marte, e o Curiosity mediu o maior pico de radiação desde o pouso."
+JOGAR_DE_NOVO,Play again,Jogar de novo
