@@ -70,6 +70,28 @@ static func celulas(ci: CanvasItem, r: Rect2, valor: float, maximo: int, cor: Co
 			cor if i < cheias else vazio)
 
 
+## Barra de células "antes → depois": cheias até `depois`; as perdidas (entre `depois` e `antes`, quando
+## cai) só com contorno; vazias preenchidas de cinza. Embaixo da barra, um triângulo marca a fronteira do `antes`.
+static func celulas_de_para(ci: CanvasItem, r: Rect2, antes: float, depois: float, maximo: int,
+		cor: Color = TEXTO, vazio: Color = CELULA_VAZIA) -> void:
+	var vao := 1.0 if r.size.x / maximo < 14.0 else 2.0
+	var larg := (r.size.x - vao * (maximo - 1)) / maximo
+	var n_antes := clampi(roundi(antes), 0, maximo)
+	var n_depois := clampi(roundi(depois), 0, maximo)
+	for i in maximo:
+		var rc := Rect2(r.position.x + i * (larg + vao), r.position.y, larg, r.size.y)
+		if i < n_depois:
+			ci.draw_rect(rc, cor)
+		elif i < n_antes:
+			ci.draw_rect(rc.grow(-0.5), cor, false, 1.0)
+		else:
+			ci.draw_rect(rc, vazio)
+	var xm := r.position.x + n_antes * (larg + vao) - vao / 2.0
+	var ym := r.end.y + 2.0
+	ci.draw_colored_polygon(PackedVector2Array([
+		Vector2(xm, ym), Vector2(xm - 3.0, ym + 4.0), Vector2(xm + 3.0, ym + 4.0)]), cor)
+
+
 ## Moldura de um retângulo: `grossura` px por dentro.
 static func moldura(ci: CanvasItem, r: Rect2, cor: Color, grossura: float = 1.0) -> void:
 	ci.draw_rect(r, cor, false, grossura)
@@ -189,3 +211,34 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 		"noite":
 			ci.draw_circle(c, s * 0.42, cor)
 			ci.draw_circle(c + Vector2(s * 0.22, -s * 0.12), s * 0.36, fundo)
+		"camera":
+			ci.draw_rect(Rect2(p.x + s * 0.04, p.y + s * 0.26, s * 0.92, s * 0.62), cor, false, w)
+			ci.draw_rect(Rect2(p.x + s * 0.30, p.y + s * 0.12, s * 0.28, s * 0.14), cor)
+			ci.draw_arc(Vector2(p.x + s * 0.5, p.y + s * 0.57), s * 0.2, 0.0, TAU, 14, cor, w)
+		"lista":
+			for k in 3:
+				var yk := p.y + s * (0.20 + 0.30 * k)
+				ci.draw_rect(Rect2(p.x + s * 0.06, yk - s * 0.07, s * 0.14, s * 0.14), cor)
+				ci.draw_line(Vector2(p.x + s * 0.36, yk), Vector2(p.x + s * 0.94, yk), cor, w)
+		"diario":
+			ci.draw_rect(Rect2(p.x + s * 0.16, p.y + s * 0.06, s * 0.68, s * 0.88), cor, false, w)
+			ci.draw_line(p + Vector2(s * 0.32, s * 0.06), p + Vector2(s * 0.32, s * 0.94), cor, w)
+			for k in 3:
+				var yk := p.y + s * (0.30 + 0.20 * k)
+				ci.draw_line(Vector2(p.x + s * 0.46, yk), Vector2(p.x + s * 0.72, yk), cor, w)
+		"fontes":
+			# Pilha de dados (cilindro): de onde vêm os números.
+			var rx := s * 0.40
+			var ry := s * 0.14
+			var xc := p.x + s * 0.5
+			var topo := PackedVector2Array()
+			for k in 17:
+				topo.append(Vector2(xc + cos(k * TAU / 16.0) * rx, p.y + s * 0.18 + sin(k * TAU / 16.0) * ry))
+			ci.draw_polyline(topo, cor, w)
+			ci.draw_line(Vector2(xc - rx, p.y + s * 0.18), Vector2(xc - rx, p.y + s * 0.82), cor, w)
+			ci.draw_line(Vector2(xc + rx, p.y + s * 0.18), Vector2(xc + rx, p.y + s * 0.82), cor, w)
+			for yb in [0.50, 0.82]:
+				var arco := PackedVector2Array()
+				for k in 9:
+					arco.append(Vector2(xc + cos(k * PI / 8.0) * rx, p.y + s * yb + sin(k * PI / 8.0) * ry))
+				ci.draw_polyline(arco, cor, w)

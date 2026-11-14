@@ -504,8 +504,9 @@ func _ui_da_tela() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not OS.has_feature("web"):
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
-		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui())]
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
+		_terminal.aba_na_tela(), _terminal.card_aberto]
 	var agora := Time.get_ticks_msec() / 1000.0
 	if chave != _sonda_chave or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
@@ -549,6 +550,7 @@ func _sonda_teste() -> void:
 		"causa": m.causa if m.fase == "seguranca" else null,
 		"estrelas": m.estrelas(),
 		"terminal_aberto": _terminal.aberto,
+		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(),
 		"ui": _ui_da_tela(),
 	}

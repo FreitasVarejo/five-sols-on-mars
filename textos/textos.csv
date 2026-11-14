@@ -7,7 +7,6 @@ CIENCIA,Science,Ciência
 MEDIDOR,Radiation,Radiação
 CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
-CAB_TURNO,· Shift,· Turno
 SOL_N,Sol %d,Sol %d
 AVISO_TEMPESTADE,A storm from the Sun is coming. It should arrive between sol 3 and sol 4.,Uma tempestade do Sol vem aí. Deve chegar entre o sol 3 e o sol 4.
 DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
@@ -17,7 +16,6 @@ DONKI_DADO_DE,DONKI data from %s,Dados do DONKI de %s
 DONKI_DADO_HISTORICO,Historical data: May 2024,Dado histórico: maio de 2024
 TANQUE_O2,O2 tank,Tanque de O2
 TANQUE_AGORA,Now: %d of %d,Agora: %d de %d
-TANQUE_DEPOIS,After the plan: %s,Depois do plano: %s
 AR_PARA_1,Air for 1 sol,Ar para 1 sol
 AR_PARA_N,Air for %d sols,Ar para %d sóis
 TRIPULACAO_RESPIRA,The crew breathes %d per sol.,A tripulação respira %d por sol.
@@ -25,32 +23,23 @@ UM_SOL,1 sol,1 sol
 ENERGIA_DO_SOL,Energy for sol %d,Energia do sol %d
 LINHA_BATERIA,Battery,Bateria
 LINHA_PAINEL,+ Solar panel,+ Painel solar
-LINHA_AQUECIMENTO,− Night heating (fixed),− Aquecimento da noite (fixo)
+LINHA_AQUECIMENTO,− Night heating,− Aquecimento da noite
 LINHA_PARA_DIVIDIR,= To divide,= Para dividir
 O2_CUSTO,−%d energy for +1 O2,−%d energia por +1 O2
 GERADOR_QUEBRADO,"generator broken: 0 O2, fix it in the shift","gerador quebrado: 0 O2, conserte no turno"
 TAREFA_CHEMCAM,ChemCam,ChemCam
 TAREFA_AMOSTRA,Sample,Amostra
 TAREFA_PLANTA,Plant,Planta
-TAREFAS_RESUMO,%d of %d tasks · +%d science,%d de %d tarefas · +%d de ciência
-VAI_PARA_BATERIA,Goes to the battery on its own,Vai sozinha para a bateria
-SOBRA_BATERIA,Left %d: battery %d of %d,Sobra %d: bateria %d de %d
-SE_PERDE,%d is lost,%d se perde
-SE_CONFIRMAR,If you confirm,Se você confirmar
-SOL_SEM_TEMPESTADE,(sol without a storm),(sol sem tempestade)
 FALHA_ENERGIA,Not enough energy,Falta energia
 FALHA_OXIGENIO,Out of oxygen,Falta oxigênio
 FALHA_MARGEM,The margin runs out,A margem acaba
-ATENCAO_OXIGENIO,No air for the next sol,Sem ar para o próximo sol
 CONFIRMAR_PLANO,Confirm plan,Confirmar plano
-LISTA_TAREFAS,Tasks,Tarefas
 SEM_TAREFAS,None,Nenhuma
 ESTADO_PENDENTE,Pending,Pendente
 ESTADO_RODANDO,Running,Rodando
 ESTADO_FEITA,Done,Feita
 INICIAR,Start,Iniciar
 ABRIGO,Shelter,Abrigo
-DIARIO_DO_SOL,Log of sol %d,Diário do sol %d
 DIARIO_CALMO,A calm sol.,Um sol calmo.
 DIARIO_TEMPESTADE,The storm from the Sun arrived.,A tempestade do Sol chegou.
 DIARIO_ABRIGO_A_TEMPO,The crew sheltered in time. It cost %d of margin.,A tripulação foi para o abrigo a tempo. Gastou %d de margem.
@@ -93,3 +82,34 @@ DE_VERDADE,What really happened,O que aconteceu de verdade
 DE_VERDADE_DATA,May 2024,Maio de 2024
 DE_VERDADE_TEXTO,"DONKI predicted CMEs arriving at Mars, and Curiosity measured the biggest radiation spike since landing.","O DONKI previu CMEs chegando a Marte, e o Curiosity mediu o maior pico de radiação desde o pouso."
 JOGAR_DE_NOVO,Play again,Jogar de novo
+ABA_CAMERAS,Cameras,Câmeras
+ABA_TAREFAS,Tasks,Tarefas
+ABA_DIARIO,Log,Diário
+ABA_FONTES,Sources,Fontes
+CAB_SOL_ABA,· Sol %d of %d,· Sol %d de %d
+VOLTAR_AO_PLANO,Back to plan,Voltar ao plano
+FECHAR,Close,Fechar
+AQUECIMENTO_DA_NOITE,Night heating,Aquecimento da noite
+CADA,each,cada
+BATERIA_CHEIA_PERDE,Battery full: %d is lost,Bateria cheia: %d se perde
+SEM_CONTAR_TEMPESTADE,Not counting the storm,Sem contar a tempestade
+CAMERAS_VAZIO,No image yet,Sem imagem ainda
+DIARIO_VAZIO,No log yet,Nenhum diário ainda
+FONTES_TITULO,Where the numbers come from,De onde vêm os números
+FONTE_DONKI_FATO,Storm from the Sun: CME predicted at Mars on %s.,Tempestade do Sol: CME prevista em Marte em %s.
+FONTE_DONKI_FONTE,"NASA DONKI (CCMC), WSA-ENLIL. Data from %s.","NASA DONKI (CCMC), WSA-ENLIL. Dados de %s."
+FONTE_DONKI_HIST_FATO,Storm from the Sun: CMEs predicted at Mars in May 2024.,Tempestade do Sol: CMEs previstas em Marte em maio de 2024.
+FONTE_DONKI_HIST_FONTE,"NASA DONKI (CCMC), WSA-ENLIL. Historical data.","NASA DONKI (CCMC), WSA-ENLIL. Dado histórico."
+FONTE_O2_FATO,Each person breathes about 0.9 kg of oxygen per day.,"Cada pessoa respira cerca de 0,9 kg de oxigênio por dia."
+FONTE_O2_FONTE,"NASA, BVAD Rev2 (2022).","NASA, BVAD Rev2 (2022)."
+FONTE_MOXIE_FATO,Making 1 kg of oxygen on Mars takes 8 to 12 kWh.,Fazer 1 kg de oxigênio em Marte gasta de 8 a 12 kWh.
+FONTE_MOXIE_FONTE,"Team estimate from MOXIE data (NASA/JPL, 2023).","Conta do time com dados do MOXIE (NASA/JPL, 2023)."
+FONTE_LIMITE_FATO,Radiation limit for one solar event: 250 mSv.,Limite de radiação num evento solar: 250 mSv.
+FONTE_LIMITE_FONTE,"NASA-STD-3001, volume 1.","NASA-STD-3001, volume 1."
+FONTE_RAD_FATO,"On 20/05/2024, radiation at Gale went from 4 to 304 µGy/h.","Em 20/05/2024, a radiação em Gale foi de 4 a 304 µGy/h."
+FONTE_RAD_FONTE,"Curiosity RAD, NASA RadLab.","Curiosity RAD, NASA RadLab."
+FONTE_PAINEL_FATO,"In 2018, Opportunity's panel fell from 645 to 22 Wh.","Em 2018, o painel do Opportunity caiu de 645 para 22 Wh."
+FONTE_PAINEL_FONTE,"JPL, cited by The Planetary Society.","JPL, citado pela Planetary Society."
+FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem da Terra a Marte leva de 3 a 22 min.
+FONTE_ATRASO_FONTE,NASA.,NASA.
+FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
