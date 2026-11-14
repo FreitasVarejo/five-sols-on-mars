@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 14:36. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 14:36, com as linhas da tela (escala, aviso de girar e menu inicial) de 14/11/2026 15:48. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -71,6 +71,8 @@ A troca com custo, decidida pelo dono em 14/11:
 - **[P]** De 3 a 4 câmeras para fora (painel solar, rocha, área de amostra, MOXIE). As tarefas de fora são feitas por braço robótico ou rover, como o InSight limpou o painel com a pá.
 - **[R]** Os botões ficam fora do espaço distorcido pelo shader: grandes, na faixa vertical central, com no mínimo 24 × 24 px pela WCAG e maiores para criança.
 - **[R]** Setas grandes para o pan, porque toque não tem mouse.
+- **[P]** Em celular em pé, a página mostra um aviso para deitar o aparelho, em inglês e português, por cima de tudo e desde o carregamento (dono, 14/11). Em pé, o jogo ocupa no máximo um terço da tela em qualquer escala.
+- **[P]** Menu inicial antes do sol 1, com o botão Jogar (dono, 14/11). O toque em Jogar pede tela cheia e, em tela cheia, trava a orientação deitada onde o navegador deixa; onde não deixa, vale o aviso. O runtime Web do Godot tem o pedido de tela cheia, mas não a trava, que é uma chamada de JavaScript feita pelo jogo. O turno não pausa em retrato; reavaliar no playtest.
 
 Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A tela mostra metade do panorama, então o que fica nas pontas só aparece virando, e é isso que dá propósito ao pan:
 
@@ -169,7 +171,7 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
 ## Arte
 
 - **[R]** Render prévio no Blender, um PNG por estado com a mesma câmera, e o jogo em 2D com panorama: [0002](decisoes/0002-a-arte-e-renderizada-antes-no-blender-e-entra-como-panorama-2d.md).
-- **[R]** Pixel art em 640×360, escala inteira e filtro Nearest.
+- **[R]** Pixel art em 640×360 e filtro Nearest nas texturas. A resolução interna é fixa; a escala na tela é fracionária (dono, 14/11). Com a escala inteira, o jogo ocupava de 10% a 42% da tela no celular e 26% num notebook de 1366×768 em janela; o custo da fracionária é a borda do pixel levemente suavizada.
 - **[R]** Fonte com acentos e licença aberta (Pixeloid, OFL).
 - **[R]** Nenhum asset do FNAF nem de fangame.
 - **[R]** IA de imagem só para retoque por inpainting, com cada uso no registro-uso-de-si.
@@ -190,6 +192,7 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
   - consertar o gerador;
   - ChemCam;
   - sol 1 guiado;
+  - menu inicial com o botão Jogar;
   - português e inglês;
   - arte final.
 - **P2, se sobrar:** amostra, planta, "Perguntar à Terra" e estática nas câmeras.

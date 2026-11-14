@@ -23,7 +23,7 @@ Para quem chega agora no Five Sols on Mars. Este texto conta o que já foi decid
 ### Plataforma
 
 - Navegador, sem download e sem conta, exigência do desafio. **Godot 4.7.2**, renderer **Compatibility** (o único que roda na Web), export Web **single-threaded**, publicado no **GitHub Pages**.
-- Tela de **640×360** com escala inteira e filtro Nearest, em pixel art. A fonte é a Pixeloid (OFL), que tem acentos.
+- Tela de **640×360** com escala fracionária e filtro Nearest, em pixel art. A fonte é a Pixeloid (OFL), que tem acentos.
 - **Coleta zero:** sem analytics, cookies, login ou chamada a terceiros no código. Progresso só em `localStorage`. Os dados da NASA vão **embutidos no build**, nunca buscados ao vivo do navegador, porque isso mandaria o IP da criança para fora.
 - Inglês por padrão e português num seletor, com as strings numa tabela CSV desde a primeira hora.
 
