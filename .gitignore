@@ -2,3 +2,4 @@
 build/
 *.tmp
 arte/blender/.render/
+__pycache__/

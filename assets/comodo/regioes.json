@@ -1,0 +1,107 @@
+{
+  "formato": "x, y, w, h em px do PNG; origem no canto superior esquerdo",
+  "panorama": {
+    "largura": 1280,
+    "altura": 360,
+    "graus": 180.0,
+    "faixa_de_clique_y": [
+      120,
+      250
+    ],
+    "cor_das_telas_em_branco": "#202e37",
+    "arquivos": [
+      "normal.png",
+      "tempestade.png",
+      "abrigo.png",
+      "modo_seguranca.png"
+    ]
+  },
+  "telas": {
+    "energia": {
+      "x": 406,
+      "y": 39,
+      "w": 225,
+      "h": 142
+    },
+    "oxigenio": {
+      "x": 649,
+      "y": 39,
+      "w": 225,
+      "h": 142
+    },
+    "radiacao": {
+      "x": 149,
+      "y": 49,
+      "w": 129,
+      "h": 77
+    }
+  },
+  "botoes": {
+    "abrigo": {
+      "x": 168,
+      "y": 153,
+      "w": 90,
+      "h": 90
+    },
+    "terra": {
+      "x": 293,
+      "y": 167,
+      "w": 65,
+      "h": 82
+    },
+    "camera_painel": {
+      "x": 991,
+      "y": 121,
+      "w": 84,
+      "h": 62
+    },
+    "camera_rocha": {
+      "x": 1076,
+      "y": 121,
+      "w": 85,
+      "h": 62
+    },
+    "camera_amostra": {
+      "x": 991,
+      "y": 186,
+      "w": 84,
+      "h": 62
+    },
+    "camera_moxie": {
+      "x": 1076,
+      "y": 186,
+      "w": 85,
+      "h": 62
+    },
+    "planta": {
+      "x": 1167,
+      "y": 122,
+      "w": 108,
+      "h": 126
+    }
+  },
+  "janela": {
+    "x": 284,
+    "y": 64,
+    "w": 100,
+    "h": 101
+  },
+  "monitor_portatil": {
+    "arquivo": "monitor_portatil.png",
+    "largura": 400,
+    "altura": 300,
+    "tela": {
+      "x": 40,
+      "y": 30,
+      "w": 320,
+      "h": 180
+    },
+    "abaixar": {
+      "x": 271,
+      "y": 215,
+      "w": 113,
+      "h": 74
+    },
+    "tela_proporcao": "16:9 (320x180: a câmera externa de 640x360 cabe a 50%)"
+  }
+}
