@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 17:15. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 17:56. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -14,7 +14,7 @@ Wireframe das telas (14/11): https://claude.ai/artifact/QotyJYnZuz6gMMqdJPpPHE. 
 
 ## O jogo
 
-Uma criança de 7 a 12 anos comanda por 5 sóis um posto na cratera Gale, em Marte, de dentro do módulo de comando. Ela divide a energia, faz tarefas de uma tela e se protege das tempestades do Sol e da poeira. Sai sabendo que toda escolha tem custo. É um **treinador de missão**: a falha reinicia o sol no simulador, e o fim da missão é um debriefing.
+Uma criança de 7 a 12 anos comanda por 5 sóis um posto na cratera Gale, em Marte, de dentro do módulo de comando. Ela divide a energia, faz tarefas de uma tela e se protege das tempestades do Sol e da poeira. Sai sabendo que toda escolha tem custo. É um **treinador de missão**: a falha leva ao modo de segurança, sem game over, e o fim da missão é um debriefing.
 
 - **[R]** Marte, não a Lua: [0001](decisoes/0001-o-posto-do-jogo-fica-em-marte-nao-na-lua.md).
 - **[R]** Navegador, sem download e sem conta (desafio). Godot 4.7.2 com renderer Compatibility e export Web single-threaded (godot-primeira-pessoa-pixel-art (pesquisa no vault do dono)).
@@ -38,23 +38,24 @@ Três barras e nenhuma escolha segura sem custo (desafio: de 2 a 3 recursos cent
 - **[R]** O **medidor de radiação**, com dois limiares (atenção e ir para o abrigo), fica separado das barras, como o sensor da Orion (operacao-real-em-marte-para-o-jogo (pesquisa no vault do dono)).
 - **[R]** As proporções vêm do dado:
   - cada pessoa respira cerca de 0,9 kg de O2 por dia;
-  - o oxigênio custa de 8 a 12 kWh/kg num MOXIE em escala real (inferência sobre números da NASA);
-  - a dose média em Gale triplicou em maio de 2024;
-  - limite de 250 mSv por evento solar.
+  - o oxigênio custa de 8 a 12 kWh/kg num MOXIE em escala real (inferência sobre números da NASA; a escala real foi pensada para o propelente de volta, e o MOXIE de verdade fez cerca de 10,5 g/h). Na tela: "uma versão gigante do MOXIE, que ainda não existe";
+  - em 20/05/2024, a dose do dia no Curiosity foi cerca de 17 vezes a dos dias anteriores, com pico cerca de 80 vezes (RadLab). Não usar "triplicou", que compara a véspera com o dia seguinte ao pico;
+  - a NASA projeta a proteção para que o evento solar de referência (a soma dos eventos de outubro de 1989) dê menos de 250 mSv (NASA-STD-3001 Vol. 1 Rev C, V1 4031). Não é teto de cada evento.
+- **[R]** A escala da radiação (dono, 14/11). Na margem, a tempestade solar vale de 15 a 20 sóis normais, pela razão de 20/05/2024. Só o fundo não zera a margem nos 5 sóis. A escala é ampliada: na realidade, 5 sóis em Gale dão menos de 1,5% do limite, e o pico de maio de 2024 ficou em cerca de 3% de 250 mGy. A tela diz que, no jogo, cada sol vale muitos dias de radiação de verdade.
 
   Fontes: recursos-de-habitat-lunar-e-marciano (pesquisa no vault do dono) e dados-nasa-do-junior-astronaut (pesquisa no vault do dono).
-- **[P]** Os números do jogo, os máximos e os limiares das estrelas são do primo. A [página de calibração](https://claude.ai/artifact/BbJQ9PyK6rhk4C3jKahBzE) simula os 5 sóis com três estratégias (tudo em ciência, equilibrada, conservadora) em todos os sóis de início da poeira e avisa quando uma domina.
+- **[P]** Os números do jogo, os máximos e os limiares das estrelas são do primo. A [página de calibração](https://claude.ai/artifact/BbJQ9PyK6rhk4C3jKahBzE) simula os 5 sóis com três estratégias (tudo em ciência, equilibrada, conservadora) em todos os sóis de início da poeira e avisa quando uma domina. Ela ainda usa a razão antiga de 3 entre a tempestade e o sol normal, anterior à escala de 14/11.
 
 A troca com custo, decidida pelo dono em 14/11:
 
 - **[R]** A energia que sobra do plano vai sozinha para a bateria. Guardar custa a ciência que não se fez, e não há controle "guardar".
 - **[R]** A bateria tem teto, e o excedente se perde. **[P]** O valor, calibrado para que o teto não seja o que decide o jogo.
 - **[R]** O O2 produzido a mais fica no tanque, até o máximo dele: é a troca "reserva de oxigênio por pesquisa" das perguntas-guia do desafio.
-- **[R]** O **aquecimento da noite** sai da energia todo sol, antes do plano e sem escolha. É uma linha fixa na fase de plano, não uma 4ª barra. É o que dá à bateria função própria na tempestade de poeira, porque o tanque de O2 sozinho não cobre o aquecimento. Base: o Opportunity em 2018 e o InSight em 2022 pararam sem energia para os aquecedores de sobrevivência. **[P]** O valor; o de partida é 1 contra 8 do painel.
+- **[R]** O **aquecimento da noite** sai da energia todo sol, antes do plano e sem escolha. É uma linha fixa na fase de plano, não uma 4ª barra. É o que dá à bateria função própria na tempestade de poeira, porque o tanque de O2 sozinho não cobre o aquecimento. Base: o Opportunity em 2018 e o InSight em 2022 pararam sem energia. Os releases do JPL não falam em aquecedores: o aquecimento da noite é simplificação do jogo, e a tela diz "ficou sem energia". **[P]** O valor; o de partida é 1 contra 8 do painel.
 
 ## Missão e sol
 
-- **[P]** A missão tem 5 sóis.
+- **[P]** A missão tem 5 sóis, os de antes do freeplay (dono, 14/11; freeplay-drone).
 - **[R]** O sol 1 é guiado, um passo por vez, sem evento. Do 2º ao 5º ano, instruir antes funciona melhor que deixar tentar (jogos-educativos-7-a-12-anos (pesquisa no vault do dono)).
 - **[P]** O tutorial do sol 1 é um roteiro gravado que a Terra manda no pacote da manhã. A base mostra um passo por vez, conforme a criança termina o anterior, porque com o atraso a Terra não vê o clique.
 - Cada sol tem duas fases e o fim do sol:
@@ -72,7 +73,7 @@ A troca com custo, decidida pelo dono em 14/11:
 - **[P]** No sol 1 guiado, o plano vem em passos, uma decisão por tela: a mensagem, o oxigênio, a ciência e o resumo com "Confirmar plano". Nos sóis 2 a 5, a tela única, porque separar oxigênio e ciência esconderia a troca entre eles.
 - **[P]** O turno dura de 60 a 90 s, com 1 s = 1 min de tempo real.
 - **[P]** O que encerra o turno:
-  - o relógio, que começa em "Confirmar plano". O Sol andando no céu é esse relógio desenhado: na faixa do Sol, na janela (dia, pôr do Sol, escuro) e na luz da sala, que esquenta nos últimos ~10 s sem piscar. Quando o Sol se põe, o turno acaba sozinho;
+  - o relógio, que começa em "Confirmar plano". O Sol andando no céu é esse relógio desenhado: na faixa do Sol, na janela (dia, pôr do Sol, escuro) e na luz da sala, que fica azulada nos últimos ~10 s sem piscar, como o pôr do Sol em Gale (Curiosity, sol 956). Quando o Sol se põe, o turno acaba sozinho;
   - ou a criança, pelo botão "Encerrar o sol", que só aparece quando todas as tarefas da lista acabaram;
   - o modo de segurança no meio do turno também encerra o turno ali.
 - **[P]** O pico de um evento é sorteado só até ~70% do turno, para nunca coincidir com o pôr do Sol.
@@ -135,24 +136,25 @@ O computador da base, que reúne o que a criança consulta e faz pela tela. Base
 
 | Tarefa | Tipo | Barra | Interação | Base real |
 |---|---|---|---|---|
-| Limpar o painel | manutenção | Energia | Arrastar a escova do braço sobre a poeira | Poeira derrubou o InSight; a pá do braço limpou um painel |
+| Limpar o painel | manutenção | Energia | Arrastar a escova do braço sobre a poeira | Poeira derrubou o InSight; em 2021 a pá soltou areia ao vento, que tirou parte da poeira de um painel (+30 Wh por sol) |
 | Consertar o gerador | manutenção | Oxigênio | Achar a peça certa e encaixar | Filtro entupido e sensor de hidrogênio trocado nos geradores da ISS |
-| Montar o abrigo | manutenção | Margem de radiação | Arrastar a carga para as paredes antes do pico | Procedimento da Artemis II |
 | Laser do ChemCam | ciência | Energia → ciência | Mirar pontos numa rocha e disparar | 30 pulsos por ponto |
 | Selar a amostra | ciência | Energia → ciência | Perfurar, encher o tubo e selar | 43 tubos no Perseverance; a primeira coleta saiu vazia |
 | Cultivar planta | ciência | Energia → ciência | Regular luz e água | Veggie e APH na ISS; material da CSA citado no desafio |
 
 - **[P]** As interações e a dificuldade de cada tarefa.
-- **[P]** Onde cada tarefa se faz: painel, gerador (MOXIE) e ChemCam pelas câmeras do terminal; amostra na glovebox e planta na estufa, na parede direita; abrigo na porta da esquerda.
-- **[R]** O abrigo custa tempo: no turno em que a tripulação se abriga, não rende ciência. Abrigar cedo demais perde ciência à toa, e tarde demais recebe dose.
+- **[P]** Onde cada tarefa se faz: painel, gerador (MOXIE) e ChemCam pelas câmeras do terminal; amostra na glovebox e planta na estufa, na parede direita.
+- **[R]** Abrigar é um toque na porta da esquerda, não minigame (dono, 14/11). O porquê: arrastar a carga punia a habilidade motora e fazia a dose depender do reflexo. A base real é o procedimento da Artemis II, com a carga nas paredes.
+- **[R]** O abrigo custa tempo: a ciência feita antes de abrigar conta, e depois a tripulação não faz mais tarefas no turno (dono, 14/11). Abrigar cedo demais perde ciência à toa, e tarde demais recebe dose.
 - **[R]** Tarefa de ciência não feita até o fim do turno: o plano só reserva a energia, e a tarefa a gasta quando roda, como o instrumento real só gasta quando liga. A reserva da tarefa não feita volta à bateria, respeitando o teto (o excedente se perde).
   - O porquê: perder a energia puniria a habilidade motora em vez da escolha, e faria o abrigo custar energia, não só tempo.
   - Consequência para a calibração: ela supõe toda tarefa escolhida feita, então vale como teto.
 - **[R]** Tarefa de manutenção não feita: a consequência vem pela própria barra, e a tarefa continua na lista no sol seguinte. O diário registra a consequência antes de ela pesar.
   - painel sujo rende menos no sol seguinte;
-  - gerador quebrado produz zero O2. O plano mostra "gerador quebrado: 0 O2, conserte no turno";
-  - abrigo não montado recebe a dose no próprio turno.
+  - gerador quebrado produz zero O2. O plano mostra "gerador quebrado: 0 O2, conserte no turno".
+- **[R]** Sem abrigo, a tripulação recebe a dose da tempestade no próprio turno.
 - **[P]** O conserto do gerador no turno libera a produção de O2 do mesmo sol.
+- **[R]** O gerador quebra num sol sorteado da missão, e a reserva de O2 é o seguro contra a quebra (dono, 14/11). O porquê: sem quebra, o tanque de O2 nunca compensava, e a pergunta-guia "reserva de oxigênio por pesquisa" ficava sem escolha. **[P]** Quantas quebras e em que sóis.
 - **[R]** Pedido de ciência da Terra não feito vence no fim do sol e vai para o diário.
 
 ## Eventos
@@ -161,12 +163,13 @@ O computador da base, que reúne o que a criança consulta e faz pela tela. Base
 - **Tempestade solar** **[R]**:
   - o DONKI prevê a CME chegando a Marte, e o aviso aparece na fase de plano dias antes, numa janela incerta;
   - no turno, o pico de partículas vem de repente, e quem olha o medidor e abriga na hora leva menos dose;
-  - base: em maio de 2024 o DONKI previu CMEs em Marte e o Curiosity mediu o maior pico de radiação desde o pouso.
+  - base: em maio de 2024 o DONKI previu cerca de 10 chegadas de CME a Marte, mas o maior pico desde o pouso veio de um flare e de uma CME do próprio dia 20/05, para a qual o DONKI não previu impacto em Marte. As partículas chegaram em dezenas de minutos;
+  - na tela: "O DONKI avisou de uma semana de tempestades a caminho de Marte. O golpe mais forte veio de surpresa, minutos depois de uma explosão no Sol. Só o medidor da base viu na hora."
 - **Tempestade de poeira** **[R]**:
   - não tem aviso do início, porque não há previsão real;
   - o painel quase para por alguns sóis, e só salva quem guardou energia antes;
   - limpar o painel não resolve, porque a poeira está no céu;
-  - base: em 2018 o Opportunity caiu de 645 para 22 Wh e não acordou mais;
+  - base: em 2018 o Opportunity caiu de 645 para 22 Wh e não acordou mais. A tempestade real começou em 30/05/2018 e só acabou entre agosto e setembro; a de 2 sóis é encurtada, e a tela diz isso;
   - o sol de início é sorteado entre 2 e 5 a cada missão, e o sorteio se mantém quando o sol recomeça;
   - comportamento-alvo (14/11): numa tempestade de 2 sóis, quem aposta tudo em ciência entra em modo de segurança na maioria dos sorteios, e quem divide passa;
   - **[P]** números de partida: ar inicial para 2 sóis (4, com consumo de 2 por sol), tempestade de 2 sóis com o painel a 10%, aquecimento 1.
@@ -195,7 +198,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
 - **[R]** Não há game over. Quando falta energia para o aquecimento, o oxigênio acaba ou a margem de radiação zera, entra o **modo de segurança**, como o safe mode real: a base corta o não essencial, a tripulação se protege e a ciência para.
 - **[R]** Uma tela explica a causa em 1 a 2 frases, com número ou caso real:
   - energia: o Opportunity em 2018;
-  - radiação: maio de 2024;
+  - radiação: o evento de referência de outubro de 1989, para o qual a NASA projeta o abrigo. Maio de 2024, o maior pico medido em Marte, ficou abaixo do limite, então não serve de caso de falha: a tela diz que no jogo a dose foi ampliada;
   - oxigênio: cerca de 0,9 kg por pessoa por dia, até um caso confirmado.
 - **[R]** Depois do modo de segurança, a saída depende de o sol ter conserto (14/11):
   - se algum plano salva o sol, o botão "o simulador reinicia o sol" volta ao começo da fase de plano do mesmo sol;
@@ -216,6 +219,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
 - **[P]** As chegadas a Marte que o DONKI prevê na janela de 60 dias costumam já ter passado na hora do build. O simulador reencena a CME real mais recente ("o DONKI previu esta CME chegando a Marte em 13/11; no simulador, ela chega no sol 3") e nunca apresenta a chegada como algo que ainda vai acontecer (dono, 14/11).
 - **[R]** O dado vem de `scripts/baixar_donki.py`, que o `scripts/publicar.sh` roda antes do export; o formato está no docstring do script.
 - **[R]** Se o filtro de impacto em Marte vier vazio na janela, vale o recorte histórico.
+- **[R]** Nenhuma dose medida fica ligada à CME recente reencenada: o RadLab só tem o Curiosity até maio de 2024.
 - **[R]** Coleta zero:
   - sem analytics, cookies, login ou chamada a terceiros no código;
   - as fontes vão empacotadas no build;
@@ -241,17 +245,21 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
   - o terminal com o botão único e a fase de plano dentro dele, com as três barras;
   - o fim do turno pelo relógio, um diário mínimo com "Enviar à Terra", modo de segurança e relatório;
   - a tempestade solar com o dado embutido, com o aviso da Terra num card azul simples;
-  - a tarefa do abrigo.
+  - o abrigo, com um toque na porta;
+  - uma tarefa de ciência mínima: o ChemCam com um clique;
+  - a tempestade de poeira só como efeito na barra de energia;
+  - consertar o gerador, com a quebra sorteada;
+  - o botão "Encerrar o sol".
+  - O porquê (dono, 14/11): sem ciência e sem poeira, "tudo em ciência" ganhava das outras estratégias em tudo, o que fere "nenhuma escolha segura sem custo".
 - **P1, o que dá o desenho (sábado à noite e domingo de manhã):**
   - primeiro, o plano enxuto, o card por cima do plano e as 4 abas do terminal, com a de fontes já preenchida (o plano enxuto depende dela);
   - o conteúdo das abas de câmeras e de tarefas;
-  - tempestade de poeira e limpar o painel;
-  - consertar o gerador;
-  - ChemCam;
+  - limpar o painel e a poeira escurecendo a janela;
+  - o ChemCam completo, com mira;
   - os cards azuis com destaque e a tela de comunicação;
   - sol 1 guiado, com o plano em passos;
   - o diário completo;
-  - "Encerrar o sol" e a sala acompanhando o pôr do Sol;
+  - a sala acompanhando o pôr do Sol;
   - menu inicial com o botão Jogar;
   - português e inglês;
   - arte final.
@@ -275,11 +283,12 @@ Nome, voz e imagem de menor ficam fora da submissão.
 - Quem faz o quê. O dono ainda não quer fechar as funções. Rascunho:
   - o primo faz as cenas, o loop, as barras, as tarefas, o shader e o ajuste dos números;
   - o dono faz a arte, o script do DONKI, os textos com fonte, o deploy, a submissão e os créditos.
-- A cor do pôr do Sol em Marte (azulada nas fotos dos rovers): conferir a fonte antes de entrar no jogo.
+- As recomendações da revisão de 14/11 que o dono ainda não decidiu: https://claude.ai/artifact/KYBpTRojemg14ztGLzBLu1. São elas: a nota das estrelas, a tela do modo de segurança com o sol e a escolha que causaram a pane, a tempestade solar e a de poeira no mesmo sol, o "Encerrar" antes do pico, a leitura para 7 anos e o idioma inicial, e a duração do turno contra o playtest.
 ## O que não faz (propostas recusadas)
 
 - Plano dividido em abas: o terminal já tem as 4 abas do limite, e o efeito previsto sairia de perto do controle.
 - Plano em passos nos sóis 2 a 5: separar oxigênio e ciência esconderia a troca entre eles, que é a lição do jogo. Fica só no sol 1.
+- Barra de comida ou de fome: a tripulação tem comida suficiente, e o jogo não toca no assunto (dono, 14/11). A planta e a amostra são tarefas de ciência.
 - Lua como cenário: [0001](decisoes/0001-o-posto-do-jogo-fica-em-marte-nao-na-lua.md).
 - Blindagem como barra que acaba: não corresponde a nada físico. O recurso é a margem de radiação, e o abrigo é a ação.
 - Escudo que gasta energia: não tem respaldo no que a NASA faz, e o abrigo custa tempo.

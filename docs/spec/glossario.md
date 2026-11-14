@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 15:52. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 17:56. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Glossário
 
@@ -30,7 +30,7 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 
 - **Pedido** — o que a Terra pede de ciência num sol, com o valor de cada um. A criança escolhe no plano o que aceitar; pedido não feito vence no fim do sol. Não é ordem: a Terra pede, e quem decide é a base.
 
-- **Margem de radiação** — quanto a tripulação ainda pode receber de radiação na missão: o limite menos a dose acumulada. É a terceira barra, ao lado de energia e oxigênio, e a única que nunca enche de volta, porque dose recebida não sai do corpo. Não chamar de "blindagem": blindagem é o que se faz para protegê-la (o abrigo), não um estoque.
+- **Margem de radiação** — quanto a tripulação ainda pode receber de radiação na missão: o limite menos a dose acumulada. É a terceira barra, ao lado de energia e oxigênio, e a única que nunca enche de volta, porque o limite soma toda a dose recebida na carreira. Não chamar de "blindagem": blindagem é o que se faz para protegê-la (o abrigo), não um estoque.
    → recursos-de-habitat-lunar-e-marciano (pesquisa no vault do dono)
 
 - **Medidor de radiação** — o sensor da base que mostra quanta radiação está chegando agora, com dois limiares (atenção e ir para o abrigo), como o da Orion na Artemis II. Não é barra de recurso: é o que a criança olha para decidir quando abrigar.
@@ -38,9 +38,9 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 
 - **Tarefa de ciência** — minigame que a criança escolhe na fase de plano, em geral a partir de um pedido da Terra, e que rende pontos de ciência no turno (ChemCam, amostra, planta). O plano reserva a energia, e a tarefa a gasta quando roda; a reserva da tarefa não feita volta à bateria. É a escolha com custo.
 
-- **Tarefa de manutenção** — minigame que a própria base pede no turno, como consequência do que aconteceu (painel sujo, gerador com falha, abrigo quando o medidor sobe). Protege um recurso. Não se escolhe: se faz ou se paga.
+- **Tarefa de manutenção** — minigame que a própria base pede no turno, como consequência do que aconteceu (painel sujo, gerador com falha). Protege um recurso. Não se escolhe: se faz ou se paga.
 
-- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. Custa tempo de ciência, não energia. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
+- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. No jogo é um toque na porta, não minigame. Custa tempo de ciência, não energia: a ciência feita antes de abrigar conta, e depois o turno não rende mais. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
    → painel-da-tripulacao-e-alertas (pesquisa no vault do dono)
 
-- **Modo de segurança** — o que acontece quando o oxigênio acaba ou a margem de radiação zera: a base corta o que não é essencial e a tripulação se protege, como no safe mode real dos rovers. Uma tela explica a causa com um número ou caso real, e o simulador reinicia o sol. Cada modo de segurança conta contra a nota do relatório. Não é game over.
+- **Modo de segurança** — o que acontece quando falta energia para o aquecimento, o oxigênio acaba ou a margem de radiação zera: a base corta o que não é essencial e a tripulação se protege, como no safe mode real dos rovers. Uma tela explica a causa com um número ou caso real. Se algum plano salva o sol, o simulador o reinicia; se não, a base segue em modo de segurança e o sol passa sem ciência. Cada modo de segurança conta contra a nota do relatório. Não é game over.
