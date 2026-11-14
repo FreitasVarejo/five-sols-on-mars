@@ -1,18 +1,18 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Texture2D" path="res://arte/placeholder/sala.png" id="2_sala"]
-[ext_resource type="Texture2D" path="res://arte/placeholder/botao_centro_normal.png" id="3_bn"]
-[ext_resource type="Texture2D" path="res://arte/placeholder/botao_centro_pressed.png" id="4_bp"]
-[ext_resource type="Texture2D" path="res://arte/placeholder/botao_centro_hover.png" id="5_bh"]
+[ext_resource type="Texture2D" path="res://assets/comodo/normal.png" id="2_sala"]
 [ext_resource type="Shader" path="res://shaders/panorama.gdshader" id="6_shader"]
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_esquerda.png" id="7_en"]
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_esquerda_pressed.png" id="8_ep"]
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_direita.png" id="9_dn"]
 [ext_resource type="Texture2D" path="res://arte/placeholder/seta_direita_pressed.png" id="10_dp"]
+[ext_resource type="Texture2D" path="res://assets/comodo/monitor_portatil.png" id="11_monitor"]
+[ext_resource type="Texture2D" path="res://assets/exterior/vista_janela_normal.png" id="12_vista"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_pan"]
 shader = ExtResource("6_shader")
+shader_parameter/zoom = 195
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -29,17 +29,25 @@ layout_mode = 3
 anchors_preset = 0
 mouse_filter = 2
 
+[node name="Vista" type="TextureRect" parent="Sala"]
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("12_vista")
+
 [node name="Panorama" type="TextureRect" parent="Sala"]
 layout_mode = 0
 mouse_filter = 2
 texture = ExtResource("2_sala")
 
-[node name="BotaoCentro" type="TextureButton" parent="Sala"]
-layout_mode = 0
-focus_mode = 0
-texture_normal = ExtResource("3_bn")
-texture_pressed = ExtResource("4_bp")
-texture_hover = ExtResource("5_bh")
+[node name="Telas" type="Control" parent="Sala"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+
+[node name="Realce" type="Control" parent="Sala"]
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
 
 [node name="Distorcao" type="ColorRect" parent="."]
 material = SubResource("ShaderMaterial_pan")
@@ -89,12 +97,62 @@ focus_mode = 0
 texture_normal = ExtResource("9_dn")
 texture_pressed = ExtResource("10_dp")
 
+[node name="Monitor" type="Control" parent="HUD"]
+visible = false
+layout_mode = 0
+offset_left = 240.0
+offset_top = 60.0
+offset_right = 640.0
+offset_bottom = 360.0
+
+[node name="Tela" type="TextureRect" parent="HUD/Monitor"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 30.0
+offset_right = 360.0
+offset_bottom = 210.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Moldura" type="TextureRect" parent="HUD/Monitor"]
+layout_mode = 0
+offset_right = 400.0
+offset_bottom = 300.0
+mouse_filter = 2
+texture = ExtResource("11_monitor")
+
+[node name="Abaixar" type="TextureButton" parent="HUD/Monitor"]
+layout_mode = 0
+offset_left = 271.0
+offset_top = 215.0
+offset_right = 384.0
+offset_bottom = 289.0
+focus_mode = 0
+
+[node name="Realce" type="ColorRect" parent="HUD/Monitor/Abaixar"]
+visible = false
+layout_mode = 0
+offset_right = 113.0
+offset_bottom = 74.0
+mouse_filter = 2
+color = Color(1, 1, 1, 0.2)
+
+[node name="Contornos" type="Control" parent="HUD"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="Depuracao" type="Label" parent="HUD"]
 layout_mode = 0
 offset_left = 52.0
-offset_top = 4.0
+offset_top = 262.0
 offset_right = 300.0
-offset_bottom = 60.0
+offset_bottom = 356.0
 mouse_filter = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4

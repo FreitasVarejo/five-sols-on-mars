@@ -9,6 +9,10 @@ Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
 Mesma câmera em todos os estados. A geometria também é a mesma, com uma única exceção
 permitida: a persiana da janela, que só o estado `abrigo` fecha. O estado muda luz e emissão.
 
+A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG (menos no
+`abrigo`, onde a persiana o cobre) e o Godot põe a vista de Marte atrás, por composição. A vista
+vem do exterior.py, que usa a mesma câmera (OLHO, PANORAMA) deste script.
+
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
 calculados pela projeção real da câmera sobre os vértices) e o monitor portátil
 assets/comodo/monitor_portatil.png (render separado, com a área da tela em alpha 0).
@@ -28,6 +32,7 @@ import bmesh
 import bpy
 import numpy as np
 import OpenImageIO as oiio
+from mathutils import Vector
 
 RAIZ = Path(__file__).resolve().parents[2]
 CACHE = RAIZ / "arte" / "blender" / ".render"
@@ -44,6 +49,8 @@ APOLLO = (
 ).split()
 
 OLHO = (0.0, 0.0, 1.2)
+# Campo do panorama: o exterior.py renderiza a vista da janela com os mesmos valores.
+PANORAMA = dict(largura=1280, altura=360, graus=180.0, yaw=0.0)
 
 
 def args():
@@ -51,9 +58,9 @@ def args():
     p = argparse.ArgumentParser(prog="comodo.py")
     p.add_argument("--estados", default=",".join(ESTADOS))
     p.add_argument("--camera", choices=["cilindrica", "perspectiva"], default="cilindrica")
-    p.add_argument("--largura", type=int, default=1280)
-    p.add_argument("--altura", type=int, default=360)
-    p.add_argument("--graus", type=float, default=180.0,
+    p.add_argument("--largura", type=int, default=PANORAMA["largura"])
+    p.add_argument("--altura", type=int, default=PANORAMA["altura"])
+    p.add_argument("--graus", type=float, default=PANORAMA["graus"],
                    help="campo horizontal do panorama (cilíndrica) em graus")
     p.add_argument("--yaw", type=float, default=0.0, help="graus, positivo vira para a direita")
     p.add_argument("--rad-por-px", type=float, default=None,
@@ -177,6 +184,37 @@ def toro(nome, centro, raio, espessura, mat, indice, rot=(0, 0, 0)):
     return ob
 
 
+def prisma_yz(nome, pontos_yz, x0, x1, mat, indice):
+    """Prisma: polígono no plano yz (y para o fundo, z para cima) extrudado de x0 a x1."""
+    me = bpy.data.meshes.new(nome)
+    bm = bmesh.new()
+    lado = [[bm.verts.new((x, y, z)) for y, z in pontos_yz] for x in (x0, x1)]
+    bm.faces.new(lado[0])
+    bm.faces.new(lado[1][::-1])
+    n = len(pontos_yz)
+    for k in range(n):
+        bm.faces.new((lado[0][k], lado[0][(k + 1) % n], lado[1][(k + 1) % n], lado[1][k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    return _objeto(nome, me, mat, indice)
+
+
+def placa_para_o_olho(nome, centro, tamanho, mat, indice, avanco=0.0):
+    """Caixa cuja face da frente (-y local) olha direto para o olho, em guinada e em arfagem.
+
+    Uma placa perpendicular à linha de visão projeta quase um retângulo na câmera cilíndrica,
+    mesmo inclinada, e o retângulo da região casa com o que o Godot desenha por cima.
+    `avanco` desloca o centro, em metros, pela normal (para o olho).
+    """
+    c = Vector(centro)
+    v = (Vector(OLHO) - c).normalized()
+    ob = caixa(nome, tuple(c + v * avanco), tamanho, mat, indice)
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = v.to_track_quat("-Y", "Z")
+    return ob
+
+
 class Painel:
     """Plano vertical voltado para o olho, em torno de (cx, cy) no chão.
 
@@ -221,6 +259,20 @@ def tela_apagada(nome, hexa):
     return m
 
 
+# Centro da sala (metros): janela larga, rampa e telas. O exterior.py abre o casco no mesmo lugar.
+JANELA_Z = (1.00, 1.84)              # vão do vidro
+JANELA_LARG = 2.4
+N_PERSIANA = 10
+BANCADA_Z = 0.46                     # topo da bancada
+RAMPA_ELEV = 22.0                    # a normal da rampa sobe tantos graus acima da horizontal
+RAMPA_CENTRO = (1.86, 0.74)          # (y, z) do centro de cada face da rampa
+RAMPA_LARG, RAMPA_ALT = 1.30, 0.56   # medidas de cada face
+TELA_X = 0.62                        # centro de cada face, para a esquerda e a direita
+TELA_MOLDURA = (1.14, 0.50)
+TELA_TAMANHO = (1.02, 0.40)
+JANELA_OBJS = ("janela_moldura_topo", "janela_moldura_base", "janela_moldura_esq",
+               "janela_moldura_dir", "janela_moldura_montante", "janela")
+
 COR_TELA_APAGADA = "202e37"          # cor única das telas em branco (Apollo)
 TELAS_APAGADAS = ("energia_tela", "oxigenio_tela", "radiacao_tela")
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
@@ -234,13 +286,79 @@ def botao(nome, cor):
     return mb
 
 
+def icone_camera(r, nome, a_, z_, escuro, tampa, ix):
+    """Pictograma em relevo sobre a tampa do botão de câmera (a_, z_: centro da tampa).
+
+    Peças escuras em relevo; onde precisa de "furo" claro, a peça usa o material da própria
+    tampa (mesma cor e mesma emissão), então a cor do botão continua a mesma em todos os
+    estados. Todas as peças de um ícone dividem o índice de objeto: sem contorno entre elas.
+    """
+    n = [0]
+
+    def caixa_(da, dz, larg, alt, nivel=0, m=None):
+        n[0] += 1
+        return r.caixa(f"icone_{nome}_{n[0]}", a_ + da, 0.27 + 0.012 * nivel, z_ + dz, larg, 0.03,
+                       alt, m or escuro, ix)
+
+    def disco(da, dz, raio, nivel=0, m=None, segs=24):
+        n[0] += 1
+        return r.cil(f"icone_{nome}_{n[0]}", a_ + da, 0.27 + 0.012 * nivel, z_ + dz, raio, 0.03,
+                     m or escuro, ix, segs=segs)
+
+    def vertical(da, d, dz, raio, comp, m=None):          # cilindro em pé (eixo z)
+        n[0] += 1
+        return cilindro(f"icone_{nome}_{n[0]}", r.pos(a_ + da, d, z_ + dz), raio, comp, m or escuro,
+                        ix, segs=20)
+
+    def esfera(da, d, dz, raio, m=None):
+        n[0] += 1
+        me = bpy.data.meshes.new(f"icone_{nome}_{n[0]}")
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=10, radius=raio)
+        bm.to_mesh(me)
+        bm.free()
+        ob = _objeto(f"icone_{nome}_{n[0]}", me, m or escuro, ix)
+        ob.location = r.pos(a_ + da, d, z_ + dz)
+        return ob
+
+    if nome == "painel":                                  # painel solar: grade 3x2 e pé
+        for lin in (0, 1):
+            for col in (-1, 0, 1):
+                caixa_(col * 0.099, 0.025 + (0.5 - lin) * 0.079, 0.085, 0.065)
+        for sinal in (-1, 1):
+            caixa_(sinal * 0.09, -0.077, 0.028, 0.065)
+    elif nome == "rocha":                                 # rocha com ponto de mira
+        disco(-0.035, -0.005, 0.115, segs=7)
+        disco(0.105, -0.055, 0.065, segs=5)
+        disco(-0.035, -0.005, 0.062, 1, tampa, segs=20)
+        disco(-0.035, -0.005, 0.046, 2, segs=20)
+        disco(-0.035, -0.005, 0.02, 3, tampa, segs=12)
+        for sinal in (-1, 1):
+            caixa_(-0.035 + sinal * 0.078, -0.005, 0.035, 0.016, 1, tampa)
+            caixa_(-0.035, -0.005 + sinal * 0.078, 0.016, 0.035, 1, tampa)
+    elif nome == "amostra":                               # tubo de ensaio com um pouco de líquido
+        vertical(0, 0.255, 0.0275, 0.052, 0.135)
+        esfera(0, 0.255, -0.04, 0.052)
+        caixa_(0, 0.093, 0.13, 0.022, 2)
+        vertical(0, 0.29, 0.0375, 0.032, 0.115, tampa)
+        esfera(0, 0.29, -0.0225, 0.032, tampa)
+        vertical(0, 0.30, -0.035, 0.032, 0.04)
+        esfera(0, 0.30, -0.055, 0.032)
+    elif nome == "moxie":                                 # molécula de O2: dois átomos colados
+        for sinal in (-1, 1):
+            disco(sinal * 0.065, 0, 0.088)
+            disco(sinal * 0.065 - 0.035, 0.035, 0.024, 1, tampa, segs=12)
+
+
 def construir():
     """Gray-box do módulo de comando. Unidades em metros; o olho fica em OLHO.
 
     Esquerda (x<320 no panorama): porta, suporte de vida com a tela de radiação e a alavanca
-    do abrigo; na parede da frente, a janela e o botão da Terra.
-    Centro (320-960): as telas de energia e oxigênio. Direita (>960): o console das câmeras
-    e a estufa da planta.
+    do abrigo; na parede da frente, o botão da Terra.
+    Centro (320-960): a janela larga para Marte e, abaixo dela, a rampa com as telas de energia
+    e oxigênio e a bancada. Direita (>960): o console das câmeras e a estufa da planta.
+    Todo botão clicável fica entre x 60 e 1220 (ZONA_LIVRE_X), fora das setas de pan do jogo.
+    Os quatro botões de câmera levam um pictograma em relevo (icone_camera).
     """
     W = 2.6       # meia largura (paredes laterais em x = ±W)
     F = 2.2       # parede da frente em y = F
@@ -292,13 +410,51 @@ def construir():
     for y in (0.6, 1.6):
         caixa(f"luminaria_{y}", (0, y, H - 0.03), (1.6, 0.25, 0.06), luminaria, next(i))
 
-    # ---- centro: console decorativo (sem botão) sob as duas telas grandes
-    caixa("console_mesa", (0, 1.25, 0.4), (2.2, 0.7, 0.8), console, next(i))
-    caixa("console_painel", (0, 1.5, 0.95), (2.2, 0.45, 0.06), painel, next(i), rot=(35, 0, 0))
-    # duas telas em branco na parede da frente: energia (esquerda) e oxigênio (direita)
-    for nome, x in (("energia", -0.7), ("oxigenio", 0.7)):
-        caixa(f"{nome}_moldura", (x, F - 0.06, 1.56), (1.40, 0.08, 0.82), moldura, next(i))
-        caixa(f"{nome}_tela", (x, F - 0.105, 1.56), (1.30, 0.01, 0.72), ecra, next(i))
+    # ---- centro, de cima para baixo: a janela larga para Marte, a rampa com as telas de
+    # energia e oxigênio e a bancada. A janela vai de 1,00 a 1,84 m: o horizonte (altura do
+    # olho, 1,2 m) cai dentro dela, com um pouco de chão abaixo. O vidro é recuado em relação
+    # à moldura e sai com alpha 0 no PNG (ver pixel_art); a persiana só fecha no abrigo.
+    jz0, jz1 = JANELA_Z
+    jl = JANELA_LARG
+    borda = 0.10
+    ix_moldura = next(i)                               # um índice só: sem traço entre as barras
+    jc = (jz0 + jz1) / 2
+    for nome, cx, cz, larg, alt in (
+            ("topo", 0.0, jz1 + borda / 2, jl + 2 * borda, borda),
+            ("base", 0.0, jz0 - borda / 2, jl + 2 * borda, borda),
+            ("esq", -(jl + borda) / 2, jc, borda, jz1 - jz0),
+            ("dir", (jl + borda) / 2, jc, borda, jz1 - jz0),
+            ("montante", 0.0, jc, 0.10, jz1 - jz0)):
+        caixa(f"janela_moldura_{nome}", (cx, F - 0.05, cz), (larg, 0.10, alt), moldura, ix_moldura)
+    caixa("janela", (0.0, F - 0.02, jc), (jl, 0.01, jz1 - jz0), janela, next(i))
+    pitch = (jz1 - jz0) / N_PERSIANA
+    for k in range(N_PERSIANA):
+        mat_s = faixa if k in (0, N_PERSIANA - 1) else blindagem
+        PERSIANA.append(caixa(f"persiana_{k}", (0.0, F - 0.115, jz0 + (k + 0.5) * pitch),
+                              (jl + 0.04, 0.03, pitch + 0.004), mat_s, next(i)))
+
+    # bancada baixa e, atrás dela, a rampa: duas faces inclinadas, cada uma virada (em guinada)
+    # para o olho, como um console que envolve quem olha. Cada tela fica rente à sua face, e assim
+    # as bordas horizontais não curvam na câmera cilíndrica.
+    caixa("console_bancada", (0.0, 1.65, BANCADA_Z / 2), (2 * 1.35, 0.9, BANCADA_Z), console,
+          next(i))
+    el = math.radians(RAMPA_ELEV)
+    for nome, x in (("energia", -TELA_X), ("oxigenio", TELA_X)):
+        c0 = Vector((x, RAMPA_CENTRO[0], RAMPA_CENTRO[1]))
+        h = Vector((OLHO[0] - c0.x, OLHO[1] - c0.y, 0.0)).normalized()
+        n = Vector((h.x * math.cos(el), h.y * math.cos(el), math.sin(el)))
+        q = n.to_track_quat("-Y", "Z")
+
+        def na_face(nome_, centro, tamanho, mat_, indice, avanco):
+            ob = caixa(nome_, tuple(centro + n * avanco), tamanho, mat_, indice)
+            ob.rotation_mode = "QUATERNION"
+            ob.rotation_quaternion = q
+            return ob
+
+        na_face(f"rampa_{nome}", c0, (RAMPA_LARG, 0.2, RAMPA_ALT), console, next(i), -0.10)
+        na_face(f"{nome}_moldura", c0, (TELA_MOLDURA[0], 0.06, TELA_MOLDURA[1]), moldura, next(i),
+                0.03)
+        na_face(f"{nome}_tela", c0, (TELA_TAMANHO[0], 0.01, TELA_TAMANHO[1]), ecra, next(i), 0.065)
 
     # ---- esquerda: porta do abrigo (parede esquerda), um pouco mais para o canto
     py = 0.55
@@ -323,15 +479,7 @@ def construir():
     s.cil("abrigo_anel", 0, 0.2, 1.10, 0.215, 0.05, moldura, next(i))
     s.cil("abrigo_botao", 0, 0.25, 1.10, 0.17, 0.12, MATS["botao_abrigo"], next(i))
 
-    # parede da frente, à esquerda: a janela (com persiana, que só o abrigo fecha) e a Terra
-    jx, jz = -2.05, 1.64
-    caixa("janela_moldura", (jx, F - 0.05, jz), (0.90, 0.10, 0.62), moldura, next(i))
-    caixa("janela", (jx, F - 0.105, jz), (0.74, 0.01, 0.46), janela, next(i))
-    for k in range(6):
-        mat_s = faixa if k in (0, 5) else blindagem
-        PERSIANA.append(caixa(f"persiana_{k}", (jx, F - 0.135, jz - 0.20 + k * 0.08),
-                              (0.78, 0.05, 0.075), mat_s, next(i)))
-
+    # parede da frente, à esquerda: o botão da Terra (a janela agora é a do centro)
     tx, tz = -2.05, 1.0
     botao("botao_terra", "73bed3")
     caixa("terra_placa", (tx, F - 0.04, tz), (0.62, 0.08, 0.62), console, next(i))
@@ -339,31 +487,35 @@ def construir():
     cilindro("terra_anel", (tx, F - 0.13, tz), 0.25, 0.05, moldura, next(i), rot=(90, 0, 0))
     cilindro("terra_botao", (tx, F - 0.18, tz), 0.19, 0.1, MATS["botao_terra"], next(i), rot=(90, 0, 0))
 
-    # ---- direita: console das 4 câmeras (voltado para o olho) e a estufa da planta
-    r = Painel(2.10, 1.15)
-    r.caixa("cameras_base", 0, 0, 0.06, 1.05, 0.42, 0.12, moldura, next(i))
+    # ---- direita: console das 4 câmeras (voltado para o olho) e a estufa da planta.
+    # Tudo clicável fica entre x 60 e 1220 do panorama (as setas de pan cobrem as pontas), então
+    # o console encosta no centro e a estufa, também voltada para o olho, fica logo depois dele.
+    r = Painel(2.014, 1.296)
+    r.caixa("cameras_base", 0, 0, 0.06, 1.02, 0.42, 0.12, moldura, next(i))
     r.caixa("cameras_corpo", 0, 0, 0.93, 0.95, 0.30, 1.62, console, next(i))
     r.caixa("cameras_lampadas", 0, 0.17, 1.66, 0.8, 0.04, 0.1, moldura, next(i))
     cores = {"painel": "75a743", "rocha": "4f8fba", "amostra": "c65197", "moxie": "be772b"}
+    icone = material("icone_camera", hexrgb("10141f"), 0.9)
     for k, (nome, cor) in enumerate(cores.items()):
         a_ = -0.235 if k % 2 == 0 else 0.235
         z_ = 1.35 if k < 2 else 1.0
         botao(f"botao_camera_{nome}", cor)
         r.caixa(f"camera_{nome}_aro", a_, 0.17, z_, 0.46, 0.04, 0.33, moldura, next(i))
         r.caixa(f"camera_{nome}_botao", a_, 0.22, z_, 0.40, 0.07, 0.27, MATS[f"botao_camera_{nome}"], next(i))
+        icone_camera(r, nome, a_, z_, icone, MATS[f"botao_camera_{nome}"], next(i))
 
-    # estufa da planta, encostada na parede direita perto do canto de trás (P2)
-    ex, ey = W - 0.275, 0.30
-    caixa("estufa_corpo", (ex, ey, 0.85), (0.55, 0.62, 1.7), estufa, next(i))
+    # estufa da planta: encostada na parede direita, depois do console
+    e = Painel(2.329, 0.580)
+    e.caixa("estufa_corpo", 0, 0, 0.85, 0.44, 0.40, 1.7, estufa, next(i))
     pz = 1.175                                   # vidro todo dentro da faixa de clique
-    caixa("planta_moldura", (W - 0.55 - 0.02, ey, pz), (0.04, 0.54, 0.62), moldura, next(i))
-    caixa("planta_vidro", (W - 0.55 - 0.04, ey, pz), (0.01, 0.46, 0.54), vidro_estufa, next(i))
-    caixa("planta_luz", (W - 0.55 - 0.05, ey, pz + 0.23), (0.02, 0.44, 0.05), luz_cultivo, next(i))
-    caixa("planta_solo", (W - 0.55 - 0.06, ey, pz - 0.22), (0.04, 0.42, 0.08), solo, next(i))
-    caixa("planta_caule", (W - 0.55 - 0.06, ey, pz - 0.06), (0.03, 0.04, 0.28), folha, next(i))
-    for k, (dy, dz, rz) in enumerate(((0.10, pz + 0.04, 25), (-0.10, pz - 0.02, -25), (0.0, pz + 0.12, 0))):
-        caixa(f"planta_folha{k}", (W - 0.55 - 0.06, ey + dy, dz), (0.03, 0.14, 0.06), folha,
-              next(i), rot=(rz, 0, 0))
+    e.caixa("planta_moldura", 0, 0.22, pz, 0.40, 0.04, 0.62, moldura, next(i))
+    e.caixa("planta_vidro", 0, 0.24, pz, 0.32, 0.01, 0.54, vidro_estufa, next(i))
+    e.caixa("planta_luz", 0, 0.25, pz + 0.23, 0.30, 0.02, 0.05, luz_cultivo, next(i))
+    e.caixa("planta_solo", 0, 0.26, pz - 0.22, 0.30, 0.04, 0.08, solo, next(i))
+    e.caixa("planta_caule", 0, 0.26, pz - 0.06, 0.04, 0.03, 0.28, folha, next(i))
+    for k, (da, dz, giro) in enumerate(((-0.075, pz + 0.04, 25), (0.075, pz - 0.02, -25), (0.0, pz + 0.12, 0))):
+        f_ = caixa(f"planta_folha{k}", e.pos(da, 0.26, dz), (0.12, 0.03, 0.06), folha, next(i),
+                   rot=(0, giro, e.yaw))
 
     # alarmes nos cantos de cima da frente
     for x in (-2.3, 2.3):
@@ -607,6 +759,7 @@ def contorno(p):
 
 
 def pixel_art(p, borda, estado):
+    """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo)."""
     if estado == "abrigo":
         verde_ok = True
     else:
@@ -621,7 +774,14 @@ def pixel_art(p, borda, estado):
     cor_tela = PALETA_SRGB[APOLLO.index(COR_TELA_APAGADA)]
     for nome in TELAS_APAGADAS:
         rgb[(p["indice"] == INDICE[nome]) & ~borda] = cor_tela
-    return rgb
+    # vidro da janela: alpha 0, e o Godot põe a vista de Marte atrás. No abrigo a persiana tapa
+    # o vidro, e o que sobrar dele (frestas) fica opaco.
+    alfa = np.full(rgb.shape[:2], 255, np.uint8)
+    if estado != "abrigo":
+        vidro = (p["indice"] == INDICE["janela"]) & ~borda
+        alfa[vidro] = 0
+        rgb[vidro] = 0
+    return np.dstack([rgb, alfa])
 
 
 def _srgb_lin(c):
@@ -655,12 +815,13 @@ REGIOES = {
     "camera_amostra": ["camera_amostra_aro", "camera_amostra_botao"],
     "camera_moxie": ["camera_moxie_aro", "camera_moxie_botao"],
     "planta": ["planta_moldura", "planta_vidro"],
-    "janela": ["janela_moldura", "janela"],
+    "janela": list(JANELA_OBJS),
 }
 TELAS = ("energia", "oxigenio", "radiacao")
 BOTOES = ("abrigo", "terra", "camera_painel", "camera_rocha", "camera_amostra", "camera_moxie",
           "planta")
 FAIXA_CLIQUE = (120, 250)
+ZONA_LIVRE_X = (60, 1220)      # fora das setas de pan (~50 px em cada ponta da tela)
 
 
 def pontos_do_objeto(nome, passos=8):
@@ -725,11 +886,14 @@ def validar_regioes(reg):
         ok &= bool(cond)
 
     y_min, y_max = FAIXA_CLIQUE
+    x_min, x_max = ZONA_LIVRE_X
     for n in BOTOES:
         r = reg[n]
         checa(y_min <= r["y"] and r["y"] + r["h"] <= y_max,
               f"{n}: faixa y {r['y']}..{r['y'] + r['h']} dentro de {y_min}..{y_max}")
         checa(r["w"] >= 24 and r["h"] >= 24, f"{n}: tamanho {r['w']}x{r['h']} px (mínimo 24x24)")
+        checa(x_min <= r["x"] and r["x"] + r["w"] <= x_max,
+              f"{n}: x {r['x']}..{r['x'] + r['w']} fora da zona das setas ({x_min}..{x_max})")
     for n in ("abrigo", "radiacao"):
         r = reg[n]
         checa(r["x"] + r["w"] <= 320, f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de x<320")
@@ -740,9 +904,13 @@ def validar_regioes(reg):
     for n in ("camera_painel", "camera_rocha", "camera_amostra", "camera_moxie", "planta"):
         r = reg[n]
         checa(r["x"] >= 960, f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de x>960")
-    for n in ("terra", "janela"):
-        r = reg[n]
-        checa(r["x"] + r["w"] <= 420, f"{n}: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
+    r = reg["terra"]
+    checa(r["x"] + r["w"] <= 420, f"terra: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
+    r = reg["janela"]
+    checa(r["x"] >= 320 and r["x"] + r["w"] <= 960,
+          f"janela: x {r['x']}..{r['x'] + r['w']} no centro, dentro de 320..960")
+    checa(r["w"] >= 400 and r["y"] < 90 and r["y"] + r["h"] > 190,
+          f"janela: {r['w']}x{r['h']} px, larga e cruzando a altura do olho (y 180)")
     return linhas, ok
 
 
@@ -976,7 +1144,7 @@ def main():
         passes[estado] = p
         borda = contorno(p)
         pngs[estado] = pixel_art(p, borda, estado)
-        salvar_png(saida / f"{estado}{a.sufixo}.png", pngs[estado])
+        salvar_png_rgba(saida / f"{estado}{a.sufixo}.png", pngs[estado])
         np.save(CACHE / f"{estado}{a.sufixo}_indice.npy", p["indice"])
         print(f"[comodo] {estado}: {saida / f'{estado}{a.sufixo}.png'}")
 
@@ -1000,6 +1168,18 @@ def main():
         print(f"[comodo] {base} x {e}: DENTRO da janela (única diferença permitida, a persiana) "
               f"px índice diferente={int(di[dentro].sum())} px contorno diferente={int(db[dentro].sum())}")
 
+    # vidro da janela: alpha 0 onde a persiana está aberta, tudo opaco no abrigo
+    vidro_ok = True
+    for e in estados:
+        transp = pngs[e][..., 3] == 0
+        ys, xs = np.nonzero(transp)
+        esperado = e != "abrigo"
+        fora = int((~dentro & transp).sum())
+        print(f"[comodo] alpha 0 em {e}: {int(transp.sum())} px"
+              + (f", x {xs.min()}..{xs.max()} y {ys.min()}..{ys.max()}, fora do retângulo da janela: {fora}" if len(xs) else ""))
+        vidro_ok &= (transp.any() == esperado) and fora == 0
+    print(f"[comodo] vidro transparente só com a persiana aberta: {'PASSA' if vidro_ok else 'FALHA'}")
+
     # regiões
     linhas, ok = validar_regioes(reg)
     print("[comodo] regiões (x, y, largura, altura em px do panorama):")
@@ -1009,7 +1189,8 @@ def main():
     print("\n".join(linhas))
     print(f"[comodo] validação: {'PASSA' if ok else 'FALHA'}")
     conferir_projecao(reg, passes[base], base)
-    salvar_png(CACHE / "regioes_debug.png", desenhar_regioes(pngs[base], reg))
+    fundo_vidro = np.where(pngs[base][..., 3:4] > 0, pngs[base][..., :3], np.array([32, 96, 160], np.uint8))
+    salvar_png(CACHE / "regioes_debug.png", desenhar_regioes(fundo_vidro.astype(np.uint8), reg))
     print(f"[comodo] depuração: {CACHE / 'regioes_debug.png'}")
 
     # tamanho em px dos botões na escala 1x (a região inclui o aro)
@@ -1026,6 +1207,11 @@ def main():
         "telas": {n: reg[n] for n in TELAS},
         "botoes": {n: reg[n] for n in BOTOES},
         "janela": reg["janela"],
+        "vista_janela": {
+            "arquivos": {"normal": "assets/exterior/vista_janela_normal.png",
+                         "poeira": "assets/exterior/vista_janela_poeira.png"},
+            "nota": "1280x360, mesma câmera do panorama; vai atrás dele. O vidro do panorama "
+                    "tem alpha 0, menos no estado abrigo (persiana fechada)."},
     }
 
     if not a.sem_monitor:

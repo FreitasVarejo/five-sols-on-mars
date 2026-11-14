@@ -18,16 +18,16 @@
   },
   "telas": {
     "energia": {
-      "x": 406,
-      "y": 39,
-      "w": 225,
-      "h": 142
+      "x": 397,
+      "y": 229,
+      "w": 224,
+      "h": 90
     },
     "oxigenio": {
-      "x": 649,
-      "y": 39,
-      "w": 225,
-      "h": 142
+      "x": 659,
+      "y": 229,
+      "w": 224,
+      "h": 90
     },
     "radiacao": {
       "x": 149,
@@ -50,41 +50,48 @@
       "h": 82
     },
     "camera_painel": {
-      "x": 991,
+      "x": 962,
       "y": 121,
-      "w": 84,
+      "w": 85,
       "h": 62
     },
     "camera_rocha": {
-      "x": 1076,
+      "x": 1047,
       "y": 121,
       "w": 85,
       "h": 62
     },
     "camera_amostra": {
-      "x": 991,
+      "x": 962,
       "y": 186,
-      "w": 84,
+      "w": 85,
       "h": 62
     },
     "camera_moxie": {
-      "x": 1076,
+      "x": 1047,
       "y": 186,
       "w": 85,
       "h": 62
     },
     "planta": {
-      "x": 1167,
-      "y": 122,
-      "w": 108,
-      "h": 126
+      "x": 1142,
+      "y": 126,
+      "w": 77,
+      "h": 118
     }
   },
   "janela": {
-    "x": 284,
-    "y": 64,
-    "w": 100,
-    "h": 101
+    "x": 414,
+    "y": 36,
+    "w": 452,
+    "h": 203
+  },
+  "vista_janela": {
+    "arquivos": {
+      "normal": "assets/exterior/vista_janela_normal.png",
+      "poeira": "assets/exterior/vista_janela_poeira.png"
+    },
+    "nota": "1280x360, mesma câmera do panorama; vai atrás dele. O vidro do panorama tem alpha 0, menos no estado abrigo (persiana fechada)."
   },
   "monitor_portatil": {
     "arquivo": "monitor_portatil.png",

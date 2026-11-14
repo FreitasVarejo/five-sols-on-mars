@@ -12,6 +12,13 @@ Fonte da verdade: este script. O .blend de --salvar-blend (arte/blender/.render/
 pasta ignorada no git) é só para abrir e mexer; nada o lê de volta.
 Os helpers (materiais, caixa, cilindro, EXR, contorno, paleta) vêm do comodo.py.
 
+Além das câmeras externas, gera a vista da janela do cômodo: assets/exterior/vista_janela_<estado>.png,
+1280x360, com a MESMA câmera cilíndrica do comodo.py (mesmo olho, yaw, 180 graus e escala angular,
+valores importados de lá). O casco do habitat e tudo o que fica entre o olho e a janela saem do render
+(visível para a câmera = não, mas ainda projetam sombra), porque o interior é o comodo.py. O Godot põe
+a vista atrás do panorama da sala, cujo vidro da janela tem alpha 0. `--so-vista` renderiza só ela;
+`compor_janela` grava a sobreposição da sala com a vista em arte/blender/.render/janela_composicao.png.
+
 Mesma geometria e mesma câmera em todos os estados; o estado muda só luz, céu e névoa.
 A névoa é aplicada depois do render, pelo passe de profundidade (o Cycles não a desenha).
 
@@ -44,17 +51,22 @@ hexrgb = c.hexrgb
 
 ESTADOS = ["normal", "poeira"]
 
-# nome: (posição do olho, alvo, campo vertical em graus). As quatro câmeras de parede saem
-# das cápsulas no teto do habitat (as telas do interior); a visão geral está só no ar.
+# nome: (posição do olho, alvo, campo vertical em graus). As câmeras de parede e de poste saem
+# das cápsulas do habitat (as telas do interior); a visão geral está só no ar. A do painel é
+# a exceção: ela olha de cima, do oeste, para a escova no painel sujo (ver CAPSULAS).
 CAMERAS = {
-    "painel": ((3.05, -1.2, 2.4), (14.0, 6.0, 1.0), 38.0),
+    "painel": ((7.5, -0.5, 5.6), (11.5, 5.15, 0.85), 27.0),
     "rocha": ((13.5, -3.5, 2.6), (9.6, 2.6, 1.0), 38.0),
     "amostra": ((-1.4, 2.55, 2.4), (-0.3, 6.9, 0.4), 38.0),
     "moxie": ((-2.0, -6.8, 2.6), (2.3, -2.2, 0.8), 38.0),
     "visao_geral": ((-7.5, -16.5, 3.6), (9.0, 5.5, 1.3), 40.0),
 }
 
+HABITAT = []                     # objetos do casco, escondidos da câmera na vista da janela
 POSTES = {"rocha", "moxie"}      # câmeras que ficam num poste, não na parede
+# A cápsula do painel continua onde estava na parede leste: o render dela foi reenquadrado
+# (a rocha escura tapava o painel), e mexer na cápsula mudaria o que as outras câmeras veem.
+CAPSULAS = {"painel": ((3.05, -1.2, 2.4), (14.0, 6.0, 1.0))}
 LARGURA_PAINEL, PROFUNDIDADE_PAINEL, INCLINACAO_PAINEL = 3.0, 1.7, 14.0
 ROCHA = Vector((7.6, 3.0, 0.0))
 ROVER = Vector((11.6, 2.2, 0.0))
@@ -71,6 +83,8 @@ def args():
     p.add_argument("--altura", type=int, default=360)
     p.add_argument("--saida", default="assets/exterior")
     p.add_argument("--amostras", type=int, default=64)
+    p.add_argument("--sem-vista", action="store_true", help="não renderiza a vista da janela")
+    p.add_argument("--so-vista", action="store_true", help="renderiza só a vista da janela")
     p.add_argument("--salvar-blend", action="store_true",
                    help="grava a cena em arte/blender/.render/exterior.blend")
     p.add_argument("--sem-render", action="store_true", help="só constrói (útil com --salvar-blend)")
@@ -366,7 +380,9 @@ def construir():
     c._objeto("chao_base", seguro, regolito, idx("chao"))
 
     paisagem()
+    antes = set(bpy.data.objects)
     habitat()
+    HABITAT[:] = [ob for ob in bpy.data.objects if ob not in antes]
     moxie()
     campo_de_paineis()
     rover_e_rocha()
@@ -427,16 +443,20 @@ def habitat():
     # nervuras verticais nas quatro paredes (como as do interior)
     for x in (-2.0, 0.0, 2.0):
         c.caixa(f"nervura_s{x}", (x, y0 - 0.04, 1.3), (0.14, 0.08, 2.3), nerv, i())
-        if x != -2.0:                                   # a janela fica nesse trecho da parede norte
+        if x != 0.0:                                    # a janela larga ocupa o centro da parede norte
             c.caixa(f"nervura_n{x}", (x, y1 + 0.04, 1.3), (0.14, 0.08, 2.3), nerv, i())
     for y in (-0.2, 1.4):
         c.caixa(f"nervura_l{y}", (Wd + 0.04, y, 1.3), (0.08, 0.14, 2.3), nerv, i())
     # calha de cabos, a 2,05 m como no interior
     c.caixa("calha_ext_sul", (0, y0 - 0.1, 2.05), (2 * Wd, 0.12, 0.12), nerv, i())
     c.caixa("calha_ext_norte", (0, y1 + 0.1, 2.05), (2 * Wd, 0.12, 0.12), nerv, i())
-    # janela da parede norte, à esquerda (interior: parede da frente, x -2,05, z 1,64)
-    c.caixa("janela_moldura_ext", (-2.05, y1 + 0.04, 1.64), (1.0, 0.1, 0.72), escuro, i())
-    c.caixa("janela_ext", (-2.05, y1 + 0.1, 1.64), (0.84, 0.02, 0.56), vidro, i())
+    # janela larga no centro da parede norte, no mesmo lugar da do interior (comodo.JANELA_*):
+    # vão de 2,4 m por z 1,00..1,84, moldura de 0,10 m e um montante no meio
+    jz0, jz1 = c.JANELA_Z
+    jl, jc = c.JANELA_LARG, (jz0 + jz1) / 2
+    c.caixa("janela_moldura_ext", (0.0, y1 + 0.04, jc), (jl + 0.2, 0.1, jz1 - jz0 + 0.2), escuro, i())
+    c.caixa("janela_ext", (0.0, y1 + 0.1, jc), (jl, 0.02, jz1 - jz0), vidro, i())
+    c.caixa("janela_montante_ext", (0.0, y1 + 0.115, jc), (0.1, 0.03, jz1 - jz0), escuro, i())
 
     # abrigo (a porta do interior abre para ele): anexo baixo, enterrado num monte
     c.caixa("abrigo_corpo", (-4.0, 0.95, 1.0), (2.4, 2.1, 2.0), abrigo, i())
@@ -461,6 +481,7 @@ def habitat():
     for nome, (loc, alvo, _) in CAMERAS.items():
         if nome == "visao_geral":
             continue
+        loc, alvo = CAPSULAS.get(nome, (loc, alvo))
         loc = Vector(loc)
         d = (Vector(alvo) - loc).normalized()
         if nome in POSTES:                              # câmera num poste, longe da parede
@@ -780,6 +801,95 @@ def pixel_art(cor, t, p, e):
     return c.PALETA_SRGB[q]
 
 
+# ---------------------------------------------------------------- vista da janela do cômodo
+
+def renderizar_vista(a, mundo, estados, saida):
+    """Vista de Marte pela janela: câmera cilíndrica idêntica à do comodo.py, 1280x360.
+
+    O casco do habitat sai do render para a câmera (continua projetando sombra no chão):
+    o interior é o comodo.py. Devolve {estado: passes} para a conferência do horizonte.
+    """
+    s = bpy.context.scene
+    pano = c.PANORAMA
+    c.configurar(types.SimpleNamespace(amostras=a.amostras, largura=pano["largura"],
+                                       altura=pano["altura"], camera="cilindrica", yaw=pano["yaw"],
+                                       graus=pano["graus"], rad_por_px=None))
+    cam = s.camera
+    assert np.allclose(tuple(cam.location), c.OLHO), "a vista tem de sair do olho do comodo.py"
+    for ob in HABITAT:
+        ob.visible_camera = False
+    out = {}
+    for estado in estados:
+        e = aplicar_estado(estado, mundo)
+        exr = CACHE / f"exterior_vista_janela_{estado}.exr"
+        s.render.filepath = str(exr)
+        bpy.ops.render.render(write_still=True)
+        p = c.ler_exr(exr)
+        cor, t = neblina(p, e)
+        destino = saida / f"vista_janela_{estado}.png"
+        c.salvar_png(destino, pixel_art(cor, t, p, e))
+        out[estado] = p
+        print(f"[exterior] vista da janela {estado}: {destino}")
+    return out
+
+
+def ler_png_rgba(caminho):
+    import OpenImageIO as oiio
+    inp = oiio.ImageInput.open(str(caminho))
+    spec = inp.spec()
+    px = np.asarray(inp.read_image(0, 0, 0, spec.nchannels, "uint8")).reshape(spec.height, spec.width, spec.nchannels)
+    inp.close()
+    if spec.nchannels == 3:
+        px = np.dstack([px, np.full(px.shape[:2], 255, np.uint8)])
+    return px
+
+
+def compor_janela(saida, passes):
+    """Sala por cima da vista, como o Godot faz: normal x normal, normal x poeira, abrigo x normal.
+
+    Imprime onde o horizonte cai na vista e quantas linhas do vidro ficam acima e abaixo dele.
+    """
+    sala = RAIZ / "assets" / "comodo"
+    linhas = []
+    for estado_sala, estado_vista in (("normal", "normal"), ("normal", "poeira"), ("abrigo", "normal")):
+        if estado_vista not in passes:
+            continue
+        s_ = ler_png_rgba(sala / f"{estado_sala}.png")
+        v_ = ler_png_rgba(saida / f"vista_janela_{estado_vista}.png")
+        linhas.append(np.where(s_[..., 3:4] > 0, s_[..., :3], v_[..., :3]).astype(np.uint8))
+    if linhas:
+        destino = CACHE / "janela_composicao.png"
+        c.salvar_png(destino, np.concatenate(linhas, 0))
+        print(f"[exterior] composição sala x vista ({len(linhas)} quadros, de cima para baixo: "
+              f"normal+normal, normal+poeira, abrigo+normal): {destino}")
+
+    sala_n = ler_png_rgba(sala / "normal.png")
+    vidro = sala_n[..., 3] == 0
+    ys, xs = np.nonzero(vidro)
+    if not len(xs) or "normal" not in passes:
+        return
+    ind = passes["normal"]["indice"]
+    chao = _INDICES["chao"]
+    meio = (xs.min() + xs.max()) // 2
+    print(f"[exterior] vidro transparente do normal.png: x {xs.min()}..{xs.max()}, y {ys.min()}..{ys.max()} "
+          f"(altura do olho = y {c.PANORAMA['altura'] // 2})")
+    topos = []
+    for x in range(xs.min() + 4, xs.max() - 3):
+        col = np.nonzero(ind[:, x] == chao)[0]
+        topos.append(col.min() if len(col) else np.nan)
+    topos = np.array(topos, float)
+    print(f"[exterior] topo do chão visível na janela (x {xs.min() + 4}..{xs.max() - 4}): "
+          f"y {np.nanmin(topos):.0f}..{np.nanmax(topos):.0f}, mediana {np.nanmedian(topos):.0f}")
+    z = passes["normal"]["z"]
+    sky = z > 1e8
+    top_sky = [np.nonzero(~sky[:, x])[0].min() if (~sky[:, x]).any() else np.nan
+               for x in range(xs.min() + 4, xs.max() - 3)]
+    print(f"[exterior] primeira linha sem céu (borda da cratera e Monte Sharp) na janela: "
+          f"y {np.nanmin(top_sky):.0f}..{np.nanmax(top_sky):.0f}, mediana {np.nanmedian(top_sky):.0f}")
+    print(f"[exterior] linhas do vidro: {180 - ys.min()} acima da altura do olho, "
+          f"{ys.max() + 1 - 180} abaixo")
+
+
 # ---------------------------------------------------------------- câmeras e render
 
 def criar_cameras(a):
@@ -809,7 +919,7 @@ def main():
     bpy.data.objects.remove(bpy.data.objects["camera"])         # a câmera genérica do comodo
     cams = criar_cameras(a)
     estados = [x for x in a.estados.split(",") if x]
-    escolhidas = [x for x in a.cameras.split(",") if x]
+    escolhidas = [] if a.so_vista else [x for x in a.cameras.split(",") if x]
     CACHE.mkdir(parents=True, exist_ok=True)
     (CACHE / ".gdignore").touch()
     saida = RAIZ / a.saida
@@ -848,6 +958,10 @@ def main():
             db = int((c.contorno(passes[est]) != c.contorno(passes[base])).sum())
             print(f"[exterior] {nome} {base} x {est}: max|Δz|={dz:.2e} max|Δnormal|={dn:.2e} "
                   f"px índice diferente={di} px contorno diferente={db}")
+
+    if not a.sem_vista:
+        passes = renderizar_vista(a, mundo, estados, saida)
+        compor_janela(saida, passes)
 
 
 if __name__ == "__main__":

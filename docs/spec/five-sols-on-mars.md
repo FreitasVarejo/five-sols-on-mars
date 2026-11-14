@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 12:10. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 12:59. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -74,12 +74,14 @@ A troca com custo, decidida pelo dono em 14/11:
 
 Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A tela mostra metade do panorama, então o que fica nas pontas só aparece virando, e é isso que dá propósito ao pan:
 
-- **[P]** No centro, a vista de repouso: as telas de energia e oxigênio, na própria parede.
+- **[P]** No centro, a vista de repouso:
+  - uma janela larga para Marte, que muda com os eventos (a poeira escurece a vista) e fecha a persiana no estado abrigo;
+  - as telas de energia e oxigênio, lado a lado na rampa do console, abaixo da janela.
+- **[P]** A vista da janela é um render à parte, com a mesma câmera da sala, posto atrás dela antes do shader: o vidro sai transparente no PNG da sala. Evento novo do lado de fora é só mais uma imagem de vista, sem refazer a sala.
 - **[P]** Na esquerda:
   - a porta e o botão do abrigo;
   - a tela do medidor e da margem de radiação;
-  - o botão "Perguntar à Terra";
-  - a janela, que fecha a persiana no estado abrigo.
+  - o botão "Perguntar à Terra".
 - **[P]** Na direita: os botões das câmeras, por onde se fazem as tarefas de fora, e a estufa da planta.
 - **[R]** As barras na sala seguem as regras das barras (ícone, texto e número) e curvam junto com a parede: são desenhadas antes do shader.
 - **[P]** No canto superior esquerdo da tela, fixo em qualquer ângulo: as notificações do sol atual, do evento em curso e dos alertas. São só ícones, porque o turno não tem texto para ler, e cumprem o equivalente visual do alarme.
