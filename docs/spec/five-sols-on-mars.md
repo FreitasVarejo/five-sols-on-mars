@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 09:26. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 12:10. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -9,6 +9,8 @@ Desenho fechado pelo dono em 13/11/2026, antes do hackathon, como base para o pr
 - **[P] proposta:** o primo pode trocar no sábado.
 
 Nada de código, cena nem asset antes de 14/11 (regulamento).
+
+Wireframe das telas (14/11): https://claude.ai/artifact/QotyJYnZuz6gMMqdJPpPHE. As marcas R e P dele seguem esta spec; W é escolha do wireframe, que o primo troca livremente. O turno do wireframe ainda mostra o HUD fixo; o mapa da sala em "Onde a criança está" vale acima dele.
 
 ## O jogo
 
@@ -65,9 +67,27 @@ A troca com custo, decidida pelo dono em 14/11:
 ## Onde a criança está
 
 - **[P]** Um cômodo, o módulo de comando, em panorama com o shader CC0 de falso 3D. Os estados são luz normal, tempestade, abrigo e modo de segurança.
+- **[P]** A criança nunca sai da nave (dono e primo, 14/11, para caber no tempo). O lado de fora só aparece pelas câmeras.
 - **[P]** De 3 a 4 câmeras para fora (painel solar, rocha, área de amostra, MOXIE). As tarefas de fora são feitas por braço robótico ou rover, como o InSight limpou o painel com a pá.
 - **[R]** Os botões ficam fora do espaço distorcido pelo shader: grandes, na faixa vertical central, com no mínimo 24 × 24 px pela WCAG e maiores para criança.
 - **[R]** Setas grandes para o pan, porque toque não tem mouse.
+
+Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A tela mostra metade do panorama, então o que fica nas pontas só aparece virando, e é isso que dá propósito ao pan:
+
+- **[P]** No centro, a vista de repouso: as telas de energia e oxigênio, na própria parede.
+- **[P]** Na esquerda:
+  - a porta e o botão do abrigo;
+  - a tela do medidor e da margem de radiação;
+  - o botão "Perguntar à Terra";
+  - a janela, que fecha a persiana no estado abrigo.
+- **[P]** Na direita: os botões das câmeras, por onde se fazem as tarefas de fora, e a estufa da planta.
+- **[R]** As barras na sala seguem as regras das barras (ícone, texto e número) e curvam junto com a parede: são desenhadas antes do shader.
+- **[P]** No canto superior esquerdo da tela, fixo em qualquer ângulo: as notificações do sol atual, do evento em curso e dos alertas. São só ícones, porque o turno não tem texto para ler, e cumprem o equivalente visual do alarme.
+- **[P]** Câmera como no FNAF, sem nenhum asset dele:
+  - o botão da câmera faz um monitor portátil subir na hora na lateral direita, numa janela menor que a tela;
+  - ele fecha pelo botão "abaixar" ou quando a criança vira para a esquerda;
+  - com o monitor aberto, o pan pela borda só funciona do lado oposto a ele.
+- **[P]** As posições exatas de cada botão e de cada tela vêm de `assets/comodo/regioes.json`, gerado pelo `arte/blender/comodo.py` a partir da câmera do render.
 
 ## Tarefas (minigames)
 
@@ -150,6 +170,7 @@ A troca com custo, decidida pelo dono em 14/11:
 - **[R]** Nenhum asset do FNAF nem de fangame.
 - **[R]** IA de imagem só para retoque por inpainting, com cada uso no registro-uso-de-si.
 - **[R]** A tela de créditos traz as licenças: Godot (MIT), shader (CC0), fonte (OFL) e o Cupcakes Framework (MIT), se for usado.
+- **[P]** Câmera do render: a cilíndrica central do Cycles (`CENTRAL_CYLINDRICAL`), com 180° em 1280×360, e o shader de panorama com `zoom` = (1 − cos(metade do ângulo da janela)) / 0,0015, que dá 195 para a janela de 640 px. A perspectiva não serve: o shader curva o que ela já deixa reto, e em 1280 px ela não alcança a porta do abrigo na parede lateral. Medido no protótipo de 14/11 (`arte/blender/comparar_camera.py` no repo).
 
 ## Ordem de construção e de corte
 
