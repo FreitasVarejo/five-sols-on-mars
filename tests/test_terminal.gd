@@ -52,6 +52,7 @@ func _tudo() -> void:
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
 	await _aba_fontes_cabe()
+	await _aba_fontes_rola()
 	await _relatorio_cabe()
 	_historia_do_sol_no_diario()
 	_diario_cabe_no_pior_caso()
@@ -1326,8 +1327,9 @@ func _card_do_aviso_cabe() -> void:
 	TranslationServer.set_locale(idioma)
 
 
-## A aba fontes com o dado do build (o par do histórico e o do dado de hoje) cabe na caixa da direita, sem
-## sobreposição, nos dois idiomas; e só com o histórico também.
+## A aba fontes (o par do histórico, os números do jogo e os créditos por último) cabe na caixa da direita, sem
+## sobreposição e sem rolagem, nos dois idiomas, com e sem o dado do build. O dado do build não aparece nela (é o
+## card do aviso que o mostra).
 func _aba_fontes_cabe() -> void:
 	var idioma := TranslationServer.get_locale()
 	var real := DadosDonki.carregar()
@@ -1353,6 +1355,10 @@ func _aba_fontes_cabe() -> void:
 			var tem_atual := false
 			var tam_fato := 0
 			var fim := 0.0
+			var fim_creditos := 0.0
+			var y_mais_baixo := -1.0
+			var texto_mais_baixo := ""
+			var antes: Array = t.textos()
 			for linha in t.textos():
 				var r := _rect_do_texto(linha)
 				if r.position.x < caixa.position.x or r.position.y < Terminal.Y_CORPO or linha[0] == t.tr("TERMINAL"):
@@ -1362,20 +1368,246 @@ func _aba_fontes_cabe() -> void:
 					tam_fato = linha[3]
 				if linha[0] == t._frase_donki_atual() and linha[0] != "":
 					tem_atual = true
+				if linha[2] > y_mais_baixo:
+					y_mais_baixo = linha[2]
+					texto_mais_baixo = linha[0]
+				if linha[0] == t.tr("CREDITOS") or linha[0] == t.tr("CREDITOS_README"):
+					fim_creditos = maxf(fim_creditos, r.end.y)
 				rects.append_array(_rects_das_linhas(linha))
 				fim = maxf(fim, r.end.y)
 				_verdade(caixa.encloses(r), "%s: cabe na caixa (%s em %s)" % [rotulo, linha[0].substr(0, 20), str(r)])
 			_verdade(tem_hist, "%s: o par do histórico de maio de 2024 está sempre" % rotulo)
-			_igual(tem_atual, not historico, "%s: o par do dado de hoje só vem com o dado do build" % rotulo)
+			_verdade(not tem_atual, "%s: o par do dado de hoje não aparece na aba" % rotulo)
+			_verdade(not t._pares_fontes().any(func(par): return par[1] == "NASA DONKI (CCMC), WSA-ENLIL."),
+				"%s: nenhum par traz a fonte do dado de hoje" % rotulo)
+			_igual(t._pares_fontes().back(), [t.tr("CREDITOS"), t.tr("CREDITOS_README")], "%s: os créditos são o último par" % rotulo)
+			_verdade(texto_mais_baixo == t.tr("CREDITOS") or texto_mais_baixo == t.tr("CREDITOS_README"),
+				"%s: o texto mais baixo da coluna é o dos créditos (%s)" % [rotulo, texto_mais_baixo.substr(0, 20)])
+			_igual(fim_creditos, fim, "%s: os créditos acabam na base da coluna" % rotulo)
+			var rolagem: Dictionary = t.rolagem_fontes()
+			_igual(rolagem["ligada"], false, "%s: a lista cabe, a rolagem está desligada" % rotulo)
+			_igual(rolagem["recorte"], [], "%s: sem rolagem, sem recorte" % rotulo)
+			_igual(rolagem["mais_embaixo"], false, "%s: sem rolagem, sem indicador" % rotulo)
+			_igual(t._coluna.visible, false, "%s: o filho da rolagem fica escondido" % rotulo)
+			_roda(t._coluna, true)
+			_roda(t._coluna, true)
+			await process_frame
+			await process_frame
+			_igual(t.rolagem_fontes()["rolagem"], 0.0, "%s: a roda não rola o que cabe" % rotulo)
+			_igual(t.textos(), antes, "%s: a roda não muda o desenho" % rotulo)
 			_verdade(not t._pares_fontes().any(func(par): return par[0].contains("%s") or par[0].begins_with("FONTE_")),
 				"%s: os fatos não têm chave nem %%s soltos" % rotulo)
 			for i in rects.size():
 				for j in range(i + 1, rects.size()):
 					_verdade(not rects[i].intersects(rects[j]), "%s: duas linhas da lista não se sobrepõem (%s, %s)" % [rotulo, str(rects[i]), str(rects[j])])
-			if not historico:
-				_verdade(t._pares_fontes().any(func(par): return par[1] == "NASA DONKI (CCMC), WSA-ENLIL."), "%s: a fonte do dado de hoje" % rotulo)
 			root.remove_child(t)
 			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## Um evento de roda, de mouse e de toque no filho `c` (a coluna das fontes), do jeito de tests/test_abertura.gd.
+func _roda(c: Control, baixo: bool) -> void:
+	_botao_mouse(c, Vector2(100, 100), true, MOUSE_BUTTON_WHEEL_DOWN if baixo else MOUSE_BUTTON_WHEEL_UP)
+	_botao_mouse(c, Vector2(100, 100), false, MOUSE_BUTTON_WHEEL_DOWN if baixo else MOUSE_BUTTON_WHEEL_UP)
+
+
+func _botao_mouse(c: Control, pos: Vector2, apertado: bool, botao: int = MOUSE_BUTTON_LEFT, emulado: bool = false) -> void:
+	var e := InputEventMouseButton.new()
+	e.button_index = botao
+	e.pressed = apertado
+	e.position = pos
+	if emulado:
+		e.device = InputEvent.DEVICE_ID_EMULATION
+	c._gui_input(e)
+
+
+func _mouse_move(c: Control, pos: Vector2, emulado: bool = false) -> void:
+	var e := InputEventMouseMotion.new()
+	e.position = pos
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT
+	if emulado:
+		e.device = InputEvent.DEVICE_ID_EMULATION
+	c._gui_input(e)
+
+
+func _toque(c: Control, pos: Vector2, apertado: bool) -> void:
+	var e := InputEventScreenTouch.new()
+	e.index = 0
+	e.pressed = apertado
+	e.position = pos
+	c._gui_input(e)
+
+
+func _arrasta_dedo(c: Control, pos: Vector2) -> void:
+	var e := InputEventScreenDrag.new()
+	e.index = 0
+	e.position = pos
+	c._gui_input(e)
+
+
+## Uma tradução de teste (locale "fr", que o jogo não tem) com todos os textos do CSV em inglês e os créditos
+## repetidos 4 vezes: a lista passa da altura da caixa sem mexer no código de produção.
+func _traducao_longa() -> Translation:
+	var tr_ := Translation.new()
+	tr_.locale = "fr"
+	var arq := FileAccess.open("res://textos/textos.csv", FileAccess.READ)
+	arq.get_csv_line()  # keys,en,pt
+	while not arq.eof_reached():
+		var l := arq.get_csv_line()
+		if l.size() >= 2 and l[0] != "":
+			tr_.add_message(l[0], l[1])
+			if l[0] == "CREDITOS":
+				tr_.add_message("CREDITOS", " ".join([l[1], l[1], l[1], l[1]]))
+	return tr_
+
+
+## Quando a lista não cabe nem na fonte compacta, a coluna da direita rola: o filho recorta no interior da caixa, o
+## indicador de "mais embaixo" acende, a roda, o arrasto do mouse e o do dedo levam ao fim, o mouse emulado do
+## toque não soma, e mudar de aba volta ao alto.
+func _aba_fontes_rola() -> void:
+	var idioma := TranslationServer.get_locale()
+	var traducao := _traducao_longa()
+	TranslationServer.add_translation(traducao)
+	TranslationServer.set_locale("fr")
+	_igual(TranslationServer.get_locale(), "fr", "rola: o idioma de teste entrou")
+	var m := Missao.new(1)
+	var t: Control = Terminal.new()
+	t.gravar_textos = true
+	t.iniciar(m, {})
+	_fechar_fila(t)
+	t._acionar("aba_fontes")
+	root.add_child(t)
+	await process_frame
+	await process_frame
+	var c: Control = t._coluna
+	var caixa := Rect2(Terminal.X0 + 186.0, Terminal.Y_CORPO, Terminal.X1 - Terminal.X0 - 186.0, Terminal.Y_FIM - Terminal.Y_CORPO)
+	var info: Dictionary = t.rolagem_fontes()
+	_igual(info["ligada"], true, "rola: a lista passou da altura, a rolagem liga")
+	_verdade(c.visible, "rola: o filho está à vista")
+	_verdade(c.clip_contents, "rola: o filho recorta")
+	_igual(c.mouse_filter, Control.MOUSE_FILTER_STOP, "rola: o filho pega o mouse")
+	var recorte := Rect2(info["recorte"][0], info["recorte"][1], info["recorte"][2], info["recorte"][3])
+	_igual(recorte, caixa.grow(-1.0), "rola: o recorte é o interior da caixa")
+	_igual(c.get_global_rect(), recorte, "rola: o filho ocupa o recorte")
+	_igual(info["rolagem"], 0.0, "rola: começa no alto")
+	_verdade(info["maximo"] > 0.0, "rola: há o que rolar")
+	_igual(info["mais_embaixo"], true, "rola: o indicador de mais embaixo acende")
+	var maximo: float = info["maximo"]
+
+	# Rolagem 0: o primeiro fato fica onde ficaria sem rolagem, e há texto da coluna além do recorte (recortado, não sumido).
+	var primeiro := true
+	var passa := false
+	for linha in t.textos():
+		var r := _rect_do_texto(linha)
+		if r.position.x < caixa.position.x or r.position.y < Terminal.Y_CORPO or linha[0] == t.tr("TERMINAL"):
+			continue
+		if primeiro:
+			primeiro = false
+			_igual([linha[1], linha[2]], [roundi(caixa.position.x + 8.0), roundi(caixa.position.y + 7.0)], "rola: o primeiro fato fica no mesmo lugar de sem rolagem")
+		if r.end.y > recorte.end.y:
+			passa = true
+	_verdade(passa, "rola: na rolagem 0 há texto da coluna além do recorte")
+
+	# A roda para baixo chega ao máximo.
+	for i in 100:
+		if c.rolagem >= maximo:
+			break
+		_roda(c, true)
+	_igual(c.rolagem, maximo, "rola: a roda chega ao máximo")
+	_roda(c, true)
+	_igual(c.rolagem, maximo, "rola: a roda não passa do máximo")
+	await process_frame
+	await process_frame
+	info = t.rolagem_fontes()
+	_igual(info["rolagem"], maximo, "rola: a sonda lê a rolagem")
+	_igual(info["mais_embaixo"], false, "rola: no fim o indicador apaga")
+	var fim_lista := 0.0
+	var achou := 0
+	for linha in t.textos():
+		if linha[0] == t.tr("CREDITOS") or linha[0] == t.tr("CREDITOS_README"):
+			achou += 1
+			for r: Rect2 in _rects_das_linhas(linha):
+				_verdade(recorte.encloses(r), "rola: no fim os créditos ficam dentro do recorte (%s em %s)" % [str(r), str(recorte)])
+				fim_lista = maxf(fim_lista, r.end.y)
+	_igual(achou, 2, "rola: os dois textos dos créditos estão na lista")
+	_verdade(fim_lista <= recorte.end.y - 5.0, "rola: sobra margem embaixo dos créditos (%f)" % (recorte.end.y - fim_lista))
+	for i in 100:
+		if c.rolagem <= 0.0:
+			break
+		_roda(c, false)
+	_igual(c.rolagem, 0.0, "rola: a roda para cima volta ao alto")
+
+	# Arrasto do mouse: aperta, move para cima, solta.
+	_botao_mouse(c, Vector2(100, 200), true)
+	_mouse_move(c, Vector2(100, 160))
+	_igual(c.rolagem, minf(40.0, maximo), "rola: o conteúdo acompanha o mouse 1 para 1")
+	for i in 20:
+		_mouse_move(c, Vector2(100, 160 - 40 * (i + 1)))
+	_botao_mouse(c, Vector2(100, -600), false)
+	_igual(c.rolagem, maximo, "rola: o arrasto do mouse chega ao máximo")
+	_mouse_move(c, Vector2(100, 0))
+	_mouse_move(c, Vector2(100, 100))
+	_igual(c.rolagem, maximo, "rola: solto o botão, o mouse não rola mais")
+	c.zerar()
+
+	# Arrasto de um dedo.
+	_toque(c, Vector2(100, 200), true)
+	for i in 20:
+		_arrasta_dedo(c, Vector2(100, 200 - 40 * (i + 1)))
+	_toque(c, Vector2(100, -600), false)
+	_igual(c.rolagem, maximo, "rola: o arrasto de um dedo chega ao máximo")
+	c.zerar()
+
+	# O mouse emulado do toque, durante o gesto do dedo, não soma.
+	var passo := minf(40.0, maximo / 2.0)
+	_toque(c, Vector2(100, 200), true)
+	_botao_mouse(c, Vector2(100, 200), true, MOUSE_BUTTON_LEFT, true)
+	_arrasta_dedo(c, Vector2(100, 200 - passo))
+	_mouse_move(c, Vector2(100, 200 - passo), true)
+	_igual(c.rolagem, passo, "rola: o toque rola uma vez só, com o mouse emulado junto")
+	_botao_mouse(c, Vector2(100, 200 - passo), false, MOUSE_BUTTON_LEFT, true)
+	_toque(c, Vector2(100, 200 - passo), false)
+	_igual(c.rolagem, passo, "rola: soltar o mouse emulado e o dedo não muda nada")
+	c.zerar()
+
+	# Mudar de aba volta ao alto: o plano e reabrir, e outra aba.
+	_roda(c, true)
+	_verdade(c.rolagem > 0.0, "rola: rolou antes de sair")
+	t._acionar("voltar_plano")
+	_igual(c.rolagem, 0.0, "rola: voltar ao plano zera a rolagem")
+	_igual(t.rolagem_fontes()["ligada"], false, "rola: fora da aba fontes a rolagem desliga")
+	t._acionar("aba_fontes")
+	await process_frame
+	await process_frame
+	_igual(t.rolagem_fontes()["ligada"], true, "rola: reabrir a aba liga de novo")
+	_igual(t.rolagem_fontes()["rolagem"], 0.0, "rola: reabrir a aba começa no alto")
+	_roda(c, true)
+	t._acionar("aba_diario")
+	_igual(c.rolagem, 0.0, "rola: trocar de aba zera a rolagem")
+	t._acionar("aba_fontes")
+	_igual(t.rolagem_fontes()["rolagem"], 0.0, "rola: voltar às fontes começa no alto")
+	await process_frame
+	await process_frame
+
+	# Descendo o terminal: só aceita gesto parado no alto, e o filho não cobre o botão TERMINAL.
+	_roda(c, true)
+	var antes: float = c.rolagem
+	t._acionar("terminal")
+	_rodar(t, m, 0.1)
+	await process_frame
+	await process_frame
+	_verdade(t.animando(), "rola: o terminal está descendo")
+	_verdade(c.visible, "rola: o filho acompanha a descida")
+	_verdade(c.get_global_rect().position.y > recorte.position.y, "rola: o filho desce junto")
+	_verdade(c.get_global_rect().end.y <= Terminal.BOTAO.position.y, "rola: o fundo do filho não passa do botão TERMINAL (%f)" % c.get_global_rect().end.y)
+	_roda(c, true)
+	_igual(c.rolagem, antes, "rola: com o terminal em movimento a roda não rola")
+	_rodar(t, m, 1.0)
+	await process_frame
+	_igual(c.visible, false, "rola: o terminal embaixo, o filho some")
+	root.remove_child(t)
+	t.free()
+	TranslationServer.remove_translation(traducao)
 	TranslationServer.set_locale(idioma)
 
 

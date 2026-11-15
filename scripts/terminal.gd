@@ -43,6 +43,10 @@ extends Control
 ## tarefas, o botão da linha (ir_chemcam, ir_gerador) leva à câmera. Com o visor à vista, o clique dentro
 ## dele não é consumido aqui: segue para o visor e para a peça.
 ##
+## Na aba fontes, a coluna da direita (de onde vêm os números) só rola quando a lista não cabe nem na fonte
+## compacta: aí a lista é desenhada por um filho (scripts/coluna_fontes.gd) que recorta e rola, e o clique
+## dentro dele segue para ele. Quando a lista cabe, o filho fica escondido e nada muda.
+##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
 
 const Missao := preload("res://scripts/missao.gd")
@@ -53,6 +57,7 @@ const DadosDonki := preload("res://scripts/dados_donki.gd")
 const HudTurno := preload("res://scripts/hud_turno.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
 const VisorCameras := preload("res://scripts/cameras/visor_cameras.gd")
+const ColunaFontes := preload("res://scripts/coluna_fontes.gd")
 const Chemcam := preload("res://scripts/minigames/chemcam.gd")
 const ConsertarGerador := preload("res://scripts/minigames/consertar_gerador.gd")
 
@@ -117,6 +122,12 @@ const CAMERA_DA_TAREFA := {"chemcam": "rocha", "gerador": "moxie"}
 const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador}
 const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador"}
 const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
+# A coluna "de onde vêm os números" da aba fontes: a caixa, o interior dela (onde o filho recorta) e a margem
+# da lista dentro do interior. A lista começa 7 px abaixo da caixa e 8 px à direita da borda; a faixa de 8 px
+# na direita (largura da lista = caixa − 16) fica livre para o indicador de rolagem.
+const FONTES_CAIXA := Rect2(X0 + 186.0, Y_CORPO, X1 - X0 - 186.0, Y_FIM - Y_CORPO)
+const FONTES_MARGEM_X := 8.0
+const FONTES_MARGEM_Y := 7.0
 const SEM_FONTE := []  # fatos do jogo que não levam linha de fonte
 const PASSO_LINHA := 42.0      # altura de uma linha da lista de tarefas, com o espaço entre elas
 
@@ -150,6 +161,12 @@ var _segura_turno := false  # o card do primeiro turno ainda não fechou: o rel�
 var _visor: VisorCameras    # o corpo da aba câmeras
 var _visor_chave := ""      # "sol|poeira" da última configuração do visor
 var _visor_pend := {}       # as últimas pendências enviadas ao visor
+var _coluna: ColunaFontes   # a coluna da direita da aba fontes, quando a lista rola
+var _textos_col: Array = [] # o que o filho desenhou no último quadro dele (mesmo formato de _textos)
+var _alvo: CanvasItem       # onde _t desenha: null = este nó; o filho enquanto ele desenha a lista
+var _origem := Vector2.ZERO # somado às posições que _t grava quando desenha no filho (coordenadas da tela)
+var _plano_chave := ""      # o idioma do último _plano_fontes
+var _plano := {}
 
 
 func iniciar(m: Missao, dado_donki: Dictionary) -> void:
@@ -166,7 +183,14 @@ func iniciar(m: Missao, dado_donki: Dictionary) -> void:
 		_visor.camera_escolhida.connect(_ao_escolher_camera)
 	_visor_chave = ""
 	_visor_pend = {}
+	if _coluna == null:
+		_coluna = ColunaFontes.new()
+		_coluna.terminal = self
+		add_child(_coluna)
+		_coluna.rolou.connect(queue_redraw)
+	_coluna.zerar()
 	_atualizar_visor()
+	_atualizar_coluna()
 
 
 func _ready() -> void:
@@ -224,7 +248,25 @@ func minigame() -> Dictionary:
 
 ## Todo texto que o último quadro desenhou: [texto, x, y, tamanho, largura (-1 sem quebra), alinhamento, negrito, fonte própria (ou null)].
 func textos() -> Array:
-	return _textos.duplicate()
+	var t := _textos.duplicate()
+	if _coluna != null and _coluna.visible:
+		t.append_array(_textos_col)  # a lista que o filho desenha, já com a rolagem aplicada
+	return t
+
+
+## A rolagem da coluna da direita da aba fontes (a sonda de teste lê). `ligada`: a aba está na tela e a lista não
+## cabe (nem na fonte compacta), então ela rola; `rolagem` e `maximo` em px; `recorte` é [x, y, w, h] do retângulo
+## que recorta, na tela sem o deslocamento da animação (vazio se desligada); `mais_embaixo`: o indicador está aceso.
+func rolagem_fontes() -> Dictionary:
+	var plano := _plano_fontes() if aba_na_tela() == "fontes" and missao != null else {}
+	var ligada: bool = not plano.is_empty() and plano["ligada"]
+	if not ligada or _coluna == null:
+		return {"ligada": false, "rolagem": 0.0, "maximo": 0.0, "recorte": [], "mais_embaixo": false}
+	var r := _interior_coluna()
+	var maximo: float = plano["maximo"]
+	return {"ligada": true, "rolagem": _coluna.rolagem, "maximo": maximo,
+		"recorte": [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)],
+		"mais_embaixo": _coluna.rolagem < maximo - 0.5}
 
 
 ## A aba na tela: "plano", "cameras", "tarefas", "diario" ou "fontes"; "" nas fases sem teclas.
@@ -331,6 +373,7 @@ func _mostrar_fase(f: String) -> void:
 func _mostrar_na_tela(f: String) -> void:
 	_fase_tela = f
 	aba = ""
+	_zerar_rolagem()
 	_fila = _cards_do_plano() if f == "plano" else []
 	card_id = ""
 	_abrir_proximo()
@@ -417,6 +460,7 @@ func _process(delta: float) -> void:
 				_fade_estado = ""
 	var animou := _animar(delta)
 	_atualizar_visor()
+	_atualizar_coluna()
 	# O card do primeiro turno abre quando o terminal chega embaixo.
 	if _segura_turno and card_id == "" and not aberto and _pos <= 0.0 and fase_ui == "turno":
 		card_id = "turno"
@@ -474,6 +518,8 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif _visor != null and _visor.visible and _visor.get_global_rect().has_point(event.position):
 			pass  # o clique segue para o visor e para a peça hospedada (o _gui_input deles)
+		elif _coluna != null and _coluna.visible and _coluna.get_global_rect().has_point(event.position):
+			pass  # a coluna das fontes, quando rola, trata o clique (o _gui_input dela)
 		elif tapa_a_sala():
 			get_viewport().set_input_as_handled()
 
@@ -500,6 +546,7 @@ func _acionar(nome: String) -> void:
 				_segura_turno = false
 		"voltar_plano":
 			aba = ""
+			_zerar_rolagem()
 		"aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes":
 			fez = _apertar_tecla(nome.trim_prefix("aba_"))
 		"o2_menos":
@@ -550,6 +597,7 @@ func _apertar_tecla(nome: String) -> bool:
 	aba = "" if aba_na_tela() == nome else nome
 	if aba == _aba_da_fase(_fase_tela):
 		aba = ""
+	_zerar_rolagem()
 	return true
 
 
@@ -636,8 +684,10 @@ func _progresso_da_linha(nome: String) -> float:
 func _t(s: String, x: float, y: float, tam: int = 11, cor: Color = Desenho.TEXTO, largura: float = -1.0,
 		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false, fonte_propria: Font = null) -> float:
 	if gravar_textos:
-		_textos.append([s, roundi(x), roundi(y), tam, largura, alinh, negrito, fonte_propria])
-	return Desenho.texto(self, s, Vector2(x, y), tam, cor, largura, alinh, negrito, fonte_propria)
+		# No filho (_alvo), x e y são locais a ele; a sonda e os testes leem em coordenadas da tela.
+		var registro := _textos if _alvo == null else _textos_col
+		registro.append([s, roundi(x + _origem.x), roundi(y + _origem.y), tam, largura, alinh, negrito, fonte_propria])
+	return Desenho.texto(_alvo if _alvo != null else self, s, Vector2(x, y), tam, cor, largura, alinh, negrito, fonte_propria)
 
 
 func _caixa(r: Rect2, fundo: Color = Desenho.FUNDO_TELA, borda: Color = Desenho.BORDA) -> void:
@@ -755,6 +805,9 @@ func _draw() -> void:
 	_alvos.clear()
 	if missao == null:
 		return
+	_atualizar_coluna()
+	if _coluna != null and _coluna.visible:
+		_coluna.queue_redraw()  # o filho redesenha depois deste quadro (a lista não duplica: ele zera o que gravou)
 	_versao_vista = missao.versao
 	var card := _card_visivel()
 	var anima := animando()
@@ -1136,7 +1189,7 @@ func _desenhar_card_aviso() -> void:
 
 
 ## A frase do dado do build, datada ("Dados do DONKI de 14/11/2026: 25 chegadas previstas a Marte em 60 dias. A
-## última: ..."), para o card do aviso e a aba fontes. "" quando o dado é o histórico ou não há chegada. A
+## última: ..."), para o card do aviso (a aba fontes não o mostra). "" quando o dado é o histórico ou não há chegada. A
 ## "última" é a mais recente que traz velocidade (o DONKI manda algumas sem ela, e "0 km/s" seria dado falso).
 func _frase_donki_atual() -> String:
 	if donki.get("historico", true):
@@ -1253,16 +1306,30 @@ func _desenhar_fontes() -> void:
 	_t(tr("FONTE_UNIDADES_FATO"), x, rl.end.y - 8 - h_nota, 10, Desenho.TEXTO_SUAVE, w)
 
 	# De onde vêm os números.
-	var rr := Rect2(X0 + 186, Y_CORPO, X1 - X0 - 186, Y_FIM - Y_CORPO)
+	var rr := FONTES_CAIXA
 	_caixa(rr)
-	x = rr.position.x + 8
-	w = rr.size.x - 16
-	y = rr.position.y + 7
+	var plano := _plano_fontes()
+	if plano["ligada"]:
+		return  # a lista não cabe: o filho (coluna_fontes.gd) a desenha, recortada e rolada
+	x = rr.position.x + FONTES_MARGEM_X
+	y = rr.position.y + FONTES_MARGEM_Y
+	for par in plano["pares"]:
+		y += _par_fonte(x, y, plano["w"], par[0], par[1], plano["tam"], true, plano["compacto"]) + plano["espaco"]
+
+
+## Como a lista de fontes se desenha na caixa da direita: os pares, a largura, o tamanho do texto, o espaço entre
+## os fatos e a fonte compacta. O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px, e o espaço
+## entre os fatos (5 px) encolhe para 2 px quando só assim a lista cabe. Se nem assim cabe, os 9 px passam à fonte
+## compacta (11 px de passo de linha em vez de 13). Se nem a compacta cabe, `ligada`: a lista rola (o filho
+## desenha), com `altura` (a lista inteira) e `maximo` (quanto rola). Guardado por idioma: o resultado só depende dele.
+func _plano_fontes() -> Dictionary:
+	var chave := TranslationServer.get_locale()
+	if not _plano.is_empty() and chave == _plano_chave:
+		return _plano
+	var rr := FONTES_CAIXA
 	var pares := _pares_fontes()
-	# O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px, e o espaço entre os fatos
-	# (5 px) encolhe para 2 px quando só assim a lista cabe. Com o dado do build a lista tem um par a mais e nem
-	# assim cabe: aí os 9 px passam à fonte compacta (11 px de passo de linha em vez de 13).
-	var livre := rr.end.y - 7 - y
+	var w := rr.size.x - 2.0 * FONTES_MARGEM_X
+	var livre := rr.size.y - 2.0 * FONTES_MARGEM_Y
 	var tam := 10
 	var espaco := 2.0
 	var compacto := false
@@ -1272,8 +1339,99 @@ func _desenhar_fontes() -> void:
 			compacto = true
 		if _altura_pares(pares, w, 9, compacto) + 3.0 * pares.size() <= livre:
 			espaco = 5.0
-	for par in pares:
-		y += _par_fonte(x, y, w, par[0], par[1], tam, true, compacto) + espaco
+	var altura := 0.0
+	var ligada := _altura_pares(pares, w, 9, true) > livre
+	var interior := _interior_coluna()
+	var maximo := 0.0
+	if ligada:
+		altura = _altura_pares(pares, w, 9, true)
+		# A lista fica a 6 px do alto do interior e deixa 6 px embaixo, como a caixa a deixa sem rolagem.
+		maximo = maxf(0.0, altura + 2.0 * (FONTES_MARGEM_Y - 1.0) - interior.size.y)
+	_plano_chave = chave
+	_plano = {"pares": pares, "w": w, "livre": livre, "tam": tam, "espaco": espaco, "compacto": compacto,
+		"ligada": ligada, "altura": altura, "maximo": maximo}
+	return _plano
+
+
+## O interior da caixa das fontes (1 px dentro da borda): o retângulo que o filho recorta, em px da tela.
+func _interior_coluna() -> Rect2:
+	return FONTES_CAIXA.grow(-1.0)
+
+
+## O filho aceita gesto: o terminal parado no alto e sem card.
+func _coluna_aceita() -> bool:
+	return _pos >= 1.0 and not card_aberto
+
+
+## Zera a rolagem da coluna (a aba mudou).
+func _zerar_rolagem() -> void:
+	if _coluna != null:
+		_coluna.zerar()
+
+
+## Liga, posiciona e dimensiona o filho da coluna: roda a cada quadro e a cada desenho. À vista só com a aba
+## fontes na tela, a lista rolando (não cabe) e o terminal fora de baixo. Subindo e descendo, o filho acompanha o
+## deslocamento do terminal, e o fundo dele nunca passa do BOTAO (o botão TERMINAL é desenhado por baixo dele).
+func _atualizar_coluna() -> void:
+	if _coluna == null or missao == null:
+		return
+	if aba_na_tela() != "fontes":
+		_coluna.zerar()  # saiu da aba: a próxima abertura começa no alto
+		_coluna.visible = false
+		return
+	var plano := _plano_fontes()
+	if not plano["ligada"]:
+		_coluna.zerar()
+		_coluna.visible = false
+		return
+	_coluna.limitar(plano["maximo"])
+	var r := _interior_coluna()
+	var topo := r.position.y + roundf((1.0 - suavizar(_pos)) * TELA.size.y)
+	_coluna.position = Vector2(r.position.x, topo)
+	_coluna.size = Vector2(r.size.x, clampf(BOTAO.position.y - topo, 0.0, r.size.y))
+	_coluna.visible = _pos > 0.0 and not _card_visivel() and _coluna.size.y > 0.0
+
+
+## A lista rolada, desenhada pelo filho `c` (a partir do _draw dele). Mesmo _par_fonte, mesmo tamanho, compacto e
+## espaço de quando a lista cabe; na rolagem 0 cada texto fica onde estaria sem rolagem. As posições gravadas
+## para a sonda são da tela, sem o deslocamento da animação, já com a rolagem.
+func _desenhar_coluna(c: Control) -> void:
+	_textos_col.clear()
+	if missao == null:
+		return
+	var plano := _plano_fontes()
+	if not plano["ligada"]:
+		return
+	var interior := _interior_coluna()
+	_alvo = c
+	_origem = interior.position
+	var x := FONTES_CAIXA.position.x + FONTES_MARGEM_X - interior.position.x
+	var rolagem: float = c.rolagem
+	var y := FONTES_CAIXA.position.y + FONTES_MARGEM_Y - interior.position.y - rolagem
+	for par in plano["pares"]:
+		y += _par_fonte(x, y, plano["w"], par[0], par[1], plano["tam"], true, plano["compacto"]) + plano["espaco"]
+	_alvo = null
+	_origem = Vector2.ZERO
+	_indicador_coluna(c, interior.size, plano["maximo"])
+	if _fade > 0.0:
+		c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(Desenho.NOITE, _fade))
+
+
+## O indicador de rolagem, na faixa de 8 px da margem direita (o texto não chega nela): um trilho de 2 px com o
+## polegar na posição, e, enquanto há mais embaixo, um triângulo para baixo no canto inferior. Só forma e cores
+## neutras, parado. `tam` é o interior inteiro (o filho encolhe ao descer, mas o desenho segue o tamanho cheio).
+func _indicador_coluna(c: Control, tam: Vector2, maximo: float) -> void:
+	var cx := tam.x - 4.0
+	var topo := 6.0
+	var base := tam.y - 16.0
+	c.draw_rect(Rect2(cx - 1.0, topo, 2.0, base - topo), Desenho.BORDA)
+	var h_polegar := maxf(8.0, (base - topo) * tam.y / (tam.y + maximo))
+	var rolagem: float = c.rolagem
+	var y_polegar := topo + (base - topo - h_polegar) * (rolagem / maximo if maximo > 0.0 else 0.0)
+	c.draw_rect(Rect2(cx - 1.0, y_polegar, 2.0, h_polegar), Desenho.TEXTO_SUAVE)
+	if rolagem < maximo - 0.5:
+		c.draw_colored_polygon(PackedVector2Array([Vector2(cx - 3.0, tam.y - 10.0), Vector2(cx + 3.0, tam.y - 10.0),
+			Vector2(cx, tam.y - 5.0)]), Desenho.TEXTO_SUAVE)
 
 
 ## Um fato (`tam` px) e a fonte dele (9 px, suave). Se a fonte cabe na última linha do fato, vai ali
@@ -1314,13 +1472,12 @@ func _altura_pares(pares: Array, w: float, tam: int, compacto: bool = false) -> 
 ## [fato, fonte] de cada número do jogo; a fonte é "" quando o fato não leva.
 func _pares_fontes() -> Array:
 	var pares := []
-	# O histórico de maio de 2024 (a data da missão) vem sempre; o dado do build, só quando existe.
+	# O histórico de maio de 2024 (a data da missão), os números do jogo e, por último, os créditos. O dado do
+	# build não entra aqui: é o card do aviso que o mostra.
 	pares.append([tr("FONTE_DONKI_HIST_FATO"), tr("FONTE_DONKI_HIST_FONTE")])
-	var atual := _frase_donki_atual()
-	if atual != "":
-		pares.append([atual, tr("FONTE_DONKI_FONTE")])
 	for k in PARES_FONTES:
 		pares.append([tr("FONTE_%s_FATO" % k), "" if k in SEM_FONTE else tr("FONTE_%s_FONTE" % k)])
+	pares.append([tr("CREDITOS"), tr("CREDITOS_README")])
 	return pares
 
 
