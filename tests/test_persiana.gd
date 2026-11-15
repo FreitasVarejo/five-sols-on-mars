@@ -62,33 +62,43 @@ func _carregar(nome: String) -> Image:
 	return Image.load_from_file(ProjectSettings.globalize_path(COMODO + nome))
 
 
-## A camada sobre o abrigo aberto refaz o abrigo.png original, e o índice tem as 10 lâminas.
+## A camada sobre o abrigo aberto refaz o abrigo.png, o índice marca a camada e tem as 10 lâminas.
 func _imagens() -> void:
 	var normal := _carregar("normal.png")
 	var abrigo := _carregar("abrigo.png")
 	var aberto := _carregar("abrigo_aberto.png")
 	var camada := _carregar("persiana.png")
 	var indice := _carregar("persiana_indice.png")
-	for img: Image in [normal, abrigo, aberto, camada]:
+	for img: Image in [normal, abrigo, aberto, camada, indice]:
 		img.convert(Image.FORMAT_RGBA8)
-	indice.convert(Image.FORMAT_RGBA8)
 	var larg := normal.get_width()
 	var alt := normal.get_height()
-	var diferentes := 0
+	var diferentes := 0   # pixels em que camada + abrigo aberto não refazem o abrigo
+	var incoerentes := 0  # camada e índice discordam, ou o vidro não é só da camada
+	var fora_de_ordem := 0  # lâmina que diminui ao descer numa coluna
 	var vidro := 0
 	var laminas := {}
-	for y in alt:
-		for x in larg:
+	for x in larg:
+		var anterior := -1
+		for y in alt:
 			var e_vidro := normal.get_pixel(x, y).a == 0.0
-			var refeito := camada.get_pixel(x, y) if camada.get_pixel(x, y).a > 0.0 else aberto.get_pixel(x, y)
+			var na_camada := camada.get_pixel(x, y).a > 0.0
+			var refeito := camada.get_pixel(x, y) if na_camada else aberto.get_pixel(x, y)
 			if refeito != abrigo.get_pixel(x, y):
 				diferentes += 1
+			var r8 := indice.get_pixel(x, y).r8
+			if na_camada != (r8 != 255) or (e_vidro and not na_camada) or (e_vidro != (aberto.get_pixel(x, y).a == 0.0)):
+				incoerentes += 1
 			if e_vidro:
 				vidro += 1
-				laminas[roundi(indice.get_pixel(x, y).r8 / 20.0 - 0.5)] = true
-			elif camada.get_pixel(x, y).a != 0.0 or aberto.get_pixel(x, y).a == 0.0 or indice.get_pixel(x, y).r8 != 255:
-				diferentes += 1
+			if na_camada:
+				var lamina := roundi(r8 / 20.0 - 0.5)
+				laminas[lamina] = true
+				if lamina < anterior:
+					fora_de_ordem += 1
+				anterior = lamina
 	_igual(diferentes, 0, "camada + abrigo aberto refazem o abrigo")
+	_igual(incoerentes, 0, "camada, índice e vidro coerentes")
+	_igual(fora_de_ordem, 0, "lâmina nunca diminui ao descer")
 	_igual(vidro, 58318, "pixels de vidro")
 	_igual(laminas.size(), N_LAMINAS_ESPERADAS, "lâminas no índice")
-

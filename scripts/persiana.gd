@@ -1,7 +1,8 @@
 extends TextureRect
-## Persiana da janela. Este nó é a camada da persiana (entre a Vista e o Panorama da Sala); o
-## shader dele mostra só as primeiras N lâminas. Quem manda é o estado da sala: fechar ao entrar no
-## abrigo, abrir ao sair. Aqui moram o progresso (0 a 1), o cross-fade da luz e os sons.
+## Persiana da janela. Este nó é a camada da persiana, acima do Panorama da Sala e abaixo das
+## Telas (a persiana fica na frente da moldura e cobre também o montante e as bordas da janela).
+## O shader dele mostra só as primeiras N lâminas. Quem manda é o estado da sala: fechar ao entrar
+## no abrigo, abrir ao sair. Aqui moram o progresso (0 a 1), o cross-fade da luz e os sons.
 ##
 ## Fechar vai de 0 a 1 e abrir, de 1 a 0. Sempre uma lâmina inteira por vez (pixel art, sem meia
 ## lâmina), de cima para baixo; a conta está em laminas_visiveis(). Cada lâmina que aparece ou some
@@ -15,7 +16,8 @@ const DURACAO_MIN := 0.5
 const DURACAO_MAX := 3.0
 const SOM_LAMINA := preload("res://assets/sons/persiana_lamina.ogg")
 const SOM_FECHO := preload("res://assets/sons/persiana_fecho.ogg")
-const VOLUME_BATIDA_DB := -7.0
+const VOLUME_DB := -4.0  # de todos os sons da persiana; o único botão de volume dela
+const VOLUME_BATIDA_DB := -7.0  # das batidas por lâmina, em relação à trava e ao fecho
 const PITCH_MIN := 0.9
 const PITCH_MAX := 1.1
 const PICO_DO_FECHO_S := 0.12  # o pico de persiana_fecho.ogg está a 0,12 s do começo
@@ -120,8 +122,8 @@ func laminas() -> int:
 
 
 func _tocar_batida() -> void:
-	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX))
+	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_DB + VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX))
 
 
 func _tocar_destaque(som: AudioStream) -> void:
-	_som.play_stream(som)
+	_som.play_stream(som, 0.0, VOLUME_DB)

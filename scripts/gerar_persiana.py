@@ -1,25 +1,36 @@
-#!/usr/bin/env python3
-"""Separa a persiana da janela dos PNGs do cômodo (Pillow e numpy).
+"""Separa a persiana da janela dos PNGs do cômodo (Pillow, numpy e scipy).
 
-Uso: scripts/gerar_persiana.py
+Uso:
+    ~/.local/bin/blender -b --factory-startup -P $PWD/arte/blender/comodo.py -- --estados abrigo_aberto
+    scripts/gerar_persiana.py
 
-Lê assets/comodo/normal.png e abrigo.png. O vidro da janela tem alfa 0 em normal.png e é opaco em
-abrigo.png, onde ali está a persiana fechada. Escreve em assets/comodo/:
+A persiana fica 6,5 cm na frente da moldura (arte/blender/comodo.py), então no abrigo ela cobre o
+vidro, o montante central e as bordas da janela. O Blender renderiza o estado extra `abrigo_aberto`
+(mesma luz do abrigo, sem a persiana, vidro em alpha 0) direto em assets/comodo/abrigo_aberto.png.
+Este script usa a diferença entre abrigo.png e esse render e escreve em assets/comodo/:
 
-- persiana.png: a persiana (pixels de abrigo.png sob o vidro), o resto transparente;
+- persiana.png: a persiana (pixels de abrigo.png dentro da máscara), o resto transparente;
 - persiana_indice.png: em cinza, a lâmina de cada pixel da persiana (R = lâmina * 20 + 10, de 0 a 9;
   255 fora dela). O shader (shaders/persiana.gdshader) mostra só as lâminas até a do progresso;
-- abrigo_aberto.png: abrigo.png com o vidro em alfa 0, para a persiana vir da camada.
+- abrigo_aberto.png, reescrito: o render do Blender dentro da máscara e abrigo.png fora dela.
+
+A máscara é onde os dois PNGs diferem, depois de fechar buracos de 1 px (fechamento 3x3), preencher
+os furos e ficar só com o maior pedaço. Fora da persiana os dois renders diferem em pontos soltos
+(a luz que a persiana reflete, e o ruído do render): ficam fora da máscara, e ali o abrigo_aberto
+copia o abrigo, para a camada sobre ele refazer o abrigo.png pixel a pixel.
 
 A persiana tem N_PERSIANA = 10 lâminas (arte/blender/comodo.py), separadas por 9 linhas escuras de
 1 px. Em cada linha, acha os pixels escuros perto da posição esperada, ajusta uma curva suave
 (polinômio, descartando os pontos fora da curva) e cola a linha no pixel escuro mais próximo da
-curva. A linha pertence à lâmina de cima. Falha se alguma coluna ficar sem as 10 lâminas.
+curva. A linha pertence à lâmina de cima. Nas colunas sem vidro (montante e bordas) a linha vem das
+colunas vizinhas, e cada pixel fica na lâmina da mesma altura. Falha se alguma coluna de vidro
+ficar sem as 10 lâminas.
 """
 import sys
 from pathlib import Path
 
 import numpy as np
+import scipy.ndimage as ndi
 from PIL import Image
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -44,8 +55,8 @@ def limites_do_vidro(vidro):
     return tem, topo, base
 
 
-def linhas_entre_laminas(abrigo, vidro):
-    """Matriz [N_LAMINAS - 1, largura]: a linha (y) de cada divisória em cada coluna do vidro."""
+def linhas_entre_laminas(abrigo, vidro, mascara):
+    """Matriz [N_LAMINAS - 1, largura]: a linha (y) de cada divisória em cada coluna da máscara."""
     escuro = abrigo[:, :, :3].astype(int).sum(axis=2) <= LIMIAR_ESCURO
     tem, topo, base = limites_do_vidro(vidro)
     colunas = np.where(tem)[0]
@@ -55,6 +66,7 @@ def linhas_entre_laminas(abrigo, vidro):
     if len(ref) != N_LAMINAS - 1:
         sys.exit("coluna %d tem %d linhas escuras, esperava %d" % (xr, len(ref), N_LAMINAS - 1))
     todas = np.arange(abrigo.shape[1])
+    colunas_mascara = np.where(mascara.any(axis=0))[0]
     linhas = np.zeros((N_LAMINAS - 1, abrigo.shape[1]))
     for k, r in enumerate(ref):
         esperada = topo + (r - topo[xr]) / altura[xr] * altura
@@ -71,23 +83,41 @@ def linhas_entre_laminas(abrigo, vidro):
             coef = np.polyfit(xs[manter], ds[manter], GRAU)
             manter = np.abs(ds - np.polyval(coef, xs)) <= TOLERANCIA
         curva = esperada + np.polyval(coef, todas)
-        for x in colunas:
+        # sem vidro (montante e bordas): a curva das colunas vizinhas
+        curva_ext = np.interp(todas, colunas, curva[colunas])
+        curva = np.where(tem, curva, curva_ext)
+        for x in colunas_mascara:
+            ys = np.where(mascara[:, x])[0]
             perto = [y for y in range(int(curva[x]) - 1, int(curva[x]) + 3)
-                     if topo[x] <= y <= base[x] and escuro[y, x] and abs(y - curva[x]) <= 1.5]
+                     if ys[0] <= y <= ys[-1] and escuro[y, x]
+                     and abs(y - curva[x]) <= (1.5 if tem[x] else 2.0)]
             linhas[k, x] = min(perto, key=lambda y: abs(y - curva[x])) if perto else round(curva[x])
     return linhas
 
 
-def indice_das_laminas(abrigo, vidro):
-    """Matriz [altura, largura] com a lâmina (0 a 9) de cada pixel do vidro, e 255 fora dele."""
-    linhas = linhas_entre_laminas(abrigo, vidro)
-    tem, topo, base = limites_do_vidro(vidro)
+def mascara_da_persiana(abrigo, aberto, vidro):
+    """Onde abrigo.png e o render sem persiana diferem: fecha buracos de 1 px, preenche furos e
+    fica com o maior pedaço (o resto são pontos soltos de luz e ruído fora da persiana)."""
+    diferem = (abrigo != aberto).any(axis=2)
+    diferem = ndi.binary_closing(diferem, structure=np.ones((3, 3)))
+    diferem = ndi.binary_fill_holes(diferem)
+    rotulos, n = ndi.label(diferem, structure=np.ones((3, 3)))
+    tamanhos = ndi.sum(diferem, rotulos, range(1, n + 1))
+    mascara = rotulos == (int(np.argmax(tamanhos)) + 1)
+    if not mascara[vidro].all():
+        sys.exit("há vidro fora da máscara da persiana")
+    return mascara
+
+
+def indice_das_laminas(abrigo, vidro, mascara):
+    """Matriz [altura, largura] com a lâmina (0 a 9) de cada pixel da máscara, e 255 fora dela."""
+    linhas = linhas_entre_laminas(abrigo, vidro, mascara)
     indice = np.full(vidro.shape, 255, np.uint8)
-    for x in np.where(tem)[0]:
+    for x in np.where(mascara.any(axis=0))[0]:
         divisorias = np.sort(linhas[:, x]) + 1  # a linha é da lâmina de cima
-        ys = np.where(vidro[:, x])[0]
+        ys = np.where(mascara[:, x])[0]
         lamina = np.searchsorted(divisorias, ys, side="right")
-        if len(set(lamina)) != N_LAMINAS:
+        if vidro[:, x].any() and len(set(lamina)) != N_LAMINAS:
             sys.exit("coluna %d ficou com %d lâminas, esperava %d" % (x, len(set(lamina)), N_LAMINAS))
         indice[ys, x] = lamina
     return indice
@@ -96,24 +126,28 @@ def indice_das_laminas(abrigo, vidro):
 def main():
     normal = carregar("normal.png")
     abrigo = carregar("abrigo.png")
+    aberto = carregar("abrigo_aberto.png")  # o render do Blender (ou o que este script já limpou)
     vidro = normal[:, :, 3] == 0
     if not (abrigo[:, :, 3][vidro] == 255).all():
         sys.exit("o vidro de normal.png tem pixel que não é opaco em abrigo.png")
+    if not ((aberto[:, :, 3] == 0) == vidro).all():
+        sys.exit("o vidro de abrigo_aberto.png não bate com o de normal.png: rode o Blender antes")
 
-    indice = indice_das_laminas(abrigo, vidro)
+    mascara = mascara_da_persiana(abrigo, aberto, vidro)
+    indice = indice_das_laminas(abrigo, vidro, mascara)
 
     persiana = np.zeros_like(abrigo)
-    persiana[vidro] = abrigo[vidro]
+    persiana[mascara] = abrigo[mascara]
     Image.fromarray(persiana, "RGBA").save(COMODO / "persiana.png", optimize=True)
 
-    cinza = np.where(vidro, indice.astype(int) * 20 + 10, 255).astype(np.uint8)
+    cinza = np.where(mascara, indice.astype(int) * 20 + 10, 255).astype(np.uint8)
     Image.fromarray(cinza, "L").save(COMODO / "persiana_indice.png", optimize=True)
 
-    aberto = abrigo.copy()
-    aberto[vidro] = 0
-    Image.fromarray(aberto, "RGBA").save(COMODO / "abrigo_aberto.png", optimize=True)
+    limpo = np.where(mascara[:, :, None], aberto, abrigo)
+    Image.fromarray(limpo.astype(np.uint8), "RGBA").save(COMODO / "abrigo_aberto.png", optimize=True)
 
-    print("%d px de persiana, %d lâminas, escrito em %s" % (vidro.sum(), N_LAMINAS, COMODO))
+    print("%d px de persiana (%d de vidro), %d lâminas, escrito em %s"
+          % (mascara.sum(), vidro.sum(), N_LAMINAS, COMODO))
 
 
 if __name__ == "__main__":
