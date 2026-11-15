@@ -148,7 +148,7 @@ const ESTACAO_DA_TAREFA := {"planta": "estufa", "amostra": "glovebox"}
 const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador, "planta": CultivarPlanta, "amostra": SelarAmostra}
 const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador", "planta": "estufa",
 	"amostra": "glovebox"}
-const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
+const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "ABRIGO", "PAINEL", "ATRASO"]
 # A coluna "de onde vêm os números" da aba fontes: a caixa, o interior dela (onde o filho recorta) e a margem
 # da lista dentro do interior. A lista começa 7 px abaixo da caixa e 8 px à direita da borda; a faixa de 8 px
 # na direita (largura da lista = caixa − 16) fica livre para o indicador de rolagem.
