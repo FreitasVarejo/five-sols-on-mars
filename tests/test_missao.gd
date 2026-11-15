@@ -403,10 +403,10 @@ func _abrigo_de_mao_unica() -> void:
 	_igual(g.iniciar_tarefa("gerador"), false, "abrigado não conserta o gerador")
 
 
-## As tarefas de POR_PECA (ChemCam e gerador) só acabam pelo `concluido` da peça: o relógio não as termina, e
+## As tarefas de POR_PECA (ChemCam, gerador e planta) só acabam pelo `concluido` da peça: o relógio não as termina, e
 ## concluir_tarefa só vale no turno, fora do abrigo e para a que está rodando.
 func _tarefas_da_peca() -> void:
-	_igual(Missao.POR_PECA, ["chemcam", "gerador"], "as tarefas que só a peça termina")
+	_igual(Missao.POR_PECA, ["chemcam", "gerador", "planta"], "as tarefas que só a peça termina")
 	for nome in Missao.POR_PECA:
 		_verdade(nome in Missao.TAREFAS or nome in Missao.MANUTENCAO, "POR_PECA só tem tarefa da missão: " + nome)
 	_igual("painel" in Missao.TAREFAS or "painel" in Missao.MANUTENCAO or "painel" in Missao.POR_PECA, false,

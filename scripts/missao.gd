@@ -61,7 +61,7 @@ const MEDIDOR_ALTO := 0.9
 const TAREFAS := ["chemcam", "amostra", "planta"]  # as de ciência, escolhidas no plano
 const MANUTENCAO := ["gerador"]  # as que a base pede; não contam como ciência
 # As tarefas que só acabam pelo `concluido` da peça (minigame), nunca pelo relógio: ver concluir_tarefa.
-const POR_PECA := ["chemcam", "gerador"]
+const POR_PECA := ["chemcam", "gerador", "planta"]
 const EPS := 1e-9
 
 var rng := RandomNumberGenerator.new()

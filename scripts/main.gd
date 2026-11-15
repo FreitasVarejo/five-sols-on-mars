@@ -335,7 +335,7 @@ func _atualizar_sala() -> void:
 		for tarefa: String in ESTACOES:
 			if _missao.tarefas.has(tarefa):
 				estados[tarefa] = _missao.tarefas[tarefa]
-				progresso[tarefa] = _missao.progresso_tarefa(tarefa)
+				progresso[tarefa] = _terminal.progresso_da_tarefa(tarefa)
 				clicaveis[tarefa] = _clicavel(ESTACOES[tarefa])
 	_estacoes.atualizar(estados, progresso, clicaveis)
 	_indicador_porta.atualizar(_missao.pode_encerrar_sol())
@@ -590,7 +590,7 @@ func _ao_clicar(nome: String) -> void:
 		"abrigo":
 			fez = _missao.abrigar()
 		"estufa":
-			fez = _missao.iniciar_tarefa("planta")
+			fez = _terminal.abrir_na_estacao("planta")
 		"glovebox":
 			fez = _missao.iniciar_tarefa("amostra")
 		"porta":
