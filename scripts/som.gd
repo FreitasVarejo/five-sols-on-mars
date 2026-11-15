@@ -22,6 +22,7 @@ const SONS := {
 	"terminal_sobe": preload("res://assets/sons/terminal_sobe.ogg"),
 	"terminal_desce": preload("res://assets/sons/terminal_desce.ogg"),
 	"desligar": preload("res://assets/sons/desligar.ogg"),
+	"alarme": preload("res://assets/sons/alarme.ogg"),  # o medidor passou do limiar de abrigo (terminal.gd)
 }
 
 ## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).
@@ -33,7 +34,7 @@ const CLIQUE_DA_ACAO := {
 	"confirmar": "clique_confirmar", "enviar": "clique_confirmar", "iniciar_chemcam": "clique_confirmar",
 	"consertar_gerador": "clique_confirmar", "reiniciar": "clique_confirmar", "seguir": "clique_confirmar",
 	"jogar_de_novo": "clique_confirmar", "estufa": "clique_confirmar", "glovebox": "clique_confirmar",
-	"abrigo": "clique_abrigo",
+	"abrigo": "clique_abrigo", "ir_ao_abrigo": "clique_navegar",
 	"porta": "clique_confirmar",
 }
 

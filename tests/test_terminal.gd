@@ -8,6 +8,9 @@ extends SceneTree
 const Terminal := preload("res://scripts/terminal.gd")
 const Missao := preload("res://scripts/missao.gd")
 const Som := preload("res://scripts/som.gd")
+const HudTurno := preload("res://scripts/hud_turno.gd")
+const Desenho := preload("res://scripts/desenho.gd")
+const Main := preload("res://scripts/main.gd")
 
 const QUADRO := 1.0 / 60.0
 
@@ -26,6 +29,10 @@ func _init() -> void:
 	_cliques_so_quando_a_acao_acontece()
 	_desligar_no_meio_do_turno()
 	_desligar_pelo_relogio()
+	_alarme_uma_vez_por_travessia()
+	_alerta_por_cima_do_terminal()
+	_linha_do_abrigo_fecha_o_terminal_e_pede_o_pan()
+	_pan_ate_o_botao_do_abrigo()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -294,10 +301,10 @@ func _desligar_no_meio_do_turno() -> void:
 	_igual(m.fase, "seguranca", "entrou no modo de segurança no meio do turno")
 	_igual(m.modos, 1, "uma entrada")
 	_rodar(t, m, QUADRO * 3.0)
-	_igual(som.historico, ["desligar", "terminal_sobe"], "meio do turno: desligar na hora, junto com a subida")
+	_igual(som.historico, ["alarme", "desligar", "terminal_sobe"], "meio do turno: o alarme do pico, o desligar na hora e a subida")
 	_igual(t._fade_estado, "", "sem escurecimento no meio do turno")
 	_rodar(t, m, 2.0)
-	_igual(som.historico, ["desligar", "terminal_sobe"], "o desligar não repete enquanto fica no modo de segurança")
+	_igual(som.historico, ["alarme", "desligar", "terminal_sobe"], "o desligar não repete enquanto fica no modo de segurança")
 	som.free()
 	t.free()
 
@@ -335,3 +342,157 @@ func _desligar_pelo_relogio() -> void:
 	_igual(som.historico, ["desligar"], "cada entrada toca o desligar uma vez")
 	som.free()
 	t.free()
+
+
+## Um turno do sol 3 com a tempestade solar (o medidor sobe até o limiar de abrigo no pico), com o terminal
+## já embaixo e o histórico de sons limpo. Devolve [terminal, missão, som].
+func _turno_de_tempestade() -> Array:
+	var m := Missao.new(21, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	m.montar_sol(3, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	t._acionar("fechar_card")
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)
+	som.historico.clear()
+	return [t, m, som]
+
+
+## Roda o turno até o medidor passar do limiar de abrigo.
+func _ate_o_alarme(t: Control, m: Missao) -> void:
+	var guarda := 0
+	while m.medidor() <= Missao.LIMIAR_ABRIGO and m.fase == "turno" and guarda < 4000:
+		_rodar(t, m, 0.05)
+		guarda += 1
+
+
+func _alarme_uma_vez_por_travessia() -> void:
+	var c := _turno_de_tempestade()
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	_rodar(t, m, 1.0)
+	_igual(som.historico, [], "medidor baixo: sem alarme")
+	_ate_o_alarme(t, m)
+	_verdade(m.medidor() > Missao.LIMIAR_ABRIGO, "o medidor passou do limiar")
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(som.historico, ["alarme"], "passou do limiar: o alarme toca")
+	_rodar(t, m, 3.0)
+	_igual(som.historico, ["alarme"], "acima do limiar o alarme não repete")
+	# Voltar ao limiar ou abaixo rearma: a travessia seguinte toca de novo (o relógio é forçado).
+	var t_depois := m.t
+	m.t = m.t_pico - 1.0
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(som.historico, ["alarme"], "abaixo do limiar não toca")
+	m.t = t_depois
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(som.historico, ["alarme", "alarme"], "outra travessia, outro alarme")
+	# Abrigado, o medidor segue alto e nada toca.
+	_verdade(m.abrigar(), "abrigou")
+	_rodar(t, m, 1.0)
+	_igual(som.historico, ["alarme", "alarme"], "abrigado: sem alarme")
+	som.free()
+	t.free()
+	# Com o terminal aberto o alarme toca igual.
+	c = _turno_de_tempestade()
+	t = c[0]
+	m = c[1]
+	som = c[2]
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.aberto, true, "terminal aberto")
+	som.historico.clear()
+	_ate_o_alarme(t, m)
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(som.historico.count("alarme"), 1, "com o terminal aberto o alarme toca uma vez")
+	som.free()
+	t.free()
+
+
+func _alerta_por_cima_do_terminal() -> void:
+	var c := _turno_de_tempestade()
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	_igual(t.alerta_sobre_o_terminal(), false, "terminal embaixo, medidor baixo: sem alerta por cima")
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.alerta_sobre_o_terminal(), false, "terminal aberto, medidor baixo: sem alerta")
+	_ate_o_alarme(t, m)
+	_igual(t.alerta_sobre_o_terminal(), true, "terminal aberto, medidor no abrigo: o alerta fica por cima")
+	_igual(HudTurno.cor_do_alerta(m), Desenho.VERMELHO, "vermelho acima do limiar de abrigo")
+	t._acionar("terminal")
+	_verdade(t.alerta_sobre_o_terminal(), "descendo, o alerta segue por cima")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.alerta_sobre_o_terminal(), false, "embaixo o alerta é o do HUD do turno")
+	_verdade(HudTurno.cor_do_alerta(m).a > 0.0, "e o HUD tem o alerta")
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	m.abrigar()
+	_igual(t.alerta_sobre_o_terminal(), false, "abrigado: sem alerta")
+	# O alerta não cobre tecla nem botão do terminal.
+	for r: Rect2 in t._retangulos_das_teclas():
+		_verdade(not Terminal.ALERTA.intersects(r), "o alerta não cobre uma tecla")
+	_verdade(not Terminal.ALERTA.intersects(Terminal.BOTAO), "o alerta não cobre o botão TERMINAL")
+	_verdade(not Terminal.ALERTA.intersects(t._retangulo_da_tela()), "o alerta não cobre a tela do terminal")
+	som.free()
+	t.free()
+
+
+func _linha_do_abrigo_fecha_o_terminal_e_pede_o_pan() -> void:
+	var c := _turno_de_tempestade()
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	var pedidos := [0]
+	t.pediu_abrigo.connect(func() -> void: pedidos[0] += 1)
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	_ate_o_alarme(t, m)
+	som.historico.clear()
+	t._acionar("ir_ao_abrigo")
+	_igual(t.aberto, false, "tocar a linha do abrigo fecha o terminal")
+	_igual(pedidos[0], 1, "e pede o pan uma vez")
+	_igual(m.abrigado, false, "a linha não abriga")
+	_igual(som.historico, ["terminal_desce", "clique_navegar"], "som: a descida e o clique de navegar")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(m.abrigado, false, "terminal embaixo, ainda sem abrigar")
+	# Abrigado, a linha é só informativa.
+	m.abrigar()
+	som.historico.clear()
+	t._acionar("terminal")
+	t._acionar("ir_ao_abrigo")
+	_igual(pedidos[0], 1, "abrigado: a linha não pede o pan")
+	_igual(som.historico, ["terminal_sobe"], "abrigado: a linha não faz clique")
+	_igual(t.aberto, true, "abrigado: a linha não fecha o terminal")
+	som.free()
+	t.free()
+	# Fora do turno a ação não vale.
+	c = _montar()
+	t = c[0]
+	pedidos = [0]
+	t.pediu_abrigo.connect(func() -> void: pedidos[0] += 1)
+	t._acionar("ir_ao_abrigo")
+	_igual(pedidos[0], 0, "no plano a ação não vale")
+	c[2].free()
+	t.free()
+
+
+func _pan_ate_o_botao_do_abrigo() -> void:
+	# O botão do abrigo (regioes.json) está em x 168..258, y 153..243 do panorama de 1280.
+	var botao := Rect2(168, 153, 90, 90)
+	var alcance := 640.0
+	_igual(Main.pan_para_ver(botao, 640.0, alcance), 0.0, "o botão do abrigo pede o pan na ponta esquerda")
+	_igual(Main.pan_para_ver(Rect2(900, 100, 100, 100), 640.0, alcance), 630.0, "um botão no meio: centrado")
+	_igual(Main.pan_para_ver(Rect2(1200, 100, 80, 100), 640.0, alcance), 640.0, "preso ao alcance")
+	# Do repouso (320) o pan chega ao alvo andando, sem salto seco, e não passa dele.
+	var pan := 320.0
+	var passos := 0
+	while pan > 0.0 and passos < 100:
+		pan = Main.passo_do_pan(pan, 0.0, Main.VELOCIDADE_VIRAR / 60.0)
+		passos += 1
+	_igual(pan, 0.0, "chegou ao alvo")
+	_verdade(passos > 5 and passos < 60, "levou de 0,1 s a 1 s (%d quadros)" % passos)
+	_igual(Main.passo_do_pan(3.0, 0.0, 17.0), 0.0, "não passa do alvo")

@@ -17,6 +17,7 @@ extends Control
 
 const VELOCIDADE_BORDA := 600.0  # px/s, no limite da tela
 const VELOCIDADE_SETA := 400.0  # px/s, seta pressionada
+const VELOCIDADE_VIRAR := 1000.0  # px/s, a sala virando sozinha para o botão do abrigo (~0,3 s do repouso)
 const JSON_REGIOES := "res://assets/comodo/regioes.json"
 const DadosDonki := preload("res://scripts/dados_donki.gd")
 const Missao := preload("res://scripts/missao.gd")
@@ -78,6 +79,11 @@ var _sonda_chave := ""
 var _sonda_t := 0.0
 var _pan := 0.0
 var _pan_inteiro := 0
+# A sala vira sozinha para o botão do abrigo (a linha do abrigo no terminal pede). Enquanto guiado, o pan
+# por posição do mouse fica parado, senão o mouse que tocou a linha puxaria a sala de volta; um movimento
+# do mouse ou uma seta solta o pan.
+var _pan_alvo := 0.0
+var _pan_guiado := false
 var _cliques := 0
 var _ultimo_clique := ""
 var _hover := ""
@@ -112,6 +118,7 @@ func _ready() -> void:
 	_hud_turno.missao = _missao
 	_terminal.iniciar(_missao, _donki)
 	_terminal.desenhou.connect(_sonda_se_mudou)
+	_terminal.pediu_abrigo.connect(_virar_para_abrigo)
 
 	var tamanho := _panorama.texture.get_size()
 	_panorama.size = tamanho
@@ -127,9 +134,13 @@ func _ready() -> void:
 	_realce.draw.connect(_desenhar_realce)
 	_contornos.draw.connect(_desenhar_contornos)
 
-	_seta_esq.button_down.connect(func() -> void: _esq_pressionada = true)
+	_seta_esq.button_down.connect(func() -> void:
+		_esq_pressionada = true
+		_pan_guiado = false)
 	_seta_esq.button_up.connect(func() -> void: _esq_pressionada = false)
-	_seta_dir.button_down.connect(func() -> void: _dir_pressionada = true)
+	_seta_dir.button_down.connect(func() -> void:
+		_dir_pressionada = true
+		_pan_guiado = false)
 	_seta_dir.button_up.connect(func() -> void: _dir_pressionada = false)
 
 	_pan = _alcance() / 2.0
@@ -213,6 +224,9 @@ func _input(event: InputEvent) -> void:
 			_mouse_real = false  # mouse emulado a partir de toque
 		elif event is InputEventMouseMotion:
 			_mouse_real = true
+		# Só depois que a sala chegou ao abrigo: o mouse que mexe enquanto o terminal desce não desfaz a virada.
+		if event is InputEventMouseMotion and _pan_guiado and absf(_pan - _pan_alvo) < 1.0:
+			_pan_guiado = false
 
 
 ## Só chega aqui o que nenhum Control (as setas) consumiu.
@@ -256,10 +270,12 @@ func _process(delta: float) -> void:
 		_dir_pressionada = false
 
 	var velocidade := 0.0
-	if not tapa:
+	if not tapa and not _pan_guiado:
 		velocidade = _velocidade_seta() if (_esq_pressionada or _dir_pressionada) else _velocidade_mouse()
 	if velocidade != 0.0:
 		_pan = clampf(_pan + velocidade * delta, 0.0, _alcance())
+	elif _pan_guiado and not tapa:
+		_pan = passo_do_pan(_pan, _pan_alvo, VELOCIDADE_VIRAR * delta)
 	var novo := roundi(_pan)
 	_sala.position.x = -novo
 	_pan_inteiro = novo
@@ -328,6 +344,23 @@ func _clicavel(nome: String) -> bool:
 
 func _pode_iniciar(tarefa: String) -> bool:
 	return _missao.tarefas.get(tarefa, "") == "pendente" and not _missao.abrigado and _missao.tarefa_rodando == ""
+
+
+## A linha do abrigo foi tocada no terminal (já descendo): a sala vira até o botão do abrigo ficar à vista.
+## Não abriga: abrigar é o toque no botão.
+func _virar_para_abrigo() -> void:
+	_pan_alvo = pan_para_ver(_botoes["abrigo"], get_viewport_rect().size.x, _alcance())
+	_pan_guiado = true
+
+
+## O pan que põe o centro do retângulo `r` (px do panorama) no meio da tela, preso ao alcance.
+static func pan_para_ver(r: Rect2, largura_tela: float, alcance: float) -> float:
+	return clampf(r.get_center().x - largura_tela / 2.0, 0.0, alcance)
+
+
+## Anda o pan até o alvo, no máximo `passo` px (sem passar dele).
+static func passo_do_pan(pan: float, alvo: float, passo: float) -> float:
+	return move_toward(pan, alvo, passo)
 
 
 ## Alcance do pan: largura da textura menos a largura visível da tela.
@@ -610,6 +643,9 @@ func _sonda_teste() -> void:
 		"modo": _nome_do_modo(), "shader_em": [res.x, res.y], "zoom": _zoom(),
 		"estado": _estado, "vista": _vista, "persiana": _dados_persiana(),
 		"hover": _hover, "depurar": _depurar,
+		"pan_guiado": _pan_guiado, "pan_alvo": roundi(_pan_alvo) if _pan_guiado else null,
+		"pan_do_abrigo": roundi(pan_para_ver(_botoes["abrigo"], get_viewport_rect().size.x, _alcance())),
+		"alerta_sobre_terminal": _terminal.alerta_sobre_o_terminal(),
 		"donki": {
 			"historico": _donki["historico"], "chegadas": _donki["chegadas_marte"].size(),
 			"coletado_em": _donki.get("coletado_em"), "motivo_historico": _donki.get("motivo_historico"),

@@ -47,6 +47,7 @@ INICIAR,Start,Iniciar
 CONSERTAR,Fix,Consertar
 ENCERRAR_O_SOL,End the sol,Encerrar o sol
 ABRIGO,Shelter,Abrigo
+IR_AO_ABRIGO,Go to shelter,Ir ao abrigo
 ABRIGO_ATE_FIM,The crew stays in the shelter until the end of the sol.,A tripulação fica no abrigo até o fim do sol.
 DIARIO_CALMO,A calm sol.,Um sol calmo.
 DIARIO_TEMPESTADE,The storm from the Sun arrived.,A tempestade do Sol chegou.

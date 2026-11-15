@@ -39,14 +39,21 @@ const Som := preload("res://scripts/som.gd")
 const Modelo := preload("res://scripts/modelo.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const DadosDonki := preload("res://scripts/dados_donki.gd")
+const HudTurno := preload("res://scripts/hud_turno.gd")
 
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
+## A linha do abrigo foi tocada: o terminal já desceu e a sala deve virar para o botão do abrigo (main.gd).
+## A linha não abriga; abrigar é o toque no botão da sala.
+signal pediu_abrigo
 
 const DURACAO_PADRAO := 0.3  # escolhida de ouvido pelo dono (14/11), entre 0,25, 0,4 e 0,6
 const DURACAO_MIN := 0.15
 const DURACAO_MAX := 1.5
 const BOTAO := Rect2(260, 328, 120, 28)
+## O alerta do medidor por cima do terminal: embaixo à esquerda, na faixa abaixo das teclas e ao lado do
+## BOTAO, onde não cobre tecla, tela nem botão.
+const ALERTA := Rect2(8, 328, 34, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
@@ -101,6 +108,7 @@ var _textos: Array = []     # [texto, x, y, tamanho] de tudo que o quadro desenh
 var _mouse := Vector2(-100, -100)
 var _hover := ""
 var _versao_vista := -1
+var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
 
 
 func iniciar(m: Missao, dado_donki: Dictionary) -> void:
@@ -145,6 +153,12 @@ func aba_na_tela() -> String:
 ## descendo) ou escurecendo.
 func tapa_a_sala() -> bool:
 	return aberto or _pos > 0.0 or _fade_estado == "escurecendo"
+
+
+## O alerta do medidor está desenhado por cima do terminal agora (a sonda de teste lê)? O HUD do turno some
+## com o terminal aberto, em animação ou escurecendo; o alerta fica por cima dele.
+func alerta_sobre_o_terminal() -> bool:
+	return missao != null and fase_ui == "turno" and (aberto or _pos > 0.0) and HudTurno.cor_do_alerta(missao).a > 0.0
 
 
 ## Duração pedida na URL (?terminal=<s>): vale de DURACAO_MIN a DURACAO_MAX; fora disso ou ausente, o padrão.
@@ -244,6 +258,7 @@ func _process(delta: float) -> void:
 	if missao.modos > _modos_vistos and som != null:
 		som.tocar("desligar")
 	_modos_vistos = missao.modos
+	_vigiar_alarme()
 	if missao.fase != _fase_logica:
 		_ao_mudar_de_fase(_fase_logica, missao.fase)
 	match _fade_estado:
@@ -262,6 +277,15 @@ func _process(delta: float) -> void:
 	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
+
+
+## O alarme toca uma vez cada vez que o medidor passa para cima do limiar de abrigo no turno, fora do abrigo.
+## Abrigar, sair do turno ou o medidor voltar ao limiar ou abaixo rearma.
+func _vigiar_alarme() -> void:
+	var acima := missao.fase == "turno" and not missao.abrigado and missao.medidor() > Missao.LIMIAR_ABRIGO
+	if acima and not _alarmou and som != null:
+		som.tocar("alarme")
+	_alarmou = acima
 
 
 func _ao_mudar_de_fase(de: String, para: String) -> void:
@@ -345,9 +369,21 @@ func _acionar(nome: String) -> void:
 			fez = missao.seguir_em_seguranca()
 		"jogar_de_novo":
 			fez = missao.jogar_de_novo()
+		"ir_ao_abrigo":
+			fez = _ir_ao_abrigo()
 	if fez and som != null:
 		som.clique(nome)
 	queue_redraw()
+
+
+## A linha do abrigo: abaixa o terminal e pede à sala que vire para o botão. Não abriga. Só vale no turno
+## e fora do abrigo.
+func _ir_ao_abrigo() -> bool:
+	if missao.fase != "turno" or fase_ui != "turno" or missao.abrigado:
+		return false
+	_definir_aberto(false)
+	pediu_abrigo.emit()
+	return true
 
 
 ## Apertar a tecla da aba na tela volta à tela própria da fase; apertar outra abre a aba dela.
@@ -502,9 +538,19 @@ func _draw() -> void:
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
+	if alerta_sobre_o_terminal():
+		_desenhar_alerta()
 	if _fade > 0.0:
 		draw_rect(TELA, Color(Desenho.NOITE, _fade))
 	desenhou.emit()
+
+
+## O alerta do medidor (o ícone do HUD do turno, no mesmo chip), por cima do terminal. Só se vê: não é botão.
+func _desenhar_alerta() -> void:
+	var cor := HudTurno.cor_do_alerta(missao)
+	draw_rect(ALERTA, Color(Desenho.NOITE, 0.92))
+	draw_rect(ALERTA, cor, false, 2.0)
+	Desenho.icone(self, "alerta", Rect2(ALERTA.position.x + 7, ALERTA.position.y + 4, 20, 20), cor, Desenho.NOITE)
 
 
 func _desenhar_terminal() -> void:
@@ -1018,6 +1064,8 @@ func _linha_abrigo(r: Rect2) -> void:
 	var feita := missao.abrigado
 	var cor := Desenho.TEXTO if feita else Desenho.VERMELHO
 	draw_rect(r, cor, false, 2.0)
+	if not feita and not _travado and r.has_point(_mouse):
+		draw_rect(r.grow(-2.0), Color(Desenho.TEXTO, 0.08))
 	Desenho.icone(self, "alerta", Rect2(r.position.x + 10, r.position.y + 10, 20, 20), cor, Desenho.FUNDO_TERMINAL)
 	_t(tr("ABRIGO"), r.position.x + 40, r.position.y + 12, 14, cor, 120, HORIZONTAL_ALIGNMENT_LEFT, true)
 	var xe := r.position.x + 170
@@ -1027,6 +1075,10 @@ func _linha_abrigo(r: Rect2) -> void:
 	else:
 		Desenho.icone(self, "circulo", Rect2(xe, r.position.y + 12, 16, 16), cor, Desenho.FUNDO_TERMINAL)
 		_t(_estado_texto("pendente"), xe + 22, r.position.y + 13, 13, cor, 120)
+		# Antes de abrigar a linha é botão: o verde marca o que se toca, e a linha inteira vale o toque.
+		_botao("ir_ao_abrigo", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("IR_AO_ABRIGO"), "", true, 12)
+		if _botoes.has("ir_ao_abrigo"):
+			_botoes["ir_ao_abrigo"] = r
 
 
 # --- aba diário ------------------------------------------------------------------
