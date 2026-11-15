@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" path="res://assets/ui/seta_direita_pressed.png" id="10_dp"]
 [ext_resource type="Texture2D" path="res://assets/ui/seta_direita_disabled.png" id="10_dd"]
 [ext_resource type="Texture2D" path="res://assets/exterior/vista_janela_normal.png" id="12_vista"]
+[ext_resource type="Script" path="res://scripts/janela.gd" id="20_janela"]
 [ext_resource type="Script" path="res://scripts/hud_turno.gd" id="13_hud"]
 [ext_resource type="Script" path="res://scripts/terminal.gd" id="14_terminal"]
 [ext_resource type="Script" path="res://scripts/persiana.gd" id="15_persiana"]
@@ -45,6 +46,7 @@ mouse_filter = 2
 layout_mode = 0
 mouse_filter = 2
 texture = ExtResource("12_vista")
+script = ExtResource("20_janela")
 
 [node name="PanoramaAnterior" type="TextureRect" parent="Sala"]
 layout_mode = 0

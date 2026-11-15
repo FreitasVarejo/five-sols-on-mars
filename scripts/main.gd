@@ -25,6 +25,7 @@ const TelaBarra := preload("res://scripts/tela_barra.gd")
 const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
 const Estacoes := preload("res://scripts/estacoes.gd")
 const Persiana := preload("res://scripts/persiana.gd")
+const Janela := preload("res://scripts/janela.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -45,7 +46,7 @@ const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
 const COR_TELA_APAGADA := Color("#202e37")
 
 @onready var _sala: Control = $Sala
-@onready var _vista_janela: TextureRect = $Sala/Vista
+@onready var _vista_janela: Janela = $Sala/Vista
 @onready var _panorama: TextureRect = $Sala/Panorama
 @onready var _panorama_anterior: TextureRect = $Sala/PanoramaAnterior
 @onready var _persiana: Persiana = $Sala/Persiana
@@ -111,6 +112,7 @@ func _ready() -> void:
 	_persiana.size = tamanho
 	_persiana.configurar(_panorama, _panorama_anterior, Persiana.duracao_da_url(_parametros.get("persiana")))
 	_persiana.mudou.connect(_sonda_persiana)
+	_vista_janela.configurar_luz([_panorama, _panorama_anterior, _persiana])
 	_sala.size = tamanho
 	_telas.size = tamanho
 	_realce.size = tamanho
@@ -276,6 +278,7 @@ func _atualizar_sala() -> void:
 			estado = "tempestade"
 	if estado != _estado:
 		_definir_estado(estado)
+	_vista_janela.acompanhar(fase_ui, _missao.relogio(), _missao.turno_s, _missao.eh_poeira())
 	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto
 	var estados := {}
 	var progresso := {}
@@ -599,4 +602,11 @@ func _sonda_teste() -> void:
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
 	}
+	estado.merge(_sonda_graficos())
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)
+
+
+## O que os gráficos expõem à sonda: a hora e a luz da sala, a mistura da vista de poeira e as setas.
+func _sonda_graficos() -> Dictionary:
+	return {"hora": _vista_janela.hora, "luz": _vista_janela.luz, "mistura_poeira": _vista_janela.mistura,
+		"setas_desabilitadas": [_seta_esq.disabled, _seta_dir.disabled]}
