@@ -31,6 +31,8 @@ const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
 const Som := preload("res://scripts/som.gd")
 const Terminal := preload("res://scripts/terminal.gd")
+const Inicio := preload("res://scripts/inicio.gd")
+const Abertura := preload("res://scripts/abertura/abertura.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -100,6 +102,10 @@ var _mouse_pos := Vector2.ZERO
 # O pan por posição só vale com mouse de verdade e com o mouse dentro da janela.
 var _mouse_real := false
 var _mouse_dentro := true
+# O começo do jogo: tela inicial -> abertura -> plano do sol 1. Enquanto uma dessas sobreposições está na
+# tela, nada por baixo responde (terminal, clique e pan da sala, setas); só o botão de mudo.
+var _sobreposicao: Control = null
+var _tela := "jogo"  # "inicio", "abertura" ou "jogo" (a sonda lê)
 
 
 func _ready() -> void:
@@ -110,7 +116,7 @@ func _ready() -> void:
 	_terminal.som = _som
 	_terminal.duracao = Terminal.duracao_da_url(_parametros.get("terminal"))
 	_aplicar_stretch_da_url()
-	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
+	# Inglês por padrão; ?lang=pt (ou en) é a escolha inicial. O idioma do navegador não conta.
 	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
 	_depuracao.hide()
 	_donki = DadosDonki.carregar()
@@ -148,6 +154,7 @@ func _ready() -> void:
 	_pan_inteiro = roundi(_pan)
 	_sala.position.x = -_pan_inteiro
 	_atualizar_depuracao()
+	_abrir_inicio()
 	# Espera um frame: depois de trocar o content_scale_mode, o tamanho da
 	# textura do viewport só vale no frame seguinte.
 	await get_tree().process_frame
@@ -232,6 +239,8 @@ func _input(event: InputEvent) -> void:
 
 ## Só chega aqui o que nenhum Control (as setas) consumiu.
 func _unhandled_input(event: InputEvent) -> void:
+	if _sobreposicao != null:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var nome := _regiao_em(event.position)
 		if nome != "":
@@ -254,12 +263,14 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
-	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro.
-	_missao.avancar(minf(delta, 0.25))
+	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro. Parado enquanto a
+	# tela inicial ou a abertura estão na tela.
+	if _sobreposicao == null:
+		_missao.avancar(minf(delta, 0.25))
 	if _missao.fixa_concluida and not _freeplay_gravado:
 		_freeplay_gravado = true
 		_gravar_freeplay_destravado()
-	var tapa: bool = _terminal.tapa_a_sala()
+	var tapa: bool = _terminal.tapa_a_sala() or _sobreposicao != null
 	if tapa:
 		_esq_pressionada = false
 		_dir_pressionada = false
@@ -332,7 +343,7 @@ func _atualizar_sala() -> void:
 ## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
 ## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
-	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala():
+	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _sobreposicao != null:
 		return false
 	match nome:
 		"abrigo":
@@ -418,7 +429,7 @@ func _panorama_para_tela(q: Vector2) -> Vector2:
 
 ## Nome do botão sob o ponto p da tela ("" se nenhum). As setas tapam.
 func _regiao_em(p: Vector2) -> String:
-	if _terminal.tapa_a_sala():
+	if _terminal.tapa_a_sala() or _sobreposicao != null:
 		return ""
 	for seta in [_seta_esq, _seta_dir]:
 		if seta.is_visible_in_tree() and seta.get_global_rect().has_point(p):
@@ -476,6 +487,94 @@ func _contorno_na_tela(r: Rect2) -> PackedVector2Array:
 	pts.append(_panorama_para_tela(Vector2(r.position.x, r.end.y)))
 	pts.append(pts[0])
 	return pts
+
+
+# --- o começo do jogo: tela inicial, abertura ----------------------------------
+
+## Põe a tela inicial por cima de tudo (só abaixo do botão de mudo) e desliga a entrada do que está por baixo.
+func _abrir_inicio() -> void:
+	var inicio := Inicio.new()
+	inicio.som = _som
+	inicio.marcar_idioma(TranslationServer.get_locale())
+	inicio.idioma_escolhido.connect(definir_idioma)
+	inicio.jogar.connect(_abrir_abertura)
+	_por_sobreposicao(inicio, "inicio")
+
+
+## Troca a tela inicial pela abertura (instanciada por código, tela cheia).
+func _abrir_abertura() -> void:
+	var abertura := Abertura.new()
+	abertura.som = _som
+	abertura.concluida.connect(_comecar_o_jogo)
+	_por_sobreposicao(abertura, "abertura")
+
+
+## A abertura acabou (botão final ou "Pular"): tira a sobreposição e devolve a entrada ao plano do sol 1.
+func _comecar_o_jogo() -> void:
+	_por_sobreposicao(null, "jogo")
+	_terminal.queue_redraw()
+
+
+func _por_sobreposicao(nova: Control, tela: String) -> void:
+	if _sobreposicao != null:
+		_sobreposicao.queue_free()
+	_sobreposicao = nova
+	_tela = tela
+	if nova != null:
+		nova.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(nova)
+		move_child(nova, _botao_mudo.get_index())  # por cima de tudo, menos do botão de mudo
+	_terminal.set_process_input(nova == null)
+	_esq_pressionada = false
+	_dir_pressionada = false
+	_pan_guiado = false
+	if is_node_ready():
+		_sonda_teste()
+
+
+## O idioma da tela inicial: troca na hora o que se desenha uma vez só (as telas de barra da sala) e manda o
+## terminal redesenhar.
+func definir_idioma(lang: String) -> void:
+	TranslationServer.set_locale("pt" if lang == "pt" else "en")
+	_atualizar_nomes_das_telas()
+	_terminal.queue_redraw()
+	_sonda_teste()
+
+
+func _atualizar_nomes_das_telas() -> void:
+	_tela_energia.nome = tr(TELAS["energia"][0])
+	_tela_energia.queue_redraw()
+	_tela_oxigenio.nome = tr(TELAS["oxigenio"][0])
+	_tela_oxigenio.queue_redraw()
+
+
+## A sobreposição de agora (ou null): o teste lê.
+func sobreposicao() -> Control:
+	return _sobreposicao
+
+
+func tela_atual() -> String:
+	return _tela
+
+
+func _quadro_da_abertura() -> int:
+	return (_sobreposicao as Abertura).quadro_atual() if _tela == "abertura" else -1
+
+
+## O que se clica na sobreposição, nome -> [x, y, w, h]: a tela inicial (jogar, idioma_en, idioma_pt) ou a
+## abertura (pular e, no último quadro, comecar).
+func _ui_da_sobreposicao() -> Dictionary:
+	if _tela == "inicio":
+		return (_sobreposicao as Inicio).ui()
+	var a := _sobreposicao as Abertura
+	var ui := {}
+	var itens := [["pular", a.rect_pular()]]
+	if a.quadro_atual() == Abertura.ULTIMO:
+		itens.append(["comecar", a.rect_botao_final()])
+	for par in itens:
+		var r: Rect2 = par[1]
+		ui[par[0]] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	return ui
 
 
 # --- ações -------------------------------------------------------------------
@@ -617,6 +716,10 @@ func _rect_na_tela(r: Rect2) -> Rect2:
 ## Tudo que se clica agora, nome -> [x, y, w, h] em px da tela de 640x360: o terminal e o que ele
 ## mostra, mais a sala (abrigo, estufa, glovebox, porta) e as setas, quando valem.
 func _ui_da_tela() -> Dictionary:
+	if _sobreposicao != null:
+		var sobre := _ui_da_sobreposicao()
+		sobre.merge(_botao_mudo.ui())
+		return sobre
 	var ui: Dictionary = _terminal.ui()
 	for nome: String in _botoes:
 		if _clicavel(nome):
@@ -645,9 +748,13 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
-		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando()]
+		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando(),
+		_tela, _quadro_da_abertura(), TranslationServer.get_locale()]
+	# Os retângulos da sobreposição andam com a rolagem da abertura: a sonda os relê a cada mudança.
+	if _sobreposicao != null:
+		chave += JSON.stringify(_ui_da_sobreposicao())
 	var agora := Time.get_ticks_msec() / 1000.0
 	if chave != _sonda_chave or _terminal.animando() or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
@@ -698,7 +805,7 @@ func _sonda_teste() -> void:
 		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),
 			"duracao": _terminal.duracao},
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
-		"idioma": TranslationServer.get_locale(),
+		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
