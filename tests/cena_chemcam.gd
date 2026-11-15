@@ -1,26 +1,30 @@
 extends Control
 ## Cena de captura do minigame do ChemCam: hospeda a peça numa área como a de uma aba de câmera do
 ## terminal e roda um roteiro determinístico (o tempo passa por `avancar`, não pelo relógio), salvando
-## PNGs do viewport em PASTA com o prefixo "chemcam_".
+## PNGs do viewport em `_pasta` com o prefixo "chemcam_".
 ## Roda com display: godot --path . res://tests/cena_chemcam.tscn
 ## Um clima só: godot --path . res://tests/cena_chemcam.tscn -- poeira   (ou: -- normal)
+## Outra pasta de saída: ... -- --pasta=/caminho/da/pasta/
 
 const Desenho := preload("res://scripts/desenho.gd")
 const ChemCam := preload("res://scripts/minigames/chemcam.gd")
 
-const PASTA := "/home/freitaspinhe/Pictures/five-sols-on-mars/noite-15-11/"
+const PASTA_PADRAO := "/home/freitaspinhe/Pictures/five-sols-on-mars/noite-15-11/"
 const AREA := Rect2(24, 40, 420, 236)
 const DURACAO := 10.0
 
 var _peca: ChemCam
+var _pasta := PASTA_PADRAO
 
 
 func _ready() -> void:
-	DirAccess.make_dir_recursive_absolute(PASTA)
 	var climas: Array[String] = ["normal", "poeira"]
 	for arg in OS.get_cmdline_user_args():
 		if arg in climas:
 			climas = [arg]
+		elif arg.begins_with("--pasta="):
+			_pasta = arg.trim_prefix("--pasta=").path_join("")
+	DirAccess.make_dir_recursive_absolute(_pasta)
 	for clima in climas:
 		await _roteiro(clima)
 	get_tree().quit()
@@ -68,6 +72,6 @@ func _roteiro(clima: String) -> void:
 func _salvar(nome: String) -> void:
 	await RenderingServer.frame_post_draw
 	var img := get_viewport().get_texture().get_image()
-	var caminho := PASTA + "chemcam_%s.png" % nome
+	var caminho := _pasta + "chemcam_%s.png" % nome
 	img.save_png(caminho)
 	print("%s (%dx%d)  progresso %.3f" % [caminho, img.get_width(), img.get_height(), _peca.progresso()])
