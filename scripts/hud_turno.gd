@@ -22,6 +22,15 @@ func _process(_delta: float) -> void:
 		queue_redraw()
 
 
+## A cor do alerta do medidor: amarela em "atenção", vermelha em "abrigo", e transparente (sem alerta)
+## abrigado ou abaixo da atenção. O terminal usa a mesma regra para o alerta por cima dele.
+static func cor_do_alerta(m: Missao) -> Color:
+	var medidor := m.medidor()
+	if m.abrigado or medidor < Missao.LIMIAR_ATENCAO:
+		return Color(0, 0, 0, 0)
+	return Desenho.VERMELHO if medidor > Missao.LIMIAR_ABRIGO else Desenho.AMARELO
+
+
 func _chip(r: Rect2) -> void:
 	draw_rect(r, Color(Desenho.NOITE, 0.85))
 	draw_rect(r, Desenho.BORDA, false, 1.0)
@@ -61,9 +70,8 @@ func _draw() -> void:
 		Desenho.icone(self, "lua", Rect2(x + 4, 9, 18, 16), Desenho.TEXTO)
 		x += 30
 	# O alerta: amarelo em "atenção", vermelho em "abrigo", enquanto fora do abrigo. Fixo, sem piscar.
-	var m := missao.medidor()
-	if not missao.abrigado and m >= Missao.LIMIAR_ATENCAO:
-		var cor := Desenho.VERMELHO if m > Missao.LIMIAR_ABRIGO else Desenho.AMARELO
+	var cor := cor_do_alerta(missao)
+	if cor.a > 0.0:
 		_chip(Rect2(x, 6, 26, 22))
 		draw_rect(Rect2(x, 6, 26, 22), cor, false, 2.0)
 		Desenho.icone(self, "alerta", Rect2(x + 4, 9, 18, 16), cor, Desenho.NOITE)

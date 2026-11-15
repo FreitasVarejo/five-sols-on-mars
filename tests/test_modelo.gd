@@ -240,10 +240,11 @@ func _dose_e_estrelas() -> void:
 	_igual(Modelo.dose(true, 0.25), 6.0, "dose tempestade 0,25: 3 + round(3)")
 	_igual(Modelo.dose(true, -1.0), 3.0, "dose tempestade limita em 0")
 	_igual(Modelo.dose(true, 2.0), 15.0, "dose tempestade limita em 1")
-	# 60% de 10 = 6: precisa de 6.
-	_igual(Modelo.estrelas(0, 6), 3, "estrelas: 0 modos, ciência 6")
-	_igual(Modelo.estrelas(0, 5), 2, "estrelas: 0 modos, ciência 5")
-	_igual(Modelo.estrelas(0, 10), 3, "estrelas: 0 modos, ciência 10")
+	# TEORICO 7 (o ótimo da missão fixa): 60% de 7 = 4,2, então precisa de 5.
+	_igual(Modelo.N.TEORICO, 7, "TEORICO é o ótimo da missão fixa")
+	_igual(Modelo.estrelas(0, 5), 3, "estrelas: 0 modos, ciência 5")
+	_igual(Modelo.estrelas(0, 4), 2, "estrelas: 0 modos, ciência 4")
+	_igual(Modelo.estrelas(0, 7), 3, "estrelas: 0 modos, ciência 7")
 	_igual(Modelo.estrelas(0, 14), 3, "estrelas: 0 modos, ciência 14")
 	_igual(Modelo.estrelas(1, 14), 2, "estrelas: 1 modo")
 	_igual(Modelo.estrelas(2, 0), 2, "estrelas: 2 modos")

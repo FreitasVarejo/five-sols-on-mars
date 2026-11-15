@@ -26,12 +26,27 @@ const PICO_MIN := 0.15      # o pico da tempestade solar é sorteado entre estas
 const PICO_MAX := 0.70      # nunca depois de 70%: não coincide com o fim do turno
 const RAMPA_S := 3.0        # o medidor sobe de baixo até "abrigo" nos segundos antes do pico
 const NOITE_S := 1.2        # a noite, entre o envio à Terra e o plano seguinte
-const SOLS_SOLAR := [3, 4]  # sóis em que pode cair a tempestade solar (um por missão)
-const ATRASO_MIN := 3       # o "há N min" do card da Terra, sorteado por missão
+const SOLS_SOLAR := [2, 3, 4]  # sóis em que a tempestade solar pode cair (um por missão); a URL aceita estes
+const ATRASO_MIN := 3       # o "há N min" do card da Terra: no freeplay, sorteado por missão entre estes
 const ATRASO_MAX := 22
-const SOL_AVISO := 2        # sol do primeiro aviso da tempestade solar
+const SOL_AVISO := 1        # sol do primeiro aviso da tempestade solar (o plano do sol 1)
 const SOLS_EVENTO := [2, 3, 4, 5]  # sóis em que podem começar a tempestade de poeira e a quebra do gerador
 const DURACAO_POEIRA := 2   # sóis da tempestade de poeira (encurtada: a de início no sol 5 fica só nele)
+# A missão fixa (a primeira): a mesma para o jurado, o vídeo e a calibração (spec, "Missão e sol").
+const FIXA_SOL_SOLAR := 2
+const FIXA_SOL_POEIRA := 3     # a poeira cobre os sóis 3 e 4 (DURACAO_POEIRA)
+const FIXA_SOL_QUEBRA := 5
+const FIXA_ATRASO_MIN := 12    # o "há N min" do card da Terra na missão fixa
+const FIXA_PICO_S := 25.0      # pico da tempestade solar, em segundos de um turno de TURNO_S
+# O freeplay versão zero: as seis agendas de 5 sóis com um evento por sol, [solar, poeira (início), quebra].
+const AGENDAS_LIVRES := [
+	[3, 4, 2],  # quebra 2, solar 3, poeira 4 e 5
+	[3, 5, 2],  # quebra 2, solar 3, poeira 5
+	[3, 5, 4],  # solar 3, quebra 4, poeira 5
+	[4, 2, 5],  # poeira 2 e 3, solar 4, quebra 5
+	[4, 5, 2],  # quebra 2, solar 4, poeira 5
+	[4, 5, 3],  # quebra 3, solar 4, poeira 5
+]
 const ACELERAR := 8.0       # "Encerrar o sol": o relógio do turno corre tantas vezes mais rápido
 
 # Medidor de radiação (0..1) e seus dois limiares.
@@ -47,13 +62,16 @@ const EPS := 1e-9
 var rng := RandomNumberGenerator.new()
 var turno_s := TURNO_S
 var tarefa_s := TAREFA_S
-var forcar_sol_solar := 0   # 3 ou 4 força o sol da tempestade; 0 sorteia
-var forcar_sol_poeira := 0  # 2 a 5 força o sol de início da poeira; 0 sorteia
-var forcar_sol_quebra := 0  # 2 a 5 (e diferente de sol_solar) força o sol da quebra; 0 sorteia
+var forcar_sol_solar := 0   # 2, 3 ou 4 força o sol da tempestade; 0 deixa a agenda
+var forcar_sol_poeira := 0  # 2 a 5 força o sol de início da poeira; 0 deixa a agenda
+var forcar_sol_quebra := 0  # 2 a 5 (e diferente de sol_solar) força o sol da quebra; 0 deixa a agenda
+var livre := false          # esta missão é o freeplay (eventos e pico sorteados); false = a missão fixa
+var freeplay_aberto := false  # o "Jogar de novo" abre o freeplay (a missão fixa já chegou ao relatório)
+var fixa_concluida := false   # a missão fixa chegou ao relatório nesta sessão (a main grava no navegador)
 
 var sol_solar := 3
 var sol_poeira := 2         # sol em que a tempestade de poeira começa (dura DURACAO_POEIRA)
-var sol_quebra := 2         # sol em que o gerador quebra (uma vez por missão, nunca no sol_solar)
+var sol_quebra := 5         # sol em que o gerador quebra (uma vez por missão, nunca no sol_solar)
 var atraso_min := 3
 var sol := 1
 var fase := "plano"
@@ -93,8 +111,10 @@ var ciencia_por_sol: Array = []
 var registros: Array = []
 
 
-## `opcoes`: turno_s, tarefa_s, sol_solar (3 ou 4, força o sol da tempestade), sol_poeira (2 a 5) e
-## sol_quebra (2 a 5, diferente de sol_solar); valor inválido ou ausente = sorteio.
+## `opcoes`: turno_s, tarefa_s, sol_solar (2, 3 ou 4, força o sol da tempestade), sol_poeira (2 a 5) e
+## sol_quebra (2 a 5, diferente de sol_solar); valor inválido ou ausente = a agenda da missão (a fixa,
+## ou uma das sorteadas no freeplay). `freeplay_aberto`: o "Jogar de novo" abre o freeplay. `livre`:
+## já começa em freeplay (testes). A semente só serve ao sorteio do freeplay.
 func _init(semente: int = -1, opcoes: Dictionary = {}) -> void:
 	if semente >= 0:
 		rng.seed = semente
@@ -105,21 +125,25 @@ func _init(semente: int = -1, opcoes: Dictionary = {}) -> void:
 	forcar_sol_solar = int(opcoes.get("sol_solar", 0))
 	forcar_sol_poeira = int(opcoes.get("sol_poeira", 0))
 	forcar_sol_quebra = int(opcoes.get("sol_quebra", 0))
+	freeplay_aberto = bool(opcoes.get("freeplay_aberto", false))
+	livre = bool(opcoes.get("livre", false))
 	nova_missao()
 
 
-## Começa uma missão nova, com novo sorteio. Os eventos são da missão: o reinício de um sol não
-## sorteia de novo.
+## Começa uma missão nova. A fixa tem a agenda da spec e não sorteia nada; o freeplay sorteia uma das
+## AGENDAS_LIVRES e o atraso do card da Terra (o pico se sorteia no turno). As opções da URL valem por
+## cima da agenda. Os eventos são da missão: o reinício de um sol não sorteia de novo.
 func nova_missao() -> void:
-	var sorteado: int = SOLS_SOLAR[rng.randi_range(0, SOLS_SOLAR.size() - 1)]
-	sol_solar = forcar_sol_solar if forcar_sol_solar in SOLS_SOLAR else sorteado
-	atraso_min = rng.randi_range(ATRASO_MIN, ATRASO_MAX)
-	var poeira: int = SOLS_EVENTO[rng.randi_range(0, SOLS_EVENTO.size() - 1)]
-	sol_poeira = forcar_sol_poeira if forcar_sol_poeira in SOLS_EVENTO else poeira
+	var agenda := [FIXA_SOL_SOLAR, FIXA_SOL_POEIRA, FIXA_SOL_QUEBRA]
+	atraso_min = FIXA_ATRASO_MIN
+	if livre:
+		agenda = AGENDAS_LIVRES[rng.randi_range(0, AGENDAS_LIVRES.size() - 1)]
+		atraso_min = rng.randi_range(ATRASO_MIN, ATRASO_MAX)
+	sol_solar = forcar_sol_solar if forcar_sol_solar in SOLS_SOLAR else agenda[0]
+	sol_poeira = forcar_sol_poeira if forcar_sol_poeira in SOLS_EVENTO else agenda[1]
 	# A quebra nunca cai no sol da tempestade solar, nem quando a URL força esse sol.
-	var possiveis: Array = SOLS_EVENTO.filter(func(n: int) -> bool: return n != sol_solar)
-	var quebra: int = possiveis[rng.randi_range(0, possiveis.size() - 1)]
-	sol_quebra = forcar_sol_quebra if forcar_sol_quebra in possiveis else quebra
+	sol_quebra = forcar_sol_quebra if (forcar_sol_quebra in SOLS_EVENTO and forcar_sol_quebra != sol_solar) else agenda[2]
+	fixa_concluida = false
 	modos = 0
 	ciencia_por_sol = []
 	registros = []
@@ -146,7 +170,7 @@ func eh_poeira() -> bool:
 	return sol >= sol_poeira and sol < sol_poeira + DURACAO_POEIRA
 
 
-## Aviso da tempestade solar nos planos do sol 2 até o sol da tempestade, inclusive.
+## Aviso da tempestade solar nos planos do sol 1 (SOL_AVISO) até o sol da tempestade, inclusive.
 func aviso_ativo() -> bool:
 	return sol >= SOL_AVISO and sol <= sol_solar
 
@@ -308,6 +332,34 @@ func estrelas() -> int:
 	return Modelo.estrelas(modos, ciencia_total())
 
 
+## A causa pelo contexto do sol que falhou, além da barra que zerou (spec, "Falha e relatório"):
+## "sem_abrigo" (a radiação veio do abrigo tardio), "gerador" (oxigênio com o gerador quebrado no começo
+## do sol e sem conserto, quando consertar salvava: falha no turno, com `tem_conserto`) ou "poeira"
+## (oxigênio ou energia num sol de poeira). "" quando não há contexto. Na tela antecipada (nenhum plano
+## salva, nem com o conserto), "aperte Consertar" não vale, e o gerador não entra.
+func causa_contexto() -> String:
+	if causa_sem_abrigo:
+		return "sem_abrigo"
+	if causa == "oxigenio" and tem_conserto and st_inicio.get("gerador_quebrado", false) and tarefas.get("gerador", "") != "feita":
+		return "gerador"
+	if eh_poeira() and (causa == "oxigenio" or causa == "energia"):
+		return "poeira"
+	return ""
+
+
+## A chave (minúscula) do caso real da tela do modo de segurança: acompanha o contexto (poeira: o da
+## energia; gerador: o do oxigênio; sem abrigo: o da radiação); sem contexto, o da barra que zerou.
+func caso_real() -> String:
+	match causa_contexto():
+		"poeira":
+			return "energia"
+		"gerador":
+			return "oxigenio"
+		"sem_abrigo":
+			return "radiacao"
+	return causa
+
+
 # --- plano -------------------------------------------------------------------
 
 ## Muda o O2 do plano em `delta`. Só vale se o plano novo cabe.
@@ -357,10 +409,14 @@ func confirmar_plano() -> bool:
 	for nome in MANUTENCAO:
 		if _manutencao_pedida(nome):
 			tarefas[nome] = "pendente"
-	# O pico é sorteado de novo a cada turno (inclusive quando o sol reinicia).
+	# Missão fixa: o pico cai sempre no mesmo instante (FIXA_PICO_S de TURNO_S, na mesma fração se o
+	# turno muda). Freeplay: sorteado de novo a cada turno (inclusive quando o sol reinicia).
 	t_pico = -1.0
 	if eh_sol_solar():
-		t_pico = rng.randf_range(PICO_MIN, PICO_MAX) * turno_s
+		if livre:
+			t_pico = rng.randf_range(PICO_MIN, PICO_MAX) * turno_s
+		else:
+			t_pico = turno_s * FIXA_PICO_S / TURNO_S
 	versao += 1
 	return true
 
@@ -476,7 +532,7 @@ func _fechar_turno() -> void:
 		"q": plano_q, "escolhidas": plano_tarefas.duplicate(), "feitas": feitas, "nao_feitas": nao_feitas,
 		"ciencia": feitas.size(), "devolvida": r["devolvida"], "perdida_no_teto": r["perdida_no_teto"],
 		"o2_produzido": r["o2_produzido"], "dose": dose, "f_exposto": f, "abrigou": t_abrigado > 0.0,
-		"seguranca": false, "causa": "",
+		"seguranca": false, "causa": "", "causa_contexto": "",
 	})
 	fase = "fim_do_sol"
 	versao += 1
@@ -523,7 +579,7 @@ func seguir_em_seguranca() -> bool:
 		"q": 0, "escolhidas": [], "feitas": [], "nao_feitas": [],
 		"ciencia": 0, "devolvida": 0.0, "perdida_no_teto": 0.0, "o2_produzido": 0,
 		"dose": 0.0, "f_exposto": 0.0, "abrigou": false,
-		"seguranca": true, "causa": causa,
+		"seguranca": true, "causa": causa, "causa_contexto": causa_contexto(),
 	})
 	fase = "fim_do_sol"
 	versao += 1
@@ -539,6 +595,10 @@ func enviar_a_terra() -> bool:
 	st = st_fim.duplicate()
 	if sol >= Modelo.N.SOLS:
 		fase = "relatorio"
+		# Só a missão fixa sem agenda forçada pela URL destrava o freeplay.
+		if not livre and not _agenda_forcada():
+			fixa_concluida = true
+			freeplay_aberto = true
 	else:
 		fase = "noite"
 		t_noite = 0.0
@@ -555,17 +615,26 @@ func _terminar_noite() -> void:
 	_comecar_sol()
 
 
+## A missão tem um evento forçado pela URL (playtest)? Então não é a missão fixa.
+func _agenda_forcada() -> bool:
+	return forcar_sol_solar in SOLS_SOLAR or forcar_sol_poeira in SOLS_EVENTO or forcar_sol_quebra in SOLS_EVENTO
+
+
+## "Jogar de novo": depois da missão fixa concluída (nesta sessão ou numa anterior), abre o freeplay.
 func jogar_de_novo() -> bool:
 	if fase != "relatorio":
 		return false
+	if freeplay_aberto:
+		livre = true
 	nova_missao()
 	return true
 
 
 # --- interno -----------------------------------------------------------------
 
-## Começa o plano do sol `sol` com o estado `st`. Sem energia para o aquecimento da noite, o sol
-## já começa em modo de segurança (no P0 isso não acontece em jogo; os testes montam o estado).
+## Começa o plano do sol `sol` com o estado `st`. Sem energia para o aquecimento da noite, ou quando
+## nenhum plano salva o sol (a causa veio dos sóis anteriores), o sol já começa em modo de segurança:
+## a criança não joga um sol perdido (spec, "Falha e relatório"). Acontece depois da noite.
 func _comecar_sol() -> void:
 	st_inicio = st.duplicate()
 	st_fim = {}
@@ -589,6 +658,11 @@ func _comecar_sol() -> void:
 	versao += 1
 	if Modelo.manha(st, eh_poeira())["falta_aquecimento"]:
 		_entrar_seguranca(["energia"], {"E": 0.0, "O": st["O"], "M": st["M"]})
+		return
+	# Nenhum plano salva: as falhas e as barras são as do plano de emergência.
+	var e := Modelo.emergencia(st, eh_poeira(), eh_sol_solar())
+	if not e["falhas"].is_empty():
+		_entrar_seguranca(e["falhas"], e["st"])
 
 
 func _barras(s: Dictionary) -> Dictionary:

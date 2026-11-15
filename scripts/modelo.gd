@@ -43,12 +43,11 @@ const N := {
 	# No sim é 0.05. No P0 fica desligado; o P1 liga junto com "limpar o painel", que devolve P.
 	"ACUMULO": 0.0,         # quanto P cai por sol
 	"SOLS": 5,              # sóis da missão
-	# [P] Máximo de ciência sem modo de segurança numa missão com tempestade solar (abrigo), 2 sóis
-	# de poeira e gerador quebrado num sol de 2 a 5, pela simulação de 14/11: o melhor caso dá 10
-	# (o teto de 14 é o da missão sem nenhum evento, que o jogo nunca sorteia). Com o limiar de
-	# 60% (6), a estratégia equilibrada ganha 3 estrelas em 12 dos 24 cenários e a conservadora
-	# nunca. Se os números acima mudarem, recalcule rodando o sim.
-	"TEORICO": 10,
+	# [P] Máximo de ciência sem modo de segurança na missão fixa (tempestade solar no sol 2, poeira nos
+	# sóis 3 e 4, gerador quebrado no sol 5, pico aos 25 s de um turno de 60 s): 7, medido em 14/11
+	# (o melhor plano com 1 modo faz 9). Com o limiar de 60% (4,2), a ciência a partir de 5 dá 3 estrelas.
+	# Se os números acima mudarem, recalcule.
+	"TEORICO": 7,
 	"ESTRELAS_PCT": 0.6,    # fração do TEORICO que a ciência precisa atingir para 3 estrelas
 }
 
