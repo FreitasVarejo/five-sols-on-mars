@@ -75,6 +75,7 @@ var _tela_radiacao: Control
 var _estacoes: Control
 var _indicador_porta: Control
 var _parametros := {}  # parâmetros da URL (só Web)
+var _freeplay_gravado := false  # o destrave do freeplay já foi gravado no navegador nesta sessão
 var _sonda_chave := ""
 var _sonda_t := 0.0
 var _pan := 0.0
@@ -255,6 +256,9 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro.
 	_missao.avancar(minf(delta, 0.25))
+	if _missao.fixa_concluida and not _freeplay_gravado:
+		_freeplay_gravado = true
+		_gravar_freeplay_destravado()
 	var tapa: bool = _terminal.tapa_a_sala()
 	if tapa:
 		_esq_pressionada = false
@@ -534,7 +538,7 @@ func _atualizar_depuracao() -> void:
 
 ## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?terminal=<s> (duração
 ## do terminal subir e descer, 0,15 a 1,5; padrão 0,3), ?semente=<int>,
-## ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
+## ?sol_solar=2|3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):
 		return {}
@@ -559,7 +563,30 @@ func _opcoes_da_missao() -> Dictionary:
 		var sol_forcado := int(_parametros.get(chave, 0))
 		if sol_forcado in Missao.SOLS_EVENTO:
 			opcoes[chave] = sol_forcado
+	if _freeplay_destravado():
+		opcoes["freeplay_aberto"] = true
 	return opcoes
+
+
+# --- freeplay destravado (localStorage, só Web) -----------------------------------
+
+const CHAVE_FREEPLAY := "five-sols-on-mars.freeplay"  # "1" quando a missão fixa já chegou ao relatório
+
+
+## A missão fixa já foi concluída neste navegador? Fora do Web, ou se o acesso falhar, não.
+func _freeplay_destravado() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var valor = JavaScriptBridge.eval(
+		"(function(){try{return window.localStorage.getItem('%s')}catch(e){return null}})()" % CHAVE_FREEPLAY, true)
+	return str(valor) == "1"
+
+
+func _gravar_freeplay_destravado() -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"(function(){try{window.localStorage.setItem('%s','1')}catch(e){}})()" % CHAVE_FREEPLAY, true)
 
 
 ## No Web, lê ?stretch=viewport|canvas_items e aplica em content_scale_mode.
@@ -660,7 +687,7 @@ func _sonda_teste() -> void:
 		"previsao": {"E": prev["st"]["E"], "O": prev["st"]["O"], "M": prev["st"]["M"], "falhas": prev["falhas"]},
 		"relogio": m.relogio(), "turno_s": m.turno_s, "tarefa_s": m.tarefa_s,
 		"t_pico": m.t_pico if m.t_pico >= 0.0 else null,
-		"sol_solar": m.sol_solar, "atraso_min": m.atraso_min, "aviso_ativo": m.aviso_ativo(),
+		"sol_solar": m.sol_solar, "freeplay": m.livre, "freeplay_aberto": m.freeplay_aberto, "atraso_min": m.atraso_min, "aviso_ativo": m.aviso_ativo(),
 		"medidor": m.medidor(), "abrigado": m.abrigado, "tarefas": tarefas,
 		"ciencia": m.ciencia_ate_agora(), "ciencia_sol": m.ciencia_do_sol(), "modos": m.modos,
 		"tem_conserto": m.tem_conserto if m.fase == "seguranca" else null,

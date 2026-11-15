@@ -60,6 +60,9 @@ func _montar(opcoes: Dictionary = {}) -> Array:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
+	# O plano do sol 1 já abre com o card do aviso da tempestade solar (agenda fixa: tempestade no
+	# sol 2, aviso desde o sol 1). Estes testes são do terminal sem card, então ele começa fechado.
+	t.card_aberto = false
 	return [t, m, som]
 
 
@@ -317,6 +320,7 @@ func _desligar_pelo_relogio() -> void:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
+	t._acionar("fechar_card")  # o sol 1 abre com o aviso da Terra
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()
@@ -333,6 +337,7 @@ func _desligar_pelo_relogio() -> void:
 	_igual(m.fase, "plano", "reiniciou")
 	_rodar(t, m, QUADRO * 3.0)
 	_igual(som.historico, ["clique_confirmar"], "reiniciar toca o clique e não o desligar")
+	t._acionar("fechar_card")  # o plano reiniciado abre com o aviso de novo
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()

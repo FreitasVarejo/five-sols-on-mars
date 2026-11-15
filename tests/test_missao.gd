@@ -32,6 +32,8 @@ func _init() -> void:
 	_fim_do_sol_noite_e_relatorio()
 	_aviso()
 	_missao_inteira()
+	_agenda_fixa()
+	_freeplay()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -72,67 +74,62 @@ func _ate_sair_do_turno(m, passo: float = 0.25) -> void:
 
 ## Missão em um sol de tempestade solar (3), com o estado dado, no plano. A poeira fica só no sol 5
 ## e a quebra no 2, para o sol 3 ter a energia cheia e o gerador inteiro.
-func _solar(semente: int, estado: Dictionary):
-	var m = Missao.new(semente, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+func _solar(semente: int, estado: Dictionary, livre: bool = false):
+	var m = Missao.new(semente, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2, "livre": livre})
 	m.montar_sol(3, estado)
 	return m
 
 
 func _sorteios() -> void:
-	var solares := {}
-	var atraso_min := 99
-	var atraso_max := 0
-	for semente in 200:
-		var m = Missao.new(semente)
-		solares[m.sol_solar] = true
-		atraso_min = mini(atraso_min, m.atraso_min)
-		atraso_max = maxi(atraso_max, m.atraso_min)
-	_igual(solares.keys().size(), 2, "sorteio: os dois sóis de tempestade aparecem")
-	_verdade(solares.has(3) and solares.has(4), "sorteio: sol da tempestade é 3 ou 4")
-	_igual(atraso_min, 3, "sorteio: atraso mínimo 3")
-	_igual(atraso_max, 22, "sorteio: atraso máximo 22")
-	# Mesma semente, mesmo sorteio (inclusive o do pico).
-	var a = Missao.new(42, {"sol_solar": 3})
-	var b = Missao.new(42, {"sol_solar": 3})
-	_igual(a.atraso_min, b.atraso_min, "semente: mesmo atraso")
-	a.montar_sol(3, _st(6, 4, 12))
-	b.montar_sol(3, _st(6, 4, 12))
-	a.confirmar_plano()
-	b.confirmar_plano()
-	_igual(a.t_pico, b.t_pico, "semente: mesmo pico")
+	# A missão fixa (a primeira) não sorteia nada: qualquer semente dá a mesma agenda.
+	for semente in [-1, 0, 1, 42, 199]:
+		var a = Missao.new(semente)
+		_igual(a.livre, false, "a primeira missão não é freeplay")
+		_igual(a.sol_solar, 2, "fixa: tempestade solar no sol 2")
+		_igual(a.sol_poeira, 3, "fixa: poeira começa no sol 3")
+		_igual(a.sol_quebra, 5, "fixa: o gerador quebra no sol 5")
+		_igual(a.atraso_min, Missao.FIXA_ATRASO_MIN, "fixa: atraso do card da Terra fixo")
+	_verdade(Missao.FIXA_ATRASO_MIN >= Missao.ATRASO_MIN and Missao.FIXA_ATRASO_MIN <= Missao.ATRASO_MAX, "o atraso fixo está no intervalo de antes")
+	_igual(Missao.FIXA_ATRASO_MIN, 12, "atraso fixo: 12 min")
+	# Poeira nos sóis 3 e 4; um evento por sol (solar 2, poeira 3-4, quebra 5).
+	var f = Missao.new(1)
+	var eventos := {}
+	for s_n in range(1, 6):
+		f.montar_sol(s_n, _st(6, 4, 12))
+		var n := 0
+		for acontece in [f.eh_sol_solar(), f.eh_poeira(), s_n == f.sol_quebra]:
+			if acontece:
+				n += 1
+		eventos[s_n] = n
+		_igual(f.eh_poeira(), s_n == 3 or s_n == 4, "fixa: poeira só nos sóis 3 e 4 (sol %d)" % s_n)
+	_igual(eventos, {1: 0, 2: 1, 3: 1, 4: 1, 5: 1}, "fixa: sol 1 sem evento e um evento por sol nos outros")
+	# A semente não muda a missão fixa (inclusive o pico).
+	var a1 = Missao.new(42)
+	var b1 = Missao.new(7)
+	a1.montar_sol(2, _st(6, 4, 12))
+	b1.montar_sol(2, _st(6, 4, 12))
+	a1.confirmar_plano()
+	b1.confirmar_plano()
+	_igual(a1.t_pico, b1.t_pico, "fixa: mesmo pico para qualquer semente")
+	# As opções da URL valem por cima da agenda, uma a uma.
 	_igual(Missao.new(1, {"sol_solar": 4}).sol_solar, 4, "sol_solar forçado em 4")
 	_igual(Missao.new(1, {"sol_solar": 3}).sol_solar, 3, "sol_solar forçado em 3")
-	# Poeira e quebra: sorteadas por missão em 2..5; a quebra nunca cai no sol da tempestade solar.
-	var poeiras := {}
-	var quebras := {}
-	var quebra_no_solar := false
-	var fora_da_faixa := false
-	for semente in 200:
-		var q = Missao.new(semente)
-		poeiras[q.sol_poeira] = true
-		quebras[q.sol_quebra] = true
-		if q.sol_quebra == q.sol_solar:
-			quebra_no_solar = true
-		if q.sol_poeira < 2 or q.sol_poeira > 5 or q.sol_quebra < 2 or q.sol_quebra > 5:
-			fora_da_faixa = true
-	_igual(poeiras.keys().size(), 4, "sorteio: a poeira começa em qualquer sol de 2 a 5")
-	_igual(quebras.keys().size(), 4, "sorteio: a quebra cai em qualquer sol de 2 a 5")
-	_igual(fora_da_faixa, false, "sorteio: poeira e quebra só de 2 a 5")
-	_igual(quebra_no_solar, false, "sorteio: a quebra nunca é no sol da tempestade solar")
-	_igual(a.sol_poeira, b.sol_poeira, "semente: mesma poeira")
-	_igual(a.sol_quebra, b.sol_quebra, "semente: mesma quebra")
-	# Opções forçam; valor inválido, ou a quebra no sol da tempestade, volta ao sorteio.
+	_igual(Missao.new(1, {"sol_solar": 2}).sol_solar, 2, "sol_solar forçado em 2")
+	_igual(Missao.new(1, {"sol_solar": 3}).sol_poeira, 3, "só o sol_solar forçado: a poeira segue a agenda")
 	_igual(Missao.new(1, {"sol_poeira": 4}).sol_poeira, 4, "sol_poeira forçado em 4")
 	_igual(Missao.new(1, {"sol_poeira": 5}).sol_poeira, 5, "sol_poeira forçado em 5")
+	_igual(Missao.new(1, {"sol_poeira": 4}).sol_solar, 2, "só a poeira forçada: a tempestade solar segue a agenda")
 	_igual(Missao.new(1, {"sol_solar": 3, "sol_quebra": 5}).sol_quebra, 5, "sol_quebra forçado em 5")
 	_igual(Missao.new(1, {"sol_solar": 3, "sol_quebra": 2}).sol_quebra, 2, "sol_quebra forçado em 2")
+	# Valor inválido volta à agenda; a quebra forçada no sol da tempestade solar também.
 	for ruim in [0, 1, 6, 9]:
-		var rp = Missao.new(7, {"sol_poeira": ruim, "sol_quebra": ruim})
-		_verdade(rp.sol_poeira >= 2 and rp.sol_poeira <= 5, "sol_poeira inválido (%d) volta ao sorteio" % ruim)
-		_verdade(rp.sol_quebra >= 2 and rp.sol_quebra <= 5, "sol_quebra inválido (%d) volta ao sorteio" % ruim)
-	for forcada in [3, 4]:
+		var rp = Missao.new(7, {"sol_poeira": ruim, "sol_quebra": ruim, "sol_solar": ruim})
+		_igual(rp.sol_poeira, 3, "sol_poeira inválido (%d) volta à agenda" % ruim)
+		_igual(rp.sol_quebra, 5, "sol_quebra inválido (%d) volta à agenda" % ruim)
+		_igual(rp.sol_solar, 2, "sol_solar inválido (%d) volta à agenda" % ruim)
+	for forcada in [2, 3, 4]:
 		var rq = Missao.new(7, {"sol_solar": forcada, "sol_quebra": forcada})
-		_verdade(rq.sol_quebra != forcada, "sol_quebra forçado no sol da tempestade (%d) volta ao sorteio" % forcada)
+		_verdade(rq.sol_quebra != forcada, "sol_quebra forçado no sol da tempestade (%d) volta à agenda" % forcada)
 	# Começo da missão.
 	var m2 = Missao.new(1)
 	_igual(m2.sol, 1, "começa no sol 1")
@@ -251,17 +248,27 @@ func _pico_e_medidor() -> void:
 			alto = true
 		c.avancar(0.5)
 	_igual(alto, false, "sol comum: medidor sempre baixo")
-	# Sol da tempestade: pico dentro de [15%, 70%] do turno, em muitas sementes.
+	# Missão fixa: o pico é sempre aos 25 s de um turno de 60 s, qualquer semente, e na mesma fração
+	# se o turno muda (?turno=40).
+	for semente in 20:
+		var f = _solar(semente, _st(6, 4, 12))
+		f.confirmar_plano()
+		_igual(f.t_pico, 25.0, "missão fixa: pico aos 25 s (semente %d)" % semente)
+	var f40 = Missao.new(1, {"sol_solar": 3, "turno_s": 40.0})
+	f40.montar_sol(3, _st(6, 4, 12))
+	f40.confirmar_plano()
+	_igual(f40.t_pico, 40.0 * 25.0 / 60.0, "missão fixa: turno de 40 s, pico na mesma fração")
+	# Freeplay, sol da tempestade: pico sorteado dentro de [15%, 70%] do turno, em muitas sementes.
 	var dentro := true
 	var distintos := {}
 	for semente in 100:
-		var s = _solar(semente, _st(6, 4, 12))
+		var s = _solar(semente, _st(6, 4, 12), true)
 		s.confirmar_plano()
 		distintos[snappedf(s.t_pico, 0.001)] = true
 		if s.t_pico < Missao.PICO_MIN * s.turno_s - 1e-9 or s.t_pico > Missao.PICO_MAX * s.turno_s + 1e-9:
 			dentro = false
-	_verdade(dentro, "pico sorteado só entre 15% e 70% do turno")
-	_verdade(distintos.size() > 50, "pico varia de sorteio para sorteio")
+	_verdade(dentro, "freeplay: pico sorteado só entre 15% e 70% do turno")
+	_verdade(distintos.size() > 50, "freeplay: pico varia de sorteio para sorteio")
 	# Medidor: baixo antes da rampa, sobe linear, acima de "abrigo" do pico ao fim.
 	var m = _solar(5, _st(6, 4, 12))
 	m.confirmar_plano()
@@ -512,10 +519,10 @@ func _seguranca_no_meio_do_turno() -> void:
 	_igual(m.modos, 1, "reiniciar não zera os modos")
 	_igual(m.plano_q, 0, "reiniciou com plano limpo")
 	_igual(m.t_pico, -1.0, "o pico só é sorteado ao confirmar")
-	# Agora abriga na hora e passa: o pico é sorteado de novo.
+	# Na missão fixa o pico recomeça no mesmo instante; no freeplay é sorteado de novo.
 	var picos := {}
 	for i in 6:
-		var n = _solar(21 + i, _st(6, 4, 4))
+		var n = _solar(21 + i, _st(6, 4, 4), true)
 		n.confirmar_plano()
 		_ate_sair_do_turno(n, 0.5)
 		if n.fase == "seguranca":
@@ -523,8 +530,9 @@ func _seguranca_no_meio_do_turno() -> void:
 			n.confirmar_plano()
 			picos[snappedf(n.t_pico, 0.001)] = true
 			_verdade(n.t_pico >= Missao.PICO_MIN * n.turno_s - 1e-9 and n.t_pico <= Missao.PICO_MAX * n.turno_s + 1e-9, "pico re-sorteado dentro da faixa")
-	_verdade(picos.size() > 1, "o pico é re-sorteado quando o sol reinicia")
+	_verdade(picos.size() > 1, "freeplay: o pico é re-sorteado quando o sol reinicia")
 	m.confirmar_plano()
+	_igual(m.t_pico, 25.0, "missão fixa: depois do reinício o pico segue aos 25 s")
 	m.abrigar()
 	_ate_sair_do_turno(m, 0.05)
 	_igual(m.fase, "fim_do_sol", "abrigado, passa: margem 4 - 3 = 1")
@@ -1040,27 +1048,30 @@ func _fim_do_sol_noite_e_relatorio() -> void:
 	_igual(f.registros.size(), 0, "missão nova: sem registros")
 	_igual(f.ciencia_total(), 0, "missão nova: sem ciência")
 	_igual(f.st["E"], 6.0, "missão nova: estado inicial")
-	_verdade(f.sol_solar in [3, 4], "missão nova: novo sorteio válido")
-	_verdade(f.sol_poeira in [2, 3, 4, 5] and f.sol_quebra in [2, 3, 4, 5], "missão nova: poeira e quebra sorteadas")
-	_verdade(f.sol_quebra != f.sol_solar, "missão nova: a quebra não é no sol da tempestade")
+	# Sem o freeplay aberto, jogar de novo repete a missão fixa.
+	_igual(f.livre, false, "missão nova sem freeplay aberto: continua a fixa")
+	_verdade(f.sol_solar == 3 and f.sol_poeira == 3 and f.sol_quebra == 5, "missão nova: os eventos forçados valem por cima da agenda")
 	_igual(f.jogar_de_novo(), false, "só se joga de novo no relatório")
 
 
 func _aviso() -> void:
-	var m = Missao.new(1, {"sol_solar": 3})
-	var esperado3 := {1: false, 2: true, 3: true, 4: false, 5: false}
-	for s in esperado3:
-		m.montar_sol(s, _st(6, 4, 12))
-		_igual(m.aviso_ativo(), esperado3[s], "aviso com tempestade no sol 3: sol %d" % s)
-	var n = Missao.new(1, {"sol_solar": 4})
-	var esperado4 := {1: false, 2: true, 3: true, 4: true, 5: false}
-	for s in esperado4:
-		n.montar_sol(s, _st(6, 4, 12))
-		_igual(n.aviso_ativo(), esperado4[s], "aviso com tempestade no sol 4: sol %d" % s)
-	n.montar_sol(4, _st(6, 4, 12))
-	_igual(n.eh_sol_solar(), true, "sol 4 é o da tempestade")
+	# O aviso começa no plano do sol 1 e vai até o sol da tempestade, inclusive.
+	var esperado := {2: {1: true, 2: true, 3: false, 4: false, 5: false},
+		3: {1: true, 2: true, 3: true, 4: false, 5: false},
+		4: {1: true, 2: true, 3: true, 4: true, 5: false}}
+	for sol_solar in esperado:
+		var m = Missao.new(1, {"sol_solar": sol_solar})
+		for s in esperado[sol_solar]:
+			m.montar_sol(s, _st(6, 4, 12))
+			_igual(m.aviso_ativo(), esperado[sol_solar][s], "aviso com tempestade no sol %d: sol %d" % [sol_solar, s])
+	var n = Missao.new(1)
+	n.montar_sol(1, _st(6, 4, 12))
+	_igual(n.aviso_ativo(), true, "missão fixa: o aviso está no plano do sol 1")
+	n.montar_sol(2, _st(6, 4, 12))
+	_igual(n.eh_sol_solar(), true, "missão fixa: o sol 2 é o da tempestade")
 	n.montar_sol(3, _st(6, 4, 12))
 	_igual(n.eh_sol_solar(), false, "sol 3 não é")
+	_igual(n.aviso_ativo(), false, "missão fixa: sem aviso depois da tempestade")
 
 
 ## Joga um sol com a estratégia: q 2, tantas tarefas de ciência quantas couberem, inicia as pendentes
@@ -1143,3 +1154,207 @@ func _missao_inteira() -> void:
 		_igual(m.registros[4]["ciencia"], 2, "sol 5: 2 de ciência, o conserto não conta")
 		_igual(m.registros[4]["consertou"], true, "sol 5: consertou o gerador")
 		_igual(m.registros[4]["o2_produzido"], 2, "sol 5: o conserto libera o O2 do mesmo sol")
+
+
+# --- a agenda fixa: regressão das quatro estratégias --------------------------------
+# Números medidos em 14/11 (calibracao/agenda-fixa/agenda.js, porte do modelo.gd) com o pico aos 25 s de um
+# turno de 60 s. Nenhuma constante do jogo foi ajustada para bater com eles.
+
+## Plano de uma estratégia da calibração (agenda.js, planoDaEstrategia): [q, n_ciencia].
+## "tudo": ar para 1 sol, o resto em ciência. "equil": ar para 2 sóis, metade do resto em ciência.
+## "cons": enche o tanque de O2, no máximo 1 tarefa de ciência.
+func _plano_da_estrategia(id: String, m) -> Array:
+	var n: Dictionary = Modelo.N
+	var estr: Array = {"tudo": [1.0, 1.0, 99], "equil": [2.0, 0.5, 99], "cons": [-1.0, 1.0, 1]}[id]
+	var st: Dictionary = m.st
+	var a: float = Modelo.manha(st, m.eh_poeira())["para_dividir"]
+	var alvo_estoque: float = INF if estr[0] < 0.0 else estr[0] * n.CREW_O2
+	var q_min: float = maxf(0.0, n.CREW_O2 - st["O"])
+	var q_quer: float = maxf(0.0, alvo_estoque - st["O"])
+	q_quer = minf(q_quer, maxf(0.0, n.TANQUE_O2 + n.CREW_O2 - st["O"]))
+	q_quer = maxf(ceilf(q_quer - Modelo.EPS), q_min)
+	var q: float = minf(q_quer, floorf(a / n.GEN_CUSTO + Modelo.EPS))
+	var livre: float = a - q * n.GEN_CUSTO
+	var n_sci: float = maxf(0.0, minf(minf(n.VAGAS_TURNO, floorf(livre * estr[1] / n.CIENCIA_CUSTO + Modelo.EPS)), estr[2]))
+	return [int(q), int(n_sci)]
+
+
+## Joga o turno do sol em curso: as tarefas da lista em fila (ciência e, por último, o conserto) e o
+## abrigo. `espera_a_lista`: no sol da tempestade, abriga quando a lista acaba ou no pico, o que vier
+## depois; senão, no pico.
+func _jogar_turno(m, espera_a_lista: bool) -> void:
+	var guarda := 0
+	while m.fase == "turno" and guarda < 10000:
+		guarda += 1
+		if m.eh_sol_solar() and not m.abrigado and m.t >= m.t_pico - 1e-9 and (not espera_a_lista or m.lista_acabou()):
+			m.abrigar()
+		if not m.abrigado and m.tarefa_rodando == "":
+			for nome in m.lista_do_turno():
+				if m.tarefas[nome] == "pendente":
+					m.iniciar_tarefa(nome)
+					break
+		m.avancar(0.25)
+
+
+## Monta o plano (q de O2 e n tarefas de ciência) e joga o turno.
+func _jogar_plano(m, q: int, n_ciencia: int, espera_a_lista: bool) -> void:
+	for i in q:
+		m.mudar_q(1)
+	for i in n_ciencia:
+		m.alternar_tarefa(Missao.TAREFAS[i])
+	m.confirmar_plano()
+	_jogar_turno(m, espera_a_lista)
+
+
+## Joga a missão fixa inteira. `plano_do_sol` devolve [q, n] do sol; `espera_a_lista` como em _jogar_turno.
+## No modo de segurança: com conserto, o simulador reinicia o sol e a criança joga o plano de emergência
+## (tudo ao gerador, conserto, abrigo); sem conserto, segue em modo de segurança. Devolve os sóis em que
+## entrou o modo de segurança.
+func _jogar_missao(m, plano_do_sol: Callable, espera_a_lista: bool) -> Array:
+	var sois_com_modo: Array = []
+	var guarda := 0
+	while m.fase != "relatorio" and guarda < 200:
+		guarda += 1
+		match m.fase:
+			"plano":
+				var p: Array = plano_do_sol.call(m)
+				_jogar_plano(m, p[0], p[1], espera_a_lista)
+			"fim_do_sol":
+				m.enviar_a_terra()
+			"noite":
+				m.avancar(2.0)
+			"seguranca":
+				sois_com_modo.append(m.sol)
+				if m.tem_conserto:
+					m.reiniciar_sol()
+					var q := int(floorf(m.para_dividir() / Modelo.N.GEN_CUSTO + Modelo.EPS))
+					_jogar_plano(m, q, 0, false)
+				else:
+					m.seguir_em_seguranca()
+	return sois_com_modo
+
+
+func _agenda_fixa() -> void:
+	var casos := [
+		# nome, ciência por sol, ciência, modos, sóis com modo
+		["tudo", [3, 2, 2, 0, 2], 9, 1, [4]],
+		["equil", [3, 2, 0, 0, 0], 5, 0, []],
+		["cons", [0, 0, 0, 0, 0], 0, 2, [3, 4]],
+	]
+	for c in casos:
+		var m = Missao.new(1)
+		var id: String = c[0]
+		var sois := _jogar_missao(m, func(mm) -> Array: return _plano_da_estrategia(id, mm), false)
+		_igual(m.fase, "relatorio", "agenda fixa, %s: chega ao relatório" % id)
+		_igual(m.ciencia_por_sol, c[1], "agenda fixa, %s: ciência por sol" % id)
+		_igual(m.ciencia_total(), c[2], "agenda fixa, %s: ciência" % id)
+		_igual(m.modos, c[3], "agenda fixa, %s: modos de segurança" % id)
+		_igual(sois, c[4], "agenda fixa, %s: sóis dos modos de segurança" % id)
+		_igual(m.estrelas(), Modelo.estrelas(m.modos, m.ciencia_total()), "agenda fixa, %s: estrelas vêm do modelo" % id)
+	# "Tudo em ciência": o modo do sol 4 é sem conserto (a causa veio do sol 3, o oxigênio).
+	var t = Missao.new(1)
+	_jogar_missao(t, func(mm) -> Array: return _plano_da_estrategia("tudo", mm), false)
+	_igual(t.registros[3]["seguranca"], true, "tudo: o sol 4 foi em modo de segurança, sem conserto")
+	_igual(t.registros[3]["causa"], "oxigenio", "tudo: a causa do sol 4 é o oxigênio")
+	# O melhor plano possível: 7 de ciência, nenhum modo. Sol 1: 1 de ciência; sol 2: 3, e abriga depois da
+	# lista (aos 30 s, dose 5); sóis 3 e 4: 2 de O2 e nenhuma ciência; sol 5: 2 de O2, 3 de ciência e o conserto.
+	var planos := {1: [0, 1], 2: [0, 3], 3: [2, 0], 4: [2, 0], 5: [2, 3]}
+	var b = Missao.new(1)
+	var sois_b := _jogar_missao(b, func(mm) -> Array: return planos[mm.sol], true)
+	_igual(b.fase, "relatorio", "melhor plano: chega ao relatório")
+	_igual(b.ciencia_por_sol, [1, 3, 0, 0, 3], "melhor plano: ciência por sol")
+	_igual(b.ciencia_total(), 7, "melhor plano: 7 de ciência")
+	_igual(b.modos, 0, "melhor plano: nenhum modo de segurança")
+	_igual(sois_b, [], "melhor plano: nenhum sol em modo de segurança")
+	_igual(b.registros[4]["consertou"], true, "melhor plano: consertou o gerador no sol 5")
+	_igual(b.registros[1]["dose"], 5.0, "melhor plano: o sol da tempestade, abrigado aos 30 s, tem dose 5")
+	_igual(b.estrelas(), 3, "melhor plano: 3 estrelas")
+	_igual(b.ciencia_total(), Modelo.N.TEORICO, "o TEORICO é o melhor plano da missão fixa")
+
+
+# --- freeplay ------------------------------------------------------------------------
+
+## Joga a missão (fixa ou livre) com a estratégia equilibrada só para chegar ao relatório.
+func _chegar_ao_relatorio(m) -> void:
+	_jogar_missao(m, func(mm) -> Array: return _plano_da_estrategia("equil", mm), false)
+
+
+func _freeplay() -> void:
+	# As seis agendas de 5 sóis, um evento por sol (solar, início da poeira, quebra).
+	var esperadas := [[3, 4, 2], [3, 5, 2], [3, 5, 4], [4, 2, 5], [4, 5, 2], [4, 5, 3]]
+	_igual(Missao.AGENDAS_LIVRES, esperadas, "freeplay: as seis agendas")
+	var vistas := {}
+	var atrasos := {}
+	for semente in 300:
+		var m = Missao.new(semente, {"livre": true})
+		_igual(m.livre, true, "freeplay: a missão é livre")
+		vistas[[m.sol_solar, m.sol_poeira, m.sol_quebra]] = true
+		atrasos[m.atraso_min] = true
+		_verdade(m.atraso_min >= Missao.ATRASO_MIN and m.atraso_min <= Missao.ATRASO_MAX, "freeplay: atraso no intervalo")
+		# Um evento por sol: nenhum sol junta dois eventos (a poeira a partir do sol 5 só dura o sol 5).
+		for s_n in range(1, 6):
+			m.montar_sol(s_n, _st(6, 4, 12))
+			var n := 0
+			for acontece in [m.eh_sol_solar(), m.eh_poeira(), s_n == m.sol_quebra]:
+				if acontece:
+					n += 1
+			_verdade(n <= 1, "freeplay: no máximo um evento por sol (agenda %s, sol %d)" % [[m.sol_solar, m.sol_poeira, m.sol_quebra], s_n])
+	for a in esperadas:
+		_verdade(vistas.has(a), "freeplay: a agenda %s é sorteada" % [a])
+	_igual(vistas.size(), 6, "freeplay: só as seis agendas")
+	_verdade(atrasos.size() > 10, "freeplay: o atraso varia")
+	# Mesma semente, mesmo sorteio.
+	var x = Missao.new(11, {"livre": true})
+	var y = Missao.new(11, {"livre": true})
+	_igual([x.sol_solar, x.sol_poeira, x.sol_quebra, x.atraso_min], [y.sol_solar, y.sol_poeira, y.sol_quebra, y.atraso_min], "freeplay: a semente fixa o sorteio")
+	# Duração da poeira: a de início no sol 5 fica só nele; a do sol 4 cobre 4 e 5; a do 2, os sóis 2 e 3.
+	var p5 = Missao.new(1, {"livre": true, "sol_poeira": 5})
+	var p4 = Missao.new(1, {"livre": true, "sol_poeira": 4})
+	var p2 = Missao.new(1, {"livre": true, "sol_poeira": 2})
+	var em_poeira := func(mm) -> Array:
+		var r: Array = []
+		for s_n in range(1, 6):
+			mm.montar_sol(s_n, _st(6, 4, 12))
+			r.append(mm.eh_poeira())
+		return r
+	_igual(em_poeira.call(p5), [false, false, false, false, true], "poeira iniciada no sol 5: só o sol 5")
+	_igual(em_poeira.call(p4), [false, false, false, true, true], "poeira iniciada no sol 4: sóis 4 e 5")
+	_igual(em_poeira.call(p2), [false, true, true, false, false], "poeira iniciada no sol 2: sóis 2 e 3")
+	# O pico é sorteado no freeplay (e fixo na missão fixa).
+	var l = Missao.new(3, {"livre": true, "sol_solar": 3})
+	l.montar_sol(3, _st(6, 4, 12))
+	l.confirmar_plano()
+	_verdade(l.t_pico >= Missao.PICO_MIN * l.turno_s - 1e-9 and l.t_pico <= Missao.PICO_MAX * l.turno_s + 1e-9, "freeplay: pico sorteado na faixa")
+	# As opções da URL valem por cima do sorteio.
+	var fo = Missao.new(5, {"livre": true, "sol_solar": 4, "sol_poeira": 3})
+	_igual(fo.sol_solar, 4, "freeplay: sol_solar da URL vale")
+	_igual(fo.sol_poeira, 3, "freeplay: sol_poeira da URL vale")
+	# Destrave: a missão fixa só conta ao chegar ao relatório, e só então o "Jogar de novo" abre o freeplay.
+	var d = Missao.new(1, {"turno_s": 4.0})
+	_igual(d.fixa_concluida, false, "fixa: não concluída no começo")
+	_igual(d.freeplay_aberto, false, "freeplay fechado no começo")
+	_chegar_ao_relatorio(d)
+	_igual(d.fase, "relatorio", "a fixa chegou ao relatório")
+	_igual(d.fixa_concluida, true, "chegar ao relatório marca a fixa como concluída")
+	_igual(d.freeplay_aberto, true, "e abre o freeplay")
+	_verdade(d.jogar_de_novo(), "jogar de novo")
+	_igual(d.livre, true, "depois da fixa, o jogar de novo abre o freeplay")
+	_igual(d.fixa_concluida, false, "a missão nova começa sem a marca")
+	_verdade(Missao.AGENDAS_LIVRES.has([d.sol_solar, d.sol_poeira, d.sol_quebra]), "a missão nova é uma das seis agendas")
+	_chegar_ao_relatorio(d)
+	_igual(d.fixa_concluida, false, "o freeplay não marca a fixa")
+	_verdade(d.jogar_de_novo(), "jogar de novo no freeplay")
+	_igual(d.livre, true, "e segue em freeplay")
+	# Numa sessão seguinte o destrave vem do navegador (opção freeplay_aberto): a primeira missão continua a fixa.
+	var s2 = Missao.new(1, {"turno_s": 4.0, "freeplay_aberto": true})
+	_igual(s2.livre, false, "destravado de antes: a primeira missão da sessão é a fixa")
+	_igual([s2.sol_solar, s2.sol_poeira, s2.sol_quebra], [2, 3, 5], "e tem a agenda fixa")
+	_chegar_ao_relatorio(s2)
+	s2.jogar_de_novo()
+	_igual(s2.livre, true, "destravado de antes: o jogar de novo abre o freeplay")
+	# Uma agenda forçada pela URL não é a missão fixa: não destrava.
+	var u = Missao.new(1, {"turno_s": 4.0, "sol_solar": 3})
+	_chegar_ao_relatorio(u)
+	_igual(u.fixa_concluida, false, "agenda forçada pela URL não conta como a missão fixa")
+	u.jogar_de_novo()
+	_igual(u.livre, false, "e o jogar de novo repete a missão")
