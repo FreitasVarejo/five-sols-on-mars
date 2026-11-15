@@ -6,6 +6,8 @@ extends SceneTree
 ## Sai com código 1 se algo falhar e imprime cada falha.
 
 const Visor := preload("res://scripts/cameras/visor_cameras.gd")
+const Prancha := preload("res://scripts/prancha.gd")
+const Desenho := preload("res://scripts/desenho.gd")
 
 const AREA := Rect2(90, 42, 534, 272)
 const AREA_MENOR := Rect2(120, 60, 400, 220)
@@ -48,6 +50,8 @@ func _rodar_tudo() -> void:
 	_layout_com_limite_de_altura()
 	_renders()
 	_palavra()
+	_contraste_do_mapa()
+	_botoes_sem_verde()
 	await _desenha_na_arvore()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
@@ -278,6 +282,71 @@ func _hospedar(area: Rect2) -> void:
 	for p in [a, c]:
 		if is_instance_valid(p):
 			p.free()
+
+
+func _no_minimo(a: Color, b: Color, minimo: float, nome: String) -> void:
+	var c := Prancha.contraste(a, b)
+	_verdade(c >= minimo, "%s: %.2f:1 (mínimo %.1f)" % [nome, c, minimo])
+
+
+## O contraste de cada par do mapa e da telemetria, como o _draw os pinta (WCAG): texto >= 4,5:1; traço, forma e
+## borda que dizem algo >= 3:1. As superfícies do mapa são o fundo (FUNDO_MAPA) e a cunha ativa (CAIXA), que vai por
+## baixo das formas. A grade do papel fica fora da conta.
+func _contraste_do_mapa() -> void:
+	_igual(Prancha.FUNDO_MAPA, Color("#0c1f38"), "o fundo do mapa é #0c1f38")
+	_verdade(Prancha.luminancia(Prancha.FUNDO_MAPA) < Prancha.luminancia(Prancha.FUNDO), "o fundo do mapa é mais escuro que o papel")
+	for par in [["o fundo do mapa", Prancha.FUNDO_MAPA], ["a cunha ativa", Prancha.CAIXA]]:
+		var fundo: Color = par[1]
+		var onde: String = par[0]
+		# Texto: o rótulo da escala e o "N" (TEXTO_SUAVE, 10 px).
+		_no_minimo(Desenho.TEXTO_SUAVE, fundo, 4.5, "rótulo da escala e N sobre " + onde)
+		# Forma e traço: monte, habitat, painéis, rocha, MOXIE e tanques (Prancha.BORDA); rover, bússola, escala e
+		# contornos das formas (TEXTO_SUAVE); estratos e cunhas das outras câmeras (TEXTO_SUAVE com alfa); cunha atual.
+		_no_minimo(Prancha.BORDA, fundo, 3.0, "monte, habitat, painéis, rocha, MOXIE e a borda do mapa sobre " + onde)
+		_no_minimo(Desenho.TEXTO_SUAVE, fundo, 3.0, "rover, bússola, escala e contornos sobre " + onde)
+		_no_minimo(fundo.blend(Color(Desenho.TEXTO_SUAVE, Visor.ALFA_ESTRATO)), fundo, 3.0, "estratos do monte sobre " + onde)
+		_no_minimo(fundo.blend(Color(Desenho.TEXTO_SUAVE, Visor.ALFA_CUNHA)), fundo, 3.0, "linhas das câmeras fora de foco sobre " + onde)
+		_no_minimo(Desenho.TEXTO, fundo, 3.0, "linhas da câmera atual sobre " + onde)
+		_no_minimo(Desenho.TEXTO, fundo, 3.0, "anel e chevron de pendência sobre " + onde)
+	# A borda do mapa também encosta no papel, por fora.
+	_no_minimo(Prancha.BORDA, Prancha.FUNDO, 3.0, "borda do mapa sobre o papel")
+	# Chips da telemetria: texto e ícone TEXTO sobre o fundo do chip; borda sobre o chip e sobre o papel.
+	_no_minimo(Desenho.TEXTO, Prancha.FUNDO_MAPA, 4.5, "números e palavras dos chips sobre o chip")
+	_no_minimo(Prancha.BORDA, Prancha.FUNDO_MAPA, 3.0, "borda dos chips sobre o chip")
+	_no_minimo(Prancha.BORDA, Prancha.FUNDO, 3.0, "borda dos chips sobre o papel")
+	# A borda da vista: o anel de 2 px entre o aro escuro de fora e o papel.
+	_no_minimo(Prancha.BORDA, Desenho.MOLDURA, 3.0, "borda da vista sobre o aro")
+	_no_minimo(Prancha.BORDA, Prancha.FUNDO, 3.0, "borda da vista sobre o papel")
+	# Botões: o contorno e o ícone de cada estado sobre o fundo que o _draw usa (cores do próprio visor).
+	var v: Control = _novo(AREA)
+	var normal: Array = v._cores_do_botao("painel")  # a atual é a visão geral; o mouse está longe
+	v._mouse = (v.alvos()["painel"] as Rect2).get_center()
+	var hover: Array = v._cores_do_botao("painel")
+	var atual: Array = v._cores_do_botao(v.camera_atual())
+	v.free()
+	for par in [["normal", normal], ["hover", hover], ["atual", atual]]:
+		var estado: String = par[0]
+		var fundo: Color = par[1][0]
+		_no_minimo(Prancha.LINHA, fundo, 3.0, "botão %s: contorno sobre o fundo" % estado)
+		_no_minimo(par[1][1], fundo, 4.5, "botão %s: ícone sobre o fundo" % estado)
+		_no_minimo(Prancha.LINHA, Prancha.FUNDO_MAPA, 3.0, "botão %s: contorno sobre o mapa" % estado)
+		_no_minimo(Prancha.LINHA, Prancha.CAIXA, 3.0, "botão %s: contorno sobre a cunha" % estado)
+	_igual(normal[0], Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO), "botão normal: BTN_FUNDO")
+	_igual(hover[0], Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO_HOVER), "botão em hover: BTN_FUNDO_HOVER")
+	_igual(atual[0], Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO_ATIVO), "botão da câmera atual: BTN_FUNDO_ATIVO")
+	_igual(atual[1], Prancha.BTN_TEXTO_ATIVO, "botão da câmera atual: ícone BTN_TEXTO_ATIVO")
+
+
+## Sem verde nos botões: nenhum estado usa uma cor da família verde do Desenho (regra [R] de cores da spec).
+func _botoes_sem_verde() -> void:
+	var v: Control = _novo(AREA)
+	var verdes := [Desenho.VERDE, Desenho.VERDE_ESCURO, Desenho.VERDE_CLARO]
+	for c in Visor.CAMERAS:
+		v._mouse = (v.alvos()[c] as Rect2).get_center()
+		for cam in Visor.CAMERAS:
+			for cor: Color in v._cores_do_botao(cam):
+				_verdade(not verdes.has(cor), "botão %s com o ponteiro em %s: sem verde" % [cam, c])
+	v.free()
 
 
 func _renders() -> void:

@@ -4,10 +4,14 @@ extends Control
 ## Desenha tudo em _draw() e trata o próprio toque. Não lê nem escreve estado da missão: quem hospeda
 ## entrega a duração, o clima, o sol, as pendências e as peças (as tarefas de cada câmera).
 ##
-## Cores (spec, "Terminal"): verde só no que se clica (os botões do mapa); sem vermelho, amarelo nem azul.
-## O alerta de pendência vai por forma e posição (chevron e anel tracejado), não por cor.
+## Cores (spec, "Terminal" e a regra [R] de cores): o mapa, os chips e os botões das câmeras são da prancha
+## (Prancha.FUNDO_MAPA, CAIXA, BORDA e as constantes BTN_*); dentro do Painel o clicável é contorno claro, não verde.
+## Dentro da vista (o render, a etiqueta escura, a mira e as peças) as cores são as de sempre. O alerta de
+## pendência vai por forma e posição (chevron e anel tracejado), não por cor.
+## Contraste de cada par do mapa: tests/test_visor_cameras.gd.
 
 const Desenho := preload("res://scripts/desenho.gd")
+const Prancha := preload("res://scripts/prancha.gd")
 
 signal concluido
 signal camera_escolhida(nome: String)
@@ -24,6 +28,9 @@ const FOLGA_ALVO := 4.0  # o teste de acerto cresce o botão nesta folga
 const MARGEM_MAPA := 4.0  # entre o desenho do mundo e a borda do mapa
 const RECUO_ALVO := 5.0  # o botão e o anel de pendência ficam a esta distância da borda do mapa
 const ALTURA_CHIP := 26.0
+# Os claros do mapa (TEXTO_SUAVE com alfa) ficam acima de 3:1 sobre o fundo do mapa e sobre a área da cunha ativa.
+const ALFA_ESTRATO := 0.6  # as linhas de estrato do Monte Sharp
+const ALFA_CUNHA := 0.65  # o contorno da cunha das câmeras que não são a atual
 
 # Números do mundo: vêm de arte/blender/exterior.py (CAMERAS, habitat(), COLUNAS, LINHAS, ROVER, ROCHA,
 # MOXIE_O) e são só leitura aqui. Metros: +x leste, +y norte (rumo ao Monte Sharp). O campo de visão é o
@@ -89,7 +96,7 @@ var _caixa_tanque := StyleBoxFlat.new()
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_caixa_tanque.bg_color = Desenho.CELULA_VAZIA
+	_caixa_tanque.bg_color = Prancha.BORDA
 	_caixa_tanque.border_color = Desenho.TEXTO_SUAVE
 	_caixa_tanque.set_border_width_all(1)
 	_caixa_tanque.set_corner_radius_all(3)
@@ -330,11 +337,18 @@ func _draw() -> void:
 	_desenhar_telemetria()
 
 
-## Chip do HUD do turno (hud_turno.gd): NOITE com 0,85, borda BORDA e 1 px de relevo no topo.
+## Chip do HUD do turno (hud_turno.gd): NOITE com 0,85, borda BORDA e 1 px de relevo no topo. É o da etiqueta da
+## câmera, que mora dentro da vista e não muda.
 func _chip(r: Rect2) -> void:
 	draw_rect(r, Color(Desenho.NOITE, 0.85))
 	draw_rect(r, Desenho.BORDA, false, 1.0)
 	draw_rect(Rect2(r.position.x + 1, r.position.y + 1, r.size.x - 2, 1), Color(Desenho.TEXTO, 0.12))
+
+
+## Chip da telemetria, fora da vista: fundo do mapa, borda da prancha, sem relevo.
+func _chip_telemetria(r: Rect2) -> void:
+	draw_rect(r, Prancha.FUNDO_MAPA)
+	draw_rect(r, Prancha.BORDA, false, 1.0)
 
 
 ## Linha de 1 px em pixel certo: os pontos ganham meio pixel.
@@ -421,7 +435,8 @@ func _icone_ceu_limpo(r: Rect2, cor: Color) -> void:
 # --- desenho: mapa ---------------------------------------------------------------
 
 func _desenhar_mapa() -> void:
-	draw_rect(_mapa, Desenho.FUNDO_TELA)
+	draw_rect(_mapa, Prancha.FUNDO_MAPA)
+	_preencher_cunha(_atual)  # o alcance da câmera atual, por baixo de tudo: as formas ficam sobre ele
 	_desenhar_monte()
 	_desenhar_habitat()
 	_desenhar_campo_de_paineis()
@@ -432,7 +447,7 @@ func _desenhar_mapa() -> void:
 			_desenhar_cunha(c)
 	_desenhar_cunha(_atual)
 	_desenhar_bussola_e_escala()
-	draw_rect(_mapa, Desenho.BORDA, false, 1.0)
+	draw_rect(_mapa, Prancha.BORDA, false, 1.0)
 	for c in CAMERAS:
 		_desenhar_botao(c)
 	for c in CAMERAS:
@@ -442,7 +457,7 @@ func _desenhar_mapa() -> void:
 
 ## Monte Sharp: três linhas de estrato onduladas ao longo da largura e um pequeno contorno de montanha.
 func _desenhar_monte() -> void:
-	_linhas(PackedVector2Array([_p(Vector2(X_MIN, Y_MONTE)), _p(Vector2(X_MAX, Y_MONTE))]), Desenho.BORDA)
+	_linhas(PackedVector2Array([_p(Vector2(X_MIN, Y_MONTE)), _p(Vector2(X_MAX, Y_MONTE))]), Prancha.BORDA)
 	for k in 3:
 		var base := Y_MONTE + 0.7 + 0.8 * k
 		var pts := PackedVector2Array()
@@ -450,7 +465,7 @@ func _desenhar_monte() -> void:
 		for i in n + 1:
 			var x := X_MIN + (X_MAX - X_MIN) * i / n
 			pts.append(_p(Vector2(x, base + 0.22 * sin(x * 0.9 + k * 1.3))))
-		_linhas(pts, Color(Desenho.TEXTO_SUAVE, 0.5))
+		_linhas(pts, Color(Desenho.TEXTO_SUAVE, ALFA_ESTRATO))
 	var monte := PackedVector2Array()
 	for q in [Vector2(-5.0, 26.0), Vector2(-2.6, 28.2), Vector2(-1.6, 27.5), Vector2(-0.4, 28.9),
 			Vector2(2.6, 26.0)]:
@@ -461,10 +476,10 @@ func _desenhar_monte() -> void:
 func _desenhar_habitat() -> void:
 	var abrigo := _rc(ABRIGO_CENTRO.x - ABRIGO_TAM.x / 2.0, ABRIGO_CENTRO.y - ABRIGO_TAM.y / 2.0,
 		ABRIGO_CENTRO.x + ABRIGO_TAM.x / 2.0, ABRIGO_CENTRO.y + ABRIGO_TAM.y / 2.0)
-	draw_rect(abrigo, Desenho.BORDA)
+	draw_rect(abrigo, Prancha.BORDA)
 	draw_rect(abrigo, Desenho.TEXTO_SUAVE, false, 1.0)
 	var h := _rc(HABITAT.position.x, HABITAT.position.y, HABITAT.end.x, HABITAT.end.y)
-	draw_rect(h, Desenho.CELULA_VAZIA)
+	draw_rect(h, Prancha.BORDA)
 	draw_rect(h, Desenho.TEXTO_SUAVE, false, 1.0)
 
 
@@ -474,7 +489,7 @@ func _desenhar_campo_de_paineis() -> void:
 			var r := _rc(cx - PAINEL_TAM.x / 2.0, cy - PAINEL_TAM.y / 2.0,
 				cx + PAINEL_TAM.x / 2.0, cy + PAINEL_TAM.y / 2.0)
 			r.size = (r.size - Vector2.ONE).max(Vector2.ONE)  # 1 px de vão entre os painéis
-			draw_rect(r, Desenho.CELULA_VAZIA)
+			draw_rect(r, Prancha.BORDA)
 			draw_rect(r, Color(Desenho.TEXTO_SUAVE, 0.45), false, 1.0)
 
 
@@ -490,7 +505,7 @@ func _desenhar_rover_e_rocha() -> void:
 	for k in FORMA_ROCHA.size():
 		var a := TAU * k / FORMA_ROCHA.size()
 		forma.append(_p(ROCHA_POS + Vector2(cos(a), sin(a)) * ROCHA_RAIO * FORMA_ROCHA[k]))
-	draw_colored_polygon(forma, Desenho.BORDA)
+	draw_colored_polygon(forma, Prancha.BORDA)
 	forma.append(forma[0])
 	_linhas(forma, Desenho.TEXTO_SUAVE)
 
@@ -499,7 +514,7 @@ func _desenhar_moxie() -> void:
 	var cx := MOXIE_POS.x
 	var cy := MOXIE_POS.y
 	var caixa := _rc(cx - MOXIE_TAM.x / 2.0, cy - MOXIE_TAM.y / 2.0, cx + MOXIE_TAM.x / 2.0, cy + MOXIE_TAM.y / 2.0)
-	draw_rect(caixa, Desenho.CELULA_VAZIA)
+	draw_rect(caixa, Prancha.BORDA)
 	draw_rect(caixa, Desenho.TEXTO_SUAVE, false, 1.0)
 	# Dois tanques cilíndricos a leste (retângulos arredondados).
 	var x0 := cx + MOXIE_TAM.x / 2.0 + 0.2
@@ -507,9 +522,9 @@ func _desenhar_moxie() -> void:
 	draw_style_box(_caixa_tanque, _rc(x0, cy - 0.9, x0 + 1.0, cy - 0.1))
 
 
-## A cunha do campo de visão de `cam`: da posição rumo ao alvo, com o comprimento da distância até ele
-## (no mínimo 4 m). Recortada pelo mapa. A da câmera atual é preenchida e leva contorno claro.
-func _desenhar_cunha(cam: String) -> void:
+## O polígono da cunha do campo de visão de `cam`: da posição rumo ao alvo, com o comprimento da distância até
+## ele (no mínimo 4 m). Ainda sem recorte pelo mapa.
+func _cunha(cam: String) -> PackedVector2Array:
 	var d: Vector2 = ALVO_NO_MUNDO[cam] - POSICAO[cam]
 	var comprimento := maxf(d.length(), 4.0) * _escala
 	var rumo := atan2(-d.y, d.x)  # y da tela cresce para baixo
@@ -519,18 +534,30 @@ func _desenhar_cunha(cam: String) -> void:
 	var n := 16
 	for i in n + 1:
 		cunha.append((origem + Vector2.from_angle(rumo - meio + 2.0 * meio * i / n) * comprimento).round())
+	return cunha
+
+
+func _moldura_do_mapa() -> PackedVector2Array:
 	var janela := _mapa.grow(-1.0)
-	var moldura := PackedVector2Array([janela.position, Vector2(janela.end.x, janela.position.y),
+	return PackedVector2Array([janela.position, Vector2(janela.end.x, janela.position.y),
 		janela.end, Vector2(janela.position.x, janela.end.y)])
-	var atual := cam == _atual
-	if atual:
-		for poli in Geometry2D.intersect_polygons(cunha, moldura):
-			if poli.size() >= 3:
-				draw_colored_polygon(poli, Color(Desenho.TEXTO, 0.18))
+
+
+## O alcance da câmera `cam` (a atual), recortado pelo mapa e preenchido com CAIXA. Vai por baixo das formas do mapa.
+func _preencher_cunha(cam: String) -> void:
+	for poli in Geometry2D.intersect_polygons(_cunha(cam), _moldura_do_mapa()):
+		if poli.size() >= 3:
+			draw_colored_polygon(poli, Prancha.CAIXA)
+
+
+## O contorno da cunha de `cam`, recortado pelo mapa. O da câmera atual é claro e cheio; o das outras, TEXTO_SUAVE
+## com ALFA_CUNHA.
+func _desenhar_cunha(cam: String) -> void:
+	var cunha := _cunha(cam)
 	var contorno := cunha.duplicate()
 	contorno.append(cunha[0])
-	var cor := Desenho.TEXTO if atual else Color(Desenho.TEXTO_SUAVE, 0.4)
-	for linha in Geometry2D.intersect_polyline_with_polygon(contorno, moldura):
+	var cor := Desenho.TEXTO if cam == _atual else Color(Desenho.TEXTO_SUAVE, ALFA_CUNHA)
+	for linha in Geometry2D.intersect_polyline_with_polygon(contorno, _moldura_do_mapa()):
 		draw_polyline(linha, cor, 1.0)
 
 
@@ -561,21 +588,26 @@ func _desenhar_bussola_e_escala() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, true)
 
 
-## O botão da câmera, no estilo de _pintar_botao do terminal: borda VERDE_ESCURO de 2 px, fundo VERDE,
-## VERDE_CLARO com o ponteiro em cima; o da câmera atual fica apertado (fundo VERDE_ESCURO, borda VERDE).
+## As cores do botão da câmera `cam` no mapa: [fundo opaco, cor do ícone]. O fundo é o do mapa com a camada
+## translúcida do botão do Painel por cima (Prancha.BTN_*): normal, hover e a câmera atual (apertado).
+func _cores_do_botao(cam: String) -> Array:
+	if cam == _atual:
+		return [Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO_ATIVO), Prancha.BTN_TEXTO_ATIVO]
+	if _alvo_em(_mouse) == cam:
+		return [Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO_HOVER), Desenho.TEXTO]
+	return [Prancha.FUNDO_MAPA.blend(Prancha.BTN_FUNDO), Desenho.TEXTO]
+
+
+## O botão da câmera, no estilo do botão do Painel (Prancha.BTN_*, sem chamar o _pintar_botao do terminal):
+## contorno Prancha.LINHA de 2 px, fundo e ícone pelo estado. Sem verde.
 func _desenhar_botao(cam: String) -> void:
 	var r: Rect2 = _alvos[cam]
-	var apertado := cam == _atual
-	var fundo := Desenho.VERDE_CLARO if _alvo_em(_mouse) == cam else Desenho.VERDE
-	var borda := Desenho.VERDE_ESCURO
-	var cor := Desenho.TEXTO_ESCURO
-	if apertado:
-		fundo = Desenho.VERDE_ESCURO
-		borda = Desenho.VERDE
-		cor = Desenho.TEXTO
-	draw_rect(r, borda)
-	draw_rect(r.grow(-2.0), fundo)
-	_icone_camera(cam, Rect2(r.position + Vector2(5, 5), Vector2(18, 18)), cor, fundo)
+	var cores := _cores_do_botao(cam)
+	var fundo: Color = cores[0]
+	draw_rect(r, Prancha.FUNDO_MAPA)  # por baixo, para as linhas das cunhas não aparecerem através do fundo translúcido
+	draw_rect(r, fundo)
+	Prancha.contorno(self, r, Prancha.LINHA, Prancha.BTN_LARG)
+	_icone_camera(cam, Rect2(r.position + Vector2(5, 5), Vector2(18, 18)), cores[1], fundo)
 
 
 ## Pendência: chevron para baixo logo acima do botão (balança ±2 px a 1 Hz, sem piscar) e anel quadrado
@@ -617,9 +649,9 @@ func _textura(cam: String) -> Texture2D:
 
 func _desenhar_vista() -> void:
 	var v := _vista
-	# Moldura: 2 px BORDA por fora e um aro de 1 px MOLDURA fora dela.
+	# Moldura: 2 px Prancha.BORDA por fora e um aro de 1 px MOLDURA fora dela.
 	draw_rect(v.grow(3.0), Desenho.MOLDURA)
-	draw_rect(v.grow(2.0), Desenho.BORDA)
+	draw_rect(v.grow(2.0), Prancha.BORDA)
 	var tex := _textura(_atual)
 	if tex != null:
 		draw_texture_rect(tex, v, false)
@@ -723,15 +755,15 @@ func _desenhar_telemetria() -> void:
 	for it in itens:
 		var larg := _largura_chip(it)
 		var rc := Rect2(x, y, larg, ALTURA_CHIP)
-		_chip(rc)
+		_chip_telemetria(rc)
 		var ri := Rect2(x + 6.0, y + (ALTURA_CHIP - 16.0) / 2.0, 16.0, 16.0)
 		var ic: String = it[0]
 		if CAMERAS.has(ic):
-			_icone_camera(ic, ri, Desenho.TEXTO, Desenho.NOITE)
+			_icone_camera(ic, ri, Desenho.TEXTO, Prancha.FUNDO_MAPA)
 		elif ic == "limpo":
 			_icone_ceu_limpo(ri, Desenho.TEXTO)
 		else:
-			Desenho.icone(self, ic, ri, Desenho.TEXTO, Desenho.NOITE)
+			Desenho.icone(self, ic, ri, Desenho.TEXTO, Prancha.FUNDO_MAPA)
 		if it[1] != "":
 			Desenho.texto(self, it[1], Vector2(x + 26.0, y + ALTURA_CHIP / 2.0 - Desenho.fonte().get_height(12) / 2.0),
 				12, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
