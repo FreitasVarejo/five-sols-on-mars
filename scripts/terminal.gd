@@ -2190,9 +2190,9 @@ const REL_MEDIDAS_W := 242.0
 ## A caixa das estrelas; a linha "o que faltou" (até 50 caracteres, 12 px) fica reservada na base dela.
 const REL_ESTRELAS := Rect2(264, 38, 362, 110)
 const REL_FALTOU := Rect2(272, 125, 346, 17)
-const REL_Y_SOIS := 153.0
+const REL_Y_SOIS := 156.0
 const REL_ALTURA_SOIS := 24.0
-const REL_Y_BAIXO := 182.0
+const REL_Y_BAIXO := 185.0
 const REL_Y_FIM := 314.0
 const REL_VERDADE_W := 372.0
 const REL_BOTAO := Rect2(394, 282, 232, 32)
@@ -2218,25 +2218,28 @@ func _desenhar_relatorio() -> void:
 	_t(tr("RELATORIO_TITULO"), x, y, 12, Desenho.TEXTO, REL_MEDIDAS_W, HORIZONTAL_ALIGNMENT_LEFT, true)
 	_t(tr("RELATORIO_SUB") % Modelo.N.SOLS, x, y + 17, 12, Desenho.TEXTO_SUAVE, REL_MEDIDAS_W)
 	var w := REL_MEDIDAS_W
-	var ry := y + 38.0
-	var r0 := Rect2(x, ry, w, 22)
-	var r1 := Rect2(x, ry + 25, w, 22)
-	var r2 := Rect2(x, ry + 50, w, 22)
+	var ry := y + 36.0
+	var r0 := Rect2(x, ry, w, 20)
+	var r1 := Rect2(x, ry + 22, w, 20)
+	var r2 := Rect2(x, ry + 44, w, 20)
 	_caixa(r0)
-	Desenho.icone(self, "ciencia", Rect2(r0.position.x + 6, ry + 4, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
-	_t(tr("RELATORIO_CIENCIA_ENVIADA") % [missao.ciencia_total(), Modelo.N.TEORICO], r0.position.x + 26, ry + 2, 12,
+	Desenho.icone(self, "ciencia", Rect2(r0.position.x + 6, ry + 3, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
+	_t(tr("RELATORIO_CIENCIA_ENVIADA") % missao.ciencia_total(), r0.position.x + 26, ry + 1, 12,
 		Desenho.TEXTO, w - 32, HORIZONTAL_ALIGNMENT_LEFT, true)
 	_caixa(r1)
-	Desenho.icone(self, "radiacao", Rect2(r1.position.x + 6, r1.position.y + 4, 14, 14), Desenho.RADIACAO, Prancha.CAIXA)
+	Desenho.icone(self, "radiacao", Rect2(r1.position.x + 6, r1.position.y + 3, 14, 14), Desenho.RADIACAO, Prancha.CAIXA)
 	var rotulo_margem := tr("MARGEM_FINAL")
-	_t(rotulo_margem, r1.position.x + 26, r1.position.y + 2, 12, Desenho.TEXTO_SUAVE)
+	_t(rotulo_margem, r1.position.x + 26, r1.position.y + 1, 12, Desenho.TEXTO_SUAVE)
 	_t(tr("N_DE_12") % roundi(missao.st["M"]), r1.position.x + 34 + Desenho.largura_texto(rotulo_margem, 12),
-		r1.position.y + 2, 13, Desenho.TEXTO, 52, HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.celulas(self, Rect2(r1.end.x - 70, r1.position.y + 7, 64, 8), missao.st["M"], 12, Desenho.RADIACAO, Prancha.CELULA_VAZIA)
+		r1.position.y + 1, 13, Desenho.TEXTO, 52, HORIZONTAL_ALIGNMENT_LEFT, true)
+	Desenho.celulas(self, Rect2(r1.end.x - 70, r1.position.y + 6, 64, 8), missao.st["M"], 12, Desenho.RADIACAO, Prancha.CELULA_VAZIA)
 	_caixa(r2)
-	Desenho.icone(self, "alerta", Rect2(r2.position.x + 6, r2.position.y + 4, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
-	_t(tr("MODOS_SEGURANCA"), r2.position.x + 26, r2.position.y + 2, 12, Desenho.TEXTO_SUAVE, w - 70)
-	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 2, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	Desenho.icone(self, "alerta", Rect2(r2.position.x + 6, r2.position.y + 3, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
+	_t(tr("MODOS_SEGURANCA"), r2.position.x + 26, r2.position.y + 1, 12, Desenho.TEXTO_SUAVE, w - 70)
+	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 1, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	# Só na missão fixa: o melhor sem modo de segurança (o TEORICO). No Modo livre o teto não existe.
+	if not missao.livre:
+		_t(tr("RELATORIO_MELHOR_SEM_MODO") % Modelo.N.TEORICO, x + 2, r2.end.y + 3, 12, Desenho.TEXTO_SUAVE, w - 4)
 
 	# A caixa das estrelas: os três ícones, "N de 3", a nota e, na base, a linha reservada (2.9).
 	var re := REL_ESTRELAS

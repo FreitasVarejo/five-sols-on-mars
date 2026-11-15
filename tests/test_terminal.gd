@@ -54,6 +54,7 @@ func _tudo() -> void:
 	await _aba_fontes_cabe()
 	await _aba_fontes_rola()
 	await _relatorio_cabe()
+	await _relatorio_livre_sem_melhor()
 	_historia_do_sol_no_diario()
 	_diario_cabe_no_pior_caso()
 	print("%d verificações, %d falhas" % [total, falhas])
@@ -1662,7 +1663,7 @@ func _relatorio_cabe() -> void:
 			var esperados := [
 				t.tr("RELATORIO_NAVE"), t.tr("RELATORIO_TITULO"), t.tr("RELATORIO_SUB") % 5,
 				t.tr("N_DE_3_ESTRELAS") % estrelas, t.tr("ESTRELAS_NOTA"), faltou_texto,
-				t.tr("RELATORIO_CIENCIA_ENVIADA") % [ciencia, 7],
+				t.tr("RELATORIO_CIENCIA_ENVIADA") % ciencia, t.tr("RELATORIO_MELHOR_SEM_MODO") % 7,
 				t.tr("MARGEM_FINAL"), t.tr("N_DE_12") % 9, t.tr("MODOS_SEGURANCA"), str(modos),
 				t.tr("RELATORIO_26_MESES"), t.tr("FONTE_ESCALA_FATO"),
 				t.tr("DE_VERDADE"), t.tr("DE_VERDADE_DATA"), t.tr("DE_VERDADE_TEXTO"), t.tr("JOGAR_DE_NOVO"),
@@ -1714,6 +1715,30 @@ func _relatorio_cabe() -> void:
 						_verdade(_rect_do_texto(linha).end.x <= 14 + i * 123 + 119 - 40, "%s: o +N do sol %d fica antes dos ícones" % [rotulo, i + 1])
 			root.remove_child(t)
 			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## O relatório do Modo livre não traz a linha do melhor sem modo de segurança (o teto de 7 é da missão fixa), e a
+## "Ciência enviada" não tem "de M": o Modo livre chega a 10 ou mais, e "10 de 7" seria falso.
+func _relatorio_livre_sem_melhor() -> void:
+	var idioma := TranslationServer.get_locale()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		var m := _missao_do_relatorio(0, 10)
+		m.livre = true
+		var t: Control = Terminal.new()
+		t.gravar_textos = true
+		t.iniciar(m, {})
+		root.add_child(t)
+		await process_frame
+		await process_frame
+		var desenhados: Array = []
+		for linha in t.textos():
+			desenhados.append(linha[0])
+		_verdade(desenhados.has(t.tr("RELATORIO_CIENCIA_ENVIADA") % 10), "livre, %s: a ciência enviada, sem \"de M\"" % loc)
+		_verdade(not desenhados.has(t.tr("RELATORIO_MELHOR_SEM_MODO") % 7), "livre, %s: sem a linha do melhor sem modo" % loc)
+		root.remove_child(t)
+		t.free()
 	TranslationServer.set_locale(idioma)
 
 

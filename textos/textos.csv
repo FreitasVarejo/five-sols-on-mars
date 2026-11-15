@@ -165,7 +165,8 @@ CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the gene
 CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Panel, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Painel, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
-RELATORIO_CIENCIA_ENVIADA,Science sent home: %d of %d,Ciência enviada: %d de %d
+RELATORIO_CIENCIA_ENVIADA,Science sent home: %d,Ciência enviada: %d
+RELATORIO_MELHOR_SEM_MODO,Best with no safe mode: %d,O melhor sem modo de segurança: %d
 RELATORIO_26_MESES,"In the simulator, the ship arrives in 5 sols. In real life, the way to Mars opens about every 26 months.","No simulador, a nave chega em 5 sóis. De verdade, o caminho para Marte abre a cada 26 meses, mais ou menos."
 ABERTURA_ROLAR,scroll,role
 ABERTURA_1_TITULO,Mars. Gale Crater.,Marte. Cratera Gale.
