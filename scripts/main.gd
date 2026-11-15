@@ -810,6 +810,7 @@ func _sonda_teste() -> void:
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),
+		"minigame": _terminal.minigame(),  # o que a peça à vista oferece (alvos, bandeja, encaixe), em px da tela
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
 		"pode_dormir": m.pode_encerrar_sol(), "porta_clicavel": _clicavel("porta"),

@@ -12,6 +12,7 @@ const HudTurno := preload("res://scripts/hud_turno.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const Main := preload("res://scripts/main.gd")
 const DadosDonki := preload("res://scripts/dados_donki.gd")
+const ConsertarGerador := preload("res://scripts/minigames/consertar_gerador.gd")
 
 const QUADRO := 1.0 / 60.0
 
@@ -42,6 +43,10 @@ func _tudo() -> void:
 	_fila_de_cards()
 	_cards_da_poeira_e_do_gerador()
 	_cards_com_o_sol_em_seguranca()
+	await _botoes_das_pecas_e_visor()
+	_pecas_nas_cameras()
+	_peca_conclui_abrigo_e_reinicio()
+	await _cliques_chegam_ao_visor_e_a_peca()
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
@@ -736,6 +741,388 @@ func _pan_ate_o_botao_do_abrigo() -> void:
 	_igual(pan, 0.0, "chegou ao alvo")
 	_verdade(passos > 5 and passos < 60, "levou de 0,1 s a 1 s (%d quadros)" % passos)
 	_igual(Main.passo_do_pan(3.0, 0.0, 17.0), 0.0, "não passa do alvo")
+
+
+# --- a aba câmeras: o visor e as peças (ChemCam, gerador) ---------------------------------------------
+
+## Um turno do sol 2 com o ChemCam escolhido e, se `quebrado`, o gerador na lista, o terminal no alto na aba
+## câmeras e o relógio andando (cards fechados). Devolve [terminal, missão, som] com o histórico de sons limpo.
+func _turno_nas_cameras(quebrado: bool, na_arvore: bool = false) -> Array:
+	var m := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	m.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": quebrado})
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	_fechar_fila(t)
+	m.alternar_tarefa("chemcam")
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)  # o terminal desce com o turno
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(m.fase, "turno", "turno nas câmeras: no turno")
+	_igual(t.posicao(), 1.0, "turno nas câmeras: o terminal no alto")
+	if na_arvore:
+		t.gravar_textos = true
+		root.add_child(t)
+	t._acionar("aba_cameras")
+	_rodar(t, m, QUADRO * 2.0)
+	som.historico.clear()
+	return [t, m, som]
+
+
+func _botoes_das_pecas_e_visor() -> void:
+	var c := _turno_nas_cameras(true, true)
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	_igual(t.aba_na_tela(), "cameras", "a aba câmeras na tela")
+	_verdade(t._visor.visible, "o visor aparece com a aba câmeras, o terminal no alto e sem card")
+	_igual(t._visor.get_parent(), t, "o visor é filho do terminal")
+	_igual(t._visor.get_global_rect(), Rect2(Terminal.X0, Terminal.Y_CORPO, Terminal.X1 - Terminal.X0, Terminal.Y_FIM - Terminal.Y_CORPO),
+		"o visor cobre o corpo da aba")
+	# O mapa entra em ui() como cam_<nome>, em px da tela, e não é botão do terminal.
+	var ui: Dictionary = t.ui()
+	for cam in ["painel", "rocha", "moxie", "visao_geral"]:
+		_verdade(ui.has("cam_" + cam), "ui: cam_" + cam)
+		var r: Array = ui["cam_" + cam]
+		_verdade(Rect2(Terminal.X0, Terminal.Y_CORPO, Terminal.X1 - Terminal.X0, Terminal.Y_FIM - Terminal.Y_CORPO).encloses(Rect2(r[0], r[1], r[2], r[3])),
+			"cam_%s fica dentro do corpo da aba" % cam)
+		_verdade(r[2] >= 24 and r[3] >= 24, "cam_%s é um alvo de 24 px ou mais" % cam)
+		_igual(t._botoes.has("cam_" + cam), false, "cam_%s não é botão do terminal" % cam)
+	_igual(t.minigame(), {}, "sem peça à vista, nada para a sonda")
+	# Sol, clima e pendências chegam ao visor: ChemCam rodando e gerador pendente.
+	_igual(t._visor_pend, {"rocha": true, "moxie": true}, "pendências: as duas câmeras com tarefa")
+	# Escondido com o terminal animando.
+	t._acionar("terminal")
+	_rodar(t, m, QUADRO * 3.0)
+	_verdade(t.animando(), "o terminal desce")
+	_igual(t._visor.visible, false, "o visor some com o terminal em movimento")
+	_igual(t.ui().keys().filter(func(k): return k.begins_with("cam_")), [], "e os cam_ saem de ui()")
+	_rodar(t, m, t.duracao * 1.5)
+	t._acionar("terminal")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(t._visor.visible, false, "subindo: ainda escondido")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(t._visor.visible, true, "parado no alto: o visor volta")
+	# Escondido com card (o aviso reaberto por cima da tela do plano) e de outra aba.
+	t.card_id = "aviso"
+	t._fase_tela = "plano"
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(t._visor.visible, false, "o visor some com o card à vista")
+	t.card_id = ""
+	t._fase_tela = "turno"
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(t._visor.visible, true, "sem card, volta")
+	t._acionar("aba_tarefas")
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(t._visor.visible, false, "o visor só aparece na aba câmeras")
+	await process_frame
+	await process_frame
+	# Os botões novos da aba tarefas (no lugar de iniciar_chemcam e consertar_gerador).
+	var ui2: Dictionary = t.ui()
+	_verdade(ui2.has("ir_chemcam"), "tarefas: ir_chemcam")
+	_verdade(ui2.has("ir_gerador"), "tarefas: ir_gerador, com as duas pendentes e nada rodando")
+	_igual(ui2.has("iniciar_chemcam") or ui2.has("consertar_gerador"), false, "os botões provisórios saíram")
+	var rb: Array = ui2["ir_chemcam"]
+	_igual(rb[2], 122, "ir_chemcam: mesma largura")
+	_igual(rb[3], 30, "ir_chemcam: mesma altura")
+	_verdade(rb[2] >= 24 and rb[3] >= 24, "ir_chemcam: alvo de 24 px ou mais")
+	var tem_rotulo := false
+	for linha in t.textos():
+		if linha[0] == t.tr("ABA_CAMERAS") and linha[3] == 12:
+			tem_rotulo = true
+	_verdade(tem_rotulo, "ir_chemcam: o rótulo é Câmeras")
+	# Com o ChemCam rodando, o do gerador fica apagado (uma tarefa por vez) e o do ChemCam segue valendo.
+	t._acionar("ir_chemcam")
+	_igual(t.aba, "cameras", "ir_chemcam abre a aba câmeras")
+	_igual(t._visor.camera_atual(), "rocha", "na câmera da rocha")
+	_igual(m.tarefas["chemcam"], "rodando", "e a tarefa começou")
+	t._acionar("aba_tarefas")
+	await process_frame
+	await process_frame
+	_verdade(t.ui().has("ir_chemcam"), "tarefa rodando: ir_chemcam vale")
+	_igual(t.ui().has("ir_gerador"), false, "ChemCam rodando: ir_gerador apagado")
+	_igual(t._acionar("ir_gerador"), null, "e a ação não faz nada")
+	_igual(m.tarefas["gerador"], "pendente", "o gerador segue pendente")
+	root.remove_child(t)
+	som.free()
+	t.free()
+
+
+func _pecas_nas_cameras() -> void:
+	var c := _turno_nas_cameras(true)
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	var visor = t._visor
+	# Nada roda no turno recém-aberto: a criança é quem escolhe a câmera.
+	_igual(m.tarefas, {"chemcam": "pendente", "gerador": "pendente"}, "turno: as duas tarefas pendentes")
+	som.historico.clear()
+	_igual(visor.peca("rocha"), null, "sem peça antes de escolher a câmera")
+	# Escolher a câmera da rocha (tarefa pendente, nada rodando) inicia o ChemCam e hospeda a peça.
+	visor.escolher("rocha")
+	_igual(m.tarefas["chemcam"], "rodando", "escolher a rocha inicia o ChemCam")
+	_igual(m.tarefa_rodando, "chemcam", "ele é a tarefa que roda")
+	var peca = visor.peca("rocha")
+	_verdade(peca != null, "a peça do ChemCam foi hospedada na rocha")
+	_verdade(peca.get_script() == Terminal.Chemcam, "e é o minigame do ChemCam")
+	_igual(som.historico, ["clique_confirmar"], "começar pela câmera toca o clique de iniciar_chemcam")
+	_rodar(t, m, QUADRO * 2.0)
+	_verdade(peca.visible, "a peça aparece (a câmera da rocha está escolhida)")
+	var mg: Dictionary = t.minigame()
+	_igual(mg["tipo"], "chemcam", "a sonda vê o ChemCam")
+	_igual(mg["alvos"].size(), 4, "quatro alvos pendentes")
+	var visor_r: Rect2 = visor.get_global_rect()
+	for a in mg["alvos"]:
+		_verdade(visor_r.has_point(Vector2(a[0], a[1])), "o alvo %s está na área do visor, em px da tela" % str(a))
+	# Escolher de novo a câmera de uma tarefa que roda só mostra: a mesma peça, sem recriar.
+	visor.escolher("visao_geral")
+	_igual(peca.visible, false, "outra câmera: a peça se esconde")
+	visor.escolher("rocha")
+	_verdade(visor.peca("rocha") == peca, "voltar à rocha mostra a mesma peça (não recria)")
+	_verdade(peca.visible, "e ela aparece")
+	_igual(som.historico, ["clique_confirmar"], "voltar não toca o som de iniciar de novo")
+	# Com o ChemCam rodando, o MOXIE (pendente) não começa: uma tarefa por vez.
+	visor.escolher("moxie")
+	_igual(m.tarefas["gerador"], "pendente", "o gerador não começa com o ChemCam rodando")
+	_igual(visor.peca("moxie"), null, "e a câmera do MOXIE fica sem peça")
+	# A barra da linha mostra a peça, não o relógio.
+	t._acionar("aba_tarefas")
+	m.avancar(5.0)  # o relógio anda; a peça não
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(t._progresso_da_linha("chemcam"), peca.progresso(), "a barra é a da peça")
+	_igual(t._progresso_da_linha("chemcam"), 0.0, "a peça parada: 0 mesmo com o relógio andando")
+	_verdade(m.progresso_tarefa("chemcam") > 0.4, "enquanto o relógio da missão já andou")
+	peca.tocar(peca.alvos_na_area()[0])
+	peca.avancar(0.3)
+	_verdade(peca.progresso() > 0.0, "a peça andou")
+	_igual(t._progresso_da_linha("chemcam"), peca.progresso(), "a barra acompanha a peça")
+	_igual(t._progresso_da_linha("amostra"), 0.0, "tarefa de relógio: a do relógio")
+	# A peça conclui: a tarefa fica feita e a peça sai no quadro seguinte.
+	peca.concluido.emit()
+	_igual(m.tarefas["chemcam"], "feita", "concluido da peça marca a tarefa feita")
+	_igual(m.tarefa_rodando, "", "nada roda")
+	_igual(m.ciencia_do_sol(), 1, "o ChemCam rende ciência")
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(visor.peca("rocha"), null, "a peça sai quando a tarefa deixa de rodar")
+	_igual(t._visor_pend, {"rocha": false, "moxie": true}, "a rocha deixa de ser pendência")
+	# Agora o gerador: escolher o MOXIE o inicia, com a semente sol*100 + modos.
+	t._acionar("aba_cameras")
+	som.historico.clear()
+	visor.escolher("moxie")
+	_igual(m.tarefas["gerador"], "rodando", "escolher o MOXIE inicia o conserto")
+	var g = visor.peca("moxie")
+	_verdade(g != null and g.get_script() == ConsertarGerador, "a peça do gerador foi hospedada no MOXIE")
+	_igual(g.sorteio_atual(), ConsertarGerador.sorteio(m.sol * 100 + m.modos), "semente = sol * 100 + modos")
+	_igual(m.sol * 100 + m.modos, 200, "no sol 2 sem modos: 200")
+	_igual(som.historico, ["clique_confirmar"], "o conserto também toca o clique de começar")
+	_rodar(t, m, QUADRO * 2.0)
+	var mg2: Dictionary = t.minigame()
+	_igual(mg2["tipo"], "gerador", "a sonda vê o gerador")
+	_igual(mg2["pecas"].size(), 3, "três peças na bandeja")
+	_igual(mg2["certa"], g.sorteio_atual()["certa"], "a sonda diz qual é a certa")
+	_verdade(visor_r.has_point(Vector2(mg2["encaixe"][0], mg2["encaixe"][1])), "o encaixe está na área do visor")
+	for r in mg2["pecas"]:
+		_verdade(r[2] >= 24 and r[3] >= 24, "a peça da bandeja é um alvo de 24 px ou mais")
+	# A semente muda com os modos de segurança: outro modo, outro sorteio.
+	_igual(ConsertarGerador.sorteio(200) == ConsertarGerador.sorteio(201), false, "outro número, outro sorteio")
+	som.free()
+	t.free()
+
+
+## A peça sai quando a tarefa deixa de rodar por outro motivo (abrigo, fim do turno, reinício), e o
+## semente leva os modos de segurança.
+func _peca_conclui_abrigo_e_reinicio() -> void:
+	# Abrigar tira a peça e a tarefa volta a pendente (cancelada).
+	var c := _turno_nas_cameras(false)
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	t._visor.escolher("rocha")
+	_verdade(t._visor.peca("rocha") != null, "abrigo: o ChemCam tem peça")
+	m.abrigar()
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(t._visor.peca("rocha"), null, "abrigar tira a peça")
+	_igual(m.tarefas["chemcam"], "pendente", "a tarefa volta a pendente")
+	_igual(t._visor_pend, {"rocha": false, "moxie": false}, "abrigado: nenhuma pendência no mapa")
+	t._visor.escolher("rocha")
+	_igual(t._visor.peca("rocha"), null, "abrigado: escolher a câmera não inicia nem hospeda")
+	_igual(m.tarefas["chemcam"], "pendente", "abrigado: a tarefa segue pendente")
+	som.free()
+	t.free()
+	# O fim do turno tira a peça.
+	c = _turno_nas_cameras(false)
+	t = c[0]
+	m = c[1]
+	som = c[2]
+	t._visor.escolher("rocha")
+	_verdade(t._visor.peca("rocha") != null, "fim do turno: o ChemCam tem peça")
+	m.avancar(m.turno_s)
+	_igual(m.fase, "fim_do_sol", "o turno acabou")
+	t._process(QUADRO)
+	_igual(t._visor.peca("rocha"), null, "o fim do turno tira a peça")
+	_igual(t._visor_pend, {"rocha": false, "moxie": false}, "fora do turno: sem pendência")
+	som.free()
+	t.free()
+	# O modo de segurança (a peça não concluiu e o oxigênio acaba) e o reinício do sol tiram a peça.
+	var ms := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	ms.montar_sol(2, {"E": 6.0, "O": 0.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
+	var som_s := Som.new()
+	var ts: Control = Terminal.new()
+	ts.som = som_s
+	ts.iniciar(ms, {})
+	_fechar_fila(ts)
+	ts._acionar("confirmar")
+	_rodar(ts, ms, ts.duracao * 1.5)
+	ts._acionar("terminal")
+	_rodar(ts, ms, ts.duracao * 1.5)
+	ts._acionar("aba_cameras")
+	_rodar(ts, ms, QUADRO * 2.0)
+	ts._visor.escolher("moxie")
+	_verdade(ts._visor.peca("moxie") != null, "segurança: o gerador tem peça")
+	ms.avancar(ms.turno_s)
+	_igual(ms.fase, "seguranca", "o conserto não concluído e sem O2: modo de segurança")
+	ts._process(QUADRO)
+	_igual(ts._visor.peca("moxie"), null, "o modo de segurança tira a peça")
+	_verdade(ms.reiniciar_sol(), "o simulador reinicia o sol")
+	_rodar(ts, ms, QUADRO * 3.0)
+	_igual(ts._visor.peca("moxie"), null, "no sol reiniciado não há peça")
+	_igual(ts._visor_pend, {"rocha": false, "moxie": false}, "no plano reiniciado, sem pendência no mapa")
+	som_s.free()
+	ts.free()
+	# Semente com modos: monta um sol 2 com a missão já com 3 modos de segurança.
+	var m2 := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	m2.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
+	m2.modos = 3
+	var som2 := Som.new()
+	var t2: Control = Terminal.new()
+	t2.som = som2
+	t2.iniciar(m2, {})
+	_fechar_fila(t2)
+	t2._acionar("confirmar")
+	_rodar(t2, m2, t2.duracao * 1.5)
+	t2._acionar("terminal")
+	_rodar(t2, m2, t2.duracao * 1.5)
+	t2._acionar("aba_cameras")
+	_rodar(t2, m2, QUADRO * 2.0)
+	t2._visor.escolher("moxie")
+	var g = t2._visor.peca("moxie")
+	_verdade(g != null, "semente com modos: o gerador tem peça")
+	_igual(g.sorteio_atual(), ConsertarGerador.sorteio(2 * 100 + 3), "semente = sol * 100 + modos, com 3 modos")
+	# Reiniciar o sol (volta ao plano do mesmo sol): a peça sai.
+	m2.avancar(m2.turno_s)
+	t2._process(QUADRO)
+	_igual(t2._visor.peca("moxie"), null, "depois do turno a peça do gerador saiu")
+	# A peça do gerador conclui pelo concluido e a tarefa vira feita.
+	var m3 := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	m3.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
+	var t3: Control = Terminal.new()
+	t3.iniciar(m3, {})
+	_fechar_fila(t3)
+	t3._acionar("confirmar")
+	_rodar(t3, m3, t3.duracao * 1.5)
+	t3._acionar("terminal")
+	_rodar(t3, m3, t3.duracao * 1.5)
+	t3._acionar("aba_cameras")
+	_rodar(t3, m3, QUADRO * 2.0)
+	t3._acionar("aba_tarefas")
+	_verdade(t3._pode_ir_a_camera("gerador"), "tarefas: ir_gerador habilitado com o gerador pendente")
+	t3._acionar("ir_gerador")
+	_igual(t3.aba, "cameras", "ir_gerador abre a aba câmeras")
+	_igual(t3._visor.camera_atual(), "moxie", "na câmera do MOXIE")
+	_igual(m3.tarefas["gerador"], "rodando", "e o conserto começou")
+	var g3 = t3._visor.peca("moxie")
+	g3.concluido.emit()
+	_igual(m3.tarefas["gerador"], "feita", "o concluido do gerador marca a tarefa feita")
+	_igual(m3.gerador_quebrado_agora(), false, "o gerador está consertado")
+	_rodar(t3, m3, QUADRO * 2.0)
+	_igual(t3._visor.peca("moxie"), null, "a peça do gerador sai")
+	m3.avancar(m3.turno_s)
+	_igual(m3.registros[0]["o2_produzido"] > 0 or m3.registros[0]["consertou"], true, "o conserto vale no fim do sol")
+	t3.free()
+	t2.free()
+	som2.free()
+
+
+## Com a peça à vista, o clique no visor chega ao `_gui_input` do visor e da peça (pelo viewport de verdade),
+## e o arrasto do gerador (pressionar, mover com o botão, soltar) chega inteiro.
+func _cliques_chegam_ao_visor_e_a_peca() -> void:
+	var c := _turno_nas_cameras(true, true)
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	await process_frame
+	await process_frame
+	# Fora do visor o terminal ainda consome o clique (a sala não o recebe).
+	root.push_input(_mouse(Vector2(5, 5), true), true)
+	_verdade(root.is_input_handled(), "fora do visor o terminal consome o clique")
+	root.push_input(_mouse(Vector2(5, 5), false), true)
+	# Dentro do visor, no botão da câmera do MOXIE: o visor recebe e a câmera muda.
+	var ui: Dictionary = t.ui()
+	var cam: Array = ui["cam_moxie"]
+	var ctr := Vector2(cam[0] + cam[2] / 2.0, cam[1] + cam[3] / 2.0)
+	_igual(t._visor.camera_atual(), "visao_geral", "a câmera começa na visão geral")
+	root.push_input(_mouse(ctr, true), true)
+	_igual(t._visor.camera_atual(), "moxie", "o clique no mapa chega ao visor (o terminal não o consome)")
+	root.push_input(_mouse(ctr, false), true)
+	_igual(m.tarefas.get("gerador", ""), "rodando", "e a câmera do MOXIE inicia o conserto")
+	await process_frame
+	var mg: Dictionary = t.minigame()
+	_igual(mg.get("tipo", ""), "gerador", "o gerador está à vista")
+	var g = t._visor.peca("moxie")
+	# Arrasto: a peça certa, do centro da bandeja ao centro do encaixe, com o botão apertado nos movimentos.
+	var r: Array = mg["pecas"][mg["certa"]]
+	var de := Vector2(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0)
+	var para := Vector2(mg["encaixe"][0], mg["encaixe"][1])
+	root.push_input(_mouse(de, true), true)
+	_verdade(root.is_input_handled(), "o toque na peça é tratado")
+	var passos := 6
+	for i in range(1, passos + 1):
+		root.push_input(_movimento(de.lerp(para, float(i) / passos), true), true)
+	_verdade(g.posicao_da_peca(mg["certa"]).distance_to(para - g.global_position) < 2.0, "a peça seguiu o arrasto até o encaixe")
+	root.push_input(_mouse(para, false), true)
+	_verdade(g.ocupada(), "soltar no encaixe a põe em voo")
+	g.avancar(5.0)
+	_verdade(g.concluida(), "o arrasto inteiro conclui o conserto")
+	_igual(m.tarefas["gerador"], "feita", "e a tarefa do gerador fica feita pelo concluido")
+	_igual(m.gerador_quebrado_agora(), false, "o gerador está consertado")
+	# O ChemCam: o clique no alvo, dentro da vista, dispara.
+	t._visor.escolher("rocha")
+	_igual(m.tarefas["chemcam"], "rodando", "a câmera da rocha inicia o ChemCam")
+	await process_frame
+	var mc: Dictionary = t.minigame()
+	_igual(mc.get("tipo", ""), "chemcam", "o ChemCam está à vista")
+	var a: Array = mc["alvos"][0]
+	root.push_input(_mouse(Vector2(a[0], a[1]), true), true)
+	_verdade(root.is_input_handled(), "o toque no alvo é tratado")
+	root.push_input(_mouse(Vector2(a[0], a[1]), false), true)
+	_igual(t._visor.peca("rocha").estado_alvo(0) != "pendente" or t._visor.peca("rocha").estado_alvo(1) != "pendente"
+		or t._visor.peca("rocha").estado_alvo(2) != "pendente" or t._visor.peca("rocha").estado_alvo(3) != "pendente", true,
+		"o alvo tocado dispara")
+	_igual(t.minigame()["alvos"].size(), 3, "um alvo a menos pendente")
+	root.remove_child(t)
+	som.free()
+	t.free()
+
+
+func _mouse(pos: Vector2, apertado: bool) -> InputEventMouseButton:
+	var e := InputEventMouseButton.new()
+	e.button_index = MOUSE_BUTTON_LEFT
+	e.pressed = apertado
+	e.position = pos
+	e.global_position = pos
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT if apertado else 0
+	return e
+
+
+func _movimento(pos: Vector2, apertado: bool) -> InputEventMouseMotion:
+	var e := InputEventMouseMotion.new()
+	e.position = pos
+	e.global_position = pos
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT if apertado else 0
+	return e
+
 
 
 ## Estado de bateria e oxigênio sem salvação no sol de poeira (o plano de emergência falha).

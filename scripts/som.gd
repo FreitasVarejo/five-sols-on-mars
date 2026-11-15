@@ -34,7 +34,7 @@ const CLIQUE_DA_ACAO := {
 	"confirmar": "clique_confirmar", "enviar": "clique_confirmar", "iniciar_chemcam": "clique_confirmar",
 	"consertar_gerador": "clique_confirmar", "reiniciar": "clique_confirmar", "seguir": "clique_confirmar",
 	"jogar_de_novo": "clique_confirmar", "estufa": "clique_confirmar", "glovebox": "clique_confirmar",
-	"abrigo": "clique_abrigo", "ir_ao_abrigo": "clique_navegar",
+	"abrigo": "clique_abrigo", "ir_ao_abrigo": "clique_navegar", "ir_chemcam": "clique_navegar", "ir_gerador": "clique_navegar",
 	"porta": "clique_confirmar",
 }
 

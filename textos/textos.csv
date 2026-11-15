@@ -110,7 +110,13 @@ AQUECIMENTO_DA_NOITE,Night heating,Aquecimento da noite
 CADA,each,cada
 BATERIA_CHEIA_PERDE,Battery full: %d is lost,Bateria cheia: %d se perde
 SEM_CONTAR_TEMPESTADE,Not counting the storm,Sem contar a tempestade
-CAMERAS_VAZIO,No image yet,Sem imagem ainda
+CAM_PAINEL,Panel,Painel
+CAM_ROCHA,Rock,Rocha
+CAM_MOXIE,MOXIE,MOXIE
+CAM_VISAO_GERAL,Overview,Panorama
+TEL_LIMPO,Clear,Limpo
+TEL_POEIRA,Dust,Poeira
+MAPA_NORTE,N,N
 DIARIO_VAZIO,No log yet,Nenhum diário ainda
 FONTE_DONKI_FATO,Storm from the Sun: CME predicted at Mars on %s.,Tempestade do Sol: CME prevista em Marte em %s.
 FONTE_DONKI_FONTE,"NASA DONKI (CCMC), WSA-ENLIL.","NASA DONKI (CCMC), WSA-ENLIL."
@@ -132,7 +138,7 @@ FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem d
 FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
 CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the generator made no oxygen. Next time, save power in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, guarde energia na bateria."
-CAUSA_GERADOR,The generator was broken and nobody fixed it. Open the Terminal and press the fix button.,O gerador estava quebrado e ninguém consertou. Abra o Terminal e aperte Consertar.
+CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Terminal, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Terminal, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
 RELATORIO_CIENCIA_ENVIADA,Science sent home: %d of %d,Ciência enviada: %d de %d
@@ -178,5 +184,5 @@ SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos 
 SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
 SOL1_CARD_TURNO,Your tasks are in the Terminal. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Terminal. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
 CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
-CARD_GERADOR,The oxygen machine broke! Fix it in the Terminal.,A máquina de oxigênio quebrou! Conserte no Terminal.
+CARD_GERADOR,"The generator broke! In the Terminal, press Cameras, then MOXIE.","O gerador quebrou! No Terminal, aperte Câmeras e depois MOXIE."
 RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.
