@@ -23,6 +23,8 @@ const SONS := {
 	"terminal_desce": preload("res://assets/sons/terminal_desce.ogg"),
 	"desligar": preload("res://assets/sons/desligar.ogg"),
 	"alarme": preload("res://assets/sons/alarme.ogg"),  # o medidor passou do limiar de abrigo (terminal.gd)
+	"viagem_ignicao": preload("res://assets/sons/viagem_ignicao.ogg"),  # o foguete parte, no começo da viagem (viagem.gd)
+	"viagem_pouso": preload("res://assets/sons/viagem_pouso.ogg"),  # o baque do pouso, junto do flash (viagem.gd)
 }
 
 ## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).

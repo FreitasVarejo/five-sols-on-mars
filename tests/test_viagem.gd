@@ -1,12 +1,13 @@
 extends SceneTree
 ## Teste headless da viagem Terra -> Marte (scripts/abertura/viagem.gd): `concluida` emitida uma vez só ao
-## fim (e nunca antes), o toque e o "Pular" só valendo depois de 1,5 s, o som do clique, o dia da viagem do
-## Curiosity (0 a 254), os passos do registro, a chama e as estrelas abaixo de 3 piscadas por segundo e o
-## texto: toda chave VIAGEM_* em inglês e português, com no máximo 8 palavras por frase.
+## fim (e nunca antes), o toque e o "Pular" só valendo depois de 1,5 s, o som (o clique, a ignição no começo
+## e o baque ao cruzar DURACAO, sem baque se pulou antes), o dia da viagem do Curiosity (0 a 254), os passos
+## do registro, a chama e as estrelas abaixo de 3 piscadas por segundo e o texto: toda chave VIAGEM_* em inglês e português, com no máximo 8 palavras por frase.
 ## Roda com: godot --headless --path . --script tests/test_viagem.gd
 ## Sai com código 1 se algo falhar e imprime cada falha.
 
 const Viagem := preload("res://scripts/abertura/viagem.gd")
+const Som := preload("res://scripts/som.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
 const CSV := "res://textos/textos.csv"
 
@@ -29,6 +30,7 @@ func _init() -> void:
 	_pular_so_depois_de_1_5_s()
 	_pular_pelo_botao_e_pelo_toque()
 	_som()
+	_som_da_viagem()
 	_dia()
 	_passos()
 	_nada_pisca_demais()
@@ -174,15 +176,62 @@ func _som() -> void:
 	_passa(v, 2.0)
 	_clique(v)
 	_clique(v)
-	_igual(s.tocados, ["clique_confirmar"], "pular faz o clique de confirmar, uma vez")
+	_igual(s.tocados, ["viagem_ignicao", "clique_confirmar"], "pular faz o clique de confirmar, uma vez, depois da ignição")
 	v.free()
+	# O fim sem pular: só a ignição e o baque, nenhum clique.
 	var f := SomFalso.new()
 	var w := _nova()
 	w.som = f
 	_passa(w, 9.0)
 	_igual(emitidos, 1, "o fim emite")
-	_igual(f.tocados.size(), 0, "o fim da viagem não faz som")
+	_igual(f.tocados, ["viagem_ignicao", "viagem_pouso"], "o fim da viagem faz a ignição e o pouso, sem clique")
 	w.free()
+
+
+func _som_da_viagem() -> void:
+	# A ignição toca uma vez no começo e não repete.
+	var s := SomFalso.new()
+	var v := _nova()
+	v.som = s
+	_igual(s.tocados.size(), 0, "antes de passar o tempo nada toca")
+	v.avancar(0.0)
+	_igual(s.tocados, ["viagem_ignicao"], "a ignição toca no primeiro avanço")
+	_passa(v, 3.0)
+	_igual(s.tocados, ["viagem_ignicao"], "a ignição não repete e o pouso ainda não chegou")
+	# O pouso toca uma vez ao cruzar DURACAO.
+	_passa(v, Viagem.DURACAO - v.tempo() - 0.05)
+	_igual(s.tocados, ["viagem_ignicao"], "um pouco antes do pouso: nada de baque")
+	_passa(v, 0.1)
+	_igual(s.tocados, ["viagem_ignicao", "viagem_pouso"], "o pouso toca ao cruzar DURACAO")
+	_passa(v, 3.0)
+	_igual(s.tocados, ["viagem_ignicao", "viagem_pouso"], "o pouso não repete")
+	v.free()
+	# Um único avanço grande por cima do pouso toca os dois, uma vez cada.
+	var g := SomFalso.new()
+	var w := _nova()
+	w.som = g
+	w.avancar(Viagem.DURACAO + 0.5)
+	_igual(g.tocados, ["viagem_ignicao", "viagem_pouso"], "um avanço grande por cima do pouso toca os dois")
+	w.avancar(10.0)
+	_igual(g.tocados, ["viagem_ignicao", "viagem_pouso"], "e não repete depois")
+	w.free()
+	# Pular antes do pouso: só o clique, sem o baque, mesmo passando o tempo depois.
+	var p := SomFalso.new()
+	var u := _nova()
+	u.som = p
+	_passa(u, 2.0)
+	_clique(u)
+	_passa(u, 9.0)
+	_igual(p.tocados, ["viagem_ignicao", "clique_confirmar"], "pular antes do pouso não toca o pouso")
+	u.free()
+	# Sem som, nada quebra.
+	var n := _nova()
+	_passa(n, 9.0)
+	_igual(emitidos, 1, "sem som a viagem segue e conclui")
+	n.free()
+	# Os dois sons existem no barramento do jogo.
+	_verdade(Som.SONS.has("viagem_ignicao") and Som.SONS.has("viagem_pouso"), "os dois sons estão no SONS")
+	_verdade(Som.SONS["viagem_ignicao"].get_length() < 3.0 and Som.SONS["viagem_pouso"].get_length() < 1.0, "e são curtos")
 
 
 func _dia() -> void:

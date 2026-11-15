@@ -3,12 +3,16 @@ extends Control
 ## esquerda, Marte à direita crescendo, a órbita tracejada, o foguete com chama e rastro, o registro da
 ## missão com 7 passos, a barra de progresso e um flash no pouso. Dura 7 s, mais 1 s de "pouso confirmado".
 ##
-## Port da `LoadingView` da versão do primo: a
-## composição, os planetas, a órbita, o foguete, o rastro, o registro, a barra e o flash são dele. O que
-## mudou, e por quê: 1280x720 para 640x360 (o jogo é pixel art), texto de tr() em vez de português fixo,
-## sem as dicas rotativas (texto com tempo limite), dia e idade da viagem do Curiosity (254 dias, os
-## números reais) no lugar dos inventados, cores pela regra da spec (verde só no que se clica, azul só
-## no que vem da Terra), nada piscando mais de 3 vezes por segundo.
+## Port da `LoadingView` do primo (o `main.gd` da solução dele): a composição,
+## os planetas, a órbita, o foguete, o rastro, o registro, a barra e o flash são dele. O que mudou, e por
+## quê: 1280x720 para 640x360 (o jogo é pixel art), texto de tr() em vez de português fixo, sem as dicas
+## rotativas (texto com tempo limite), dia e idade da viagem do Curiosity (254 dias, os números reais) no
+## lugar dos inventados, cores pela regra da spec (verde só no que se clica, azul só no que vem da Terra),
+## nada piscando mais de 3 vezes por segundo.
+##
+## O som é nosso, sintetizado por `scripts/gerar_som_viagem.py`: o ronco da ignição quando a viagem começa
+## e o baque do pouso quando o tempo cruza DURACAO, junto do flash. Quem pula antes do pouso não ouve o
+## baque (o pular tem o clique dele).
 ##
 ## Quem hospeda liga `concluida` (emitido uma vez só: no fim, ou no toque e no "Pular" depois de 1,5 s)
 ## ao que vem depois. O tempo passa por `avancar(delta)`, que o _process chama: uma cena de captura ou um
@@ -80,6 +84,8 @@ var som = null
 
 var _t := 0.0
 var _emitida := false
+var _ignicao_tocada := false
+var _pouso_tocado := false
 ## Por estrela: x, y e um número de 0 a 1 que decide o tamanho, a velocidade e o ritmo do cintilar.
 var _estrelas: Array[Vector3] = []
 
@@ -108,8 +114,23 @@ func _process(delta: float) -> void:
 func avancar(delta: float) -> void:
 	_t += delta
 	queue_redraw()
+	_tocar_sons()
 	if _t >= DURACAO + POUSO_S:
 		_emitir(false)
+
+
+## A ignição toca no primeiro avanço do tempo (o `som` é injetado depois do _init, então não dá no _init) e
+## o pouso quando o tempo cruza DURACAO, mesmo que um único avanço grande passe por cima. Cada um toca uma
+## vez; depois de emitir (pulou ou acabou) nada toca.
+func _tocar_sons() -> void:
+	if som == null or _emitida:
+		return
+	if not _ignicao_tocada:
+		_ignicao_tocada = true
+		som.tocar("viagem_ignicao")
+	if not _pouso_tocado and _t >= DURACAO:
+		_pouso_tocado = true
+		som.tocar("viagem_pouso")
 
 
 ## Segundos desde o começo.
