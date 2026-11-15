@@ -93,6 +93,9 @@ const ALERTA := Rect2(8, 328, 34, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
+# A noite (Missao.NOITE_S = 2,0 s): parada, a barra de energia cai, parada de novo (os 0,7 s que sobram).
+const NOITE_PARADA_S := 0.5
+const NOITE_QUEDA_S := 0.8
 
 # Moldura com as 4 teclas (plano, turno, fim do sol): as teclas à esquerda, a tela à direita.
 const TELA_COM_TECLAS := Rect2(80, 6, 554, 316)
@@ -565,7 +568,7 @@ func _process(delta: float) -> void:
 		_vistos["turno"] = true
 		animou = true
 	animou = _avancar_avisos(delta) or animou
-	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
+	var precisa := missao.fase == "turno" or missao.fase == "noite" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
 
@@ -2061,10 +2064,69 @@ func _altura_itens(itens: Array, w: float, menos: int) -> float:
 
 # --- noite -----------------------------------------------------------------------
 
+## A conta da noite, pela mesma conta que o plano seguinte usa (Modelo.manha), e não pela constante AQUEC:
+## a noite nunca mostra um número diferente do que vai ser descontado. `st` é o estado no fim do sol (já
+## o do sol seguinte) e `poeira` diz se o sol seguinte é de poeira. Devolve "n" (o "−N" do aviso), "antes" e
+## "depois" (a bateria, em células) e "falta" (a energia não cobre o aquecimento: a barra cai até zero).
+static func conta_da_noite(st: Dictionary, poeira: bool) -> Dictionary:
+	var m := Modelo.manha(st, poeira)
+	var bateria: float = st["E"]
+	var desconto := maxf(0.0, bateria + m["renda"] - m["para_dividir"])
+	return {
+		"n": maxi(1, roundi(desconto)),
+		"antes": clampf(bateria, 0.0, Modelo.N.TETO),
+		"depois": clampf(bateria - desconto, 0.0, Modelo.N.TETO),
+		"falta": m["falta_aquecimento"],
+	}
+
+
+## Quanto da queda já passou na noite, de 0 a 1, `t` segundos depois do "Enviar à Terra".
+static func progresso_da_noite(t: float) -> float:
+	return clampf((t - NOITE_PARADA_S) / NOITE_QUEDA_S, 0.0, 1.0)
+
+
+## A energia que a barra mostra `t` segundos depois do "Enviar à Terra": cai do "antes" ao "depois", e a
+## barra arredonda para a célula, então uma célula por vez.
+static func energia_na_noite(conta: Dictionary, t: float) -> float:
+	return lerpf(conta["antes"], conta["depois"], progresso_da_noite(t))
+
+
+## A noite é do sol seguinte: o sol da missão só sobe no fim dela, então a poeira que vale é a de sol + 1.
+func _poeira_da_manha() -> bool:
+	var n := missao.sol + (1 if missao.fase == "noite" else 0)
+	return n >= missao.sol_poeira and n < missao.sol_poeira + Missao.DURACAO_POEIRA
+
+
+## O ícone da noite; embaixo, o aviso do aquecimento com o ícone e o "−N" na cor da energia; embaixo dele, a
+## barra de energia, que perde as N células do aquecimento. Sem alerta: a energia é sempre violeta, mesmo
+## quando não cobre o aquecimento (a tela do modo de segurança que vem depois explica a causa).
 func _desenhar_noite() -> void:
 	draw_rect(TELA, Desenho.NOITE)
-	Desenho.icone(self, "noite", Rect2(304, 124, 32, 32), Desenho.TEXTO, Desenho.NOITE)
-	_t(tr("NOITE_AQUECIMENTO") % roundi(Modelo.N.AQUEC), 120, 170, 16, Desenho.TEXTO, 400, HORIZONTAL_ALIGNMENT_CENTER, true)
+	var conta := conta_da_noite(missao.st, _poeira_da_manha())
+	var cor := Desenho.cor_recurso("energia")
+	Desenho.icone(self, "noite", Rect2(304, 104, 32, 32), Desenho.TEXTO, Desenho.NOITE)
+
+	var rot_a := tr("NOITE_AQUECIMENTO_A")
+	var numero := _numero(-float(conta["n"]))
+	var rot_b := tr("NOITE_AQUECIMENTO_B")
+	var l_a := Desenho.largura_texto(rot_a, 16, true)
+	var l_numero := Desenho.largura_texto(numero, 16, true)
+	var l_b := Desenho.largura_texto(rot_b, 16, true)
+	var x := roundf((TELA.size.x - (l_a + 8.0 + 16.0 + 4.0 + l_numero + 6.0 + l_b)) / 2.0)
+	var y := 152.0
+	_t(rot_a, x, y, 16, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
+	x += l_a + 8.0
+	Desenho.icone(self, "energia", Rect2(x, y + 1, 16, 16), cor, Desenho.NOITE)
+	x += 20.0
+	_t(numero, x, y, 16, cor, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
+	_t(rot_b, x + l_numero + 6.0, y, 16, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
+
+	# A barra, com o mesmo helper e o mesmo máximo da barra do plano.
+	var rb := Rect2(170, 218, 300, 14)
+	Desenho.icone(self, "energia", Rect2(rb.position.x, rb.position.y - 22, 14, 14), cor, Desenho.NOITE)
+	_t(tr("ENERGIA"), rb.position.x + 20, rb.position.y - 23, 12, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
+	Desenho.celulas_de_para(self, rb, conta["antes"], energia_na_noite(conta, missao.t_noite), roundi(Modelo.N.TETO), cor,
+		Desenho.CELULA_VAZIA)
 
 
 # --- modo de segurança -----------------------------------------------------------

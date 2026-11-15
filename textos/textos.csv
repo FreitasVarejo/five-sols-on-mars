@@ -83,7 +83,8 @@ DIARIO_MENSAGEM,Message from Earth,Mensagem da Terra
 DIARIO_SEGURANCA,"This sol passed in safe mode, with no science.","Este sol passou em modo de segurança, sem ciência."
 DIARIO_BARRAS,Bars: before and after,Barras: antes e depois
 ENVIAR_A_TERRA,Send to Earth,Enviar à Terra
-NOITE_AQUECIMENTO,Night heating: −%d energy,Aquecimento da noite: −%d de energia
+NOITE_AQUECIMENTO_A,Night heating:,Aquecimento da noite:
+NOITE_AQUECIMENTO_B,energy,de energia
 MODO_SEGURANCA,Safe mode,Modo de segurança
 CAUSA_ENERGIA,The base ran out of energy.,A base ficou sem energia.
 CAUSA_OXIGENIO,The oxygen ran out.,O oxigênio acabou.

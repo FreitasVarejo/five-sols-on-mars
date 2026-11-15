@@ -1021,7 +1021,7 @@ func _quebra_do_gerador() -> void:
 				"fim_do_sol":
 					m.enviar_a_terra()
 				"noite":
-					m.avancar(2.0)
+					m.avancar(Missao.NOITE_S + 0.1)
 		_igual(quebrou_em, sol_q, "a quebra entra no sol %d, e em nenhum antes" % sol_q)
 		_igual(m.modos, 0, "quebra no sol %d, consertada: sem modo de segurança" % sol_q)
 	# Na tempestade solar a quebra não cai: nem com a URL forçando.
@@ -1035,7 +1035,7 @@ func _quebra_do_gerador() -> void:
 	_igual(q.tarefas, {}, "sol 1: nenhuma tarefa na lista")
 	q.avancar(q.turno_s)
 	q.enviar_a_terra()
-	q.avancar(2.0)
+	q.avancar(Missao.NOITE_S + 0.1)
 	_igual(q.sol, 2, "chegou ao sol 2")
 	_igual(q.st["gerador_quebrado"], true, "sol 2: o gerador quebrou")
 	_igual(q.st_inicio["gerador_quebrado"], true, "sol 2: o instantâneo do sol leva o gerador quebrado")
@@ -1088,7 +1088,7 @@ func _quebra_do_gerador() -> void:
 	_igual(c.st_fim["gerador_quebrado"], false, "consertado: o gerador volta a funcionar")
 	_igual(c.ciencia_por_sol, [0], "ciência por sol: o conserto não entra")
 	c.enviar_a_terra()
-	c.avancar(2.0)
+	c.avancar(Missao.NOITE_S + 0.1)
 	_igual(c.lista_do_turno(), [], "sol seguinte: nada a consertar")
 	c.confirmar_plano()
 	_igual(c.tarefas, {}, "sol seguinte: a lista não tem o gerador")
@@ -1111,7 +1111,7 @@ func _quebra_do_gerador() -> void:
 	_igual(rd["depois"], {"E": 12.0, "O": 2.0, "M": 11.0}, "não consertado: barras depois")
 	_igual(d.st_fim["gerador_quebrado"], true, "não consertado: o gerador segue quebrado")
 	d.enviar_a_terra()
-	d.avancar(2.0)
+	d.avancar(Missao.NOITE_S + 0.1)
 	_igual(d.sol, 3, "plano do sol 3")
 	_igual(d.st["gerador_quebrado"], true, "sol 3: o gerador segue quebrado")
 	_igual(d.lista_do_turno(), ["gerador"], "sol 3: o conserto volta à lista")
@@ -1392,8 +1392,8 @@ func _fim_do_sol_noite_e_relatorio() -> void:
 	_igual(m.fase, "noite", "depois do envio vem a noite")
 	_igual(m.sol, 1, "a noite ainda é do sol 1")
 	_igual(m.enviar_a_terra(), false, "não se envia duas vezes")
-	m.avancar(1.0)
-	_igual(m.fase, "noite", "a noite dura ~1,2 s")
+	m.avancar(Missao.NOITE_S - 0.2)
+	_igual(m.fase, "noite", "a noite dura ~2,0 s")
 	m.avancar(0.3)
 	_igual(m.fase, "plano", "depois da noite, o plano")
 	_igual(m.sol, 2, "plano do sol 2")
@@ -1492,7 +1492,7 @@ func _missao_inteira() -> void:
 					sois += 1
 					m.enviar_a_terra()
 				"noite":
-					m.avancar(2.0)
+					m.avancar(Missao.NOITE_S + 0.1)
 				"seguranca":
 					if m.tem_conserto:
 						m.reiniciar_sol()
@@ -1595,7 +1595,7 @@ func _jogar_missao(m, plano_do_sol: Callable, espera_a_lista: bool) -> Array:
 			"fim_do_sol":
 				m.enviar_a_terra()
 			"noite":
-				m.avancar(2.0)
+				m.avancar(Missao.NOITE_S + 0.1)
 			"seguranca":
 				sois_com_modo.append(m.sol)
 				if m.t == 0.0:
