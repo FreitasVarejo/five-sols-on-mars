@@ -11,6 +11,7 @@ const Som := preload("res://scripts/som.gd")
 const HudTurno := preload("res://scripts/hud_turno.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const Main := preload("res://scripts/main.gd")
+const DadosDonki := preload("res://scripts/dados_donki.gd")
 
 const QUADRO := 1.0 / 60.0
 
@@ -43,6 +44,7 @@ func _tudo() -> void:
 	_cards_com_o_sol_em_seguranca()
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
+	await _card_do_aviso_cabe()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -826,6 +828,54 @@ func _cards_ao_lado_do_controle() -> void:
 		_igual(t.card_id, "", "%s: a fila acabou" % loc)
 		root.remove_child(t)
 		t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## O card do aviso: o texto, a frase do DONKI (do dado atual e do histórico) e o rodapé não se sobrepõem, e o
+## card inteiro cabe na tela do terminal, nos dois idiomas.
+func _card_do_aviso_cabe() -> void:
+	var idioma := TranslationServer.get_locale()
+	var real := DadosDonki.carregar()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for historico in [true, false]:
+			var dado := real.duplicate()
+			dado["historico"] = historico
+			var rotulo := "%s, %s" % [loc, "histórico" if historico else "atual"]
+			var m := Missao.new(1)
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, dado)
+			root.add_child(t)
+			await process_frame
+			await process_frame
+			_igual(t.card_id, "aviso", "%s: o aviso abre" % rotulo)
+			var larg: float = Terminal.CARD.size.x - 28.0
+			var aviso: Array = []
+			var donki_linha: Array = []
+			var rodape: Array = []
+			for linha in t.textos():
+				if linha[0] == t.tr("AVISO_TEMPESTADE"):
+					aviso = linha
+				elif linha[0].begins_with("DONKI") or linha[0].begins_with("O DONKI") or linha[0].begins_with("19 "):
+					if linha[3] == 12:
+						donki_linha = linha
+				elif linha[0].begins_with(t.tr("ENVIADO_DA_TERRA").substr(0, 8)):
+					rodape = linha
+			_verdade(not aviso.is_empty() and not donki_linha.is_empty() and not rodape.is_empty(), "%s: as três partes foram desenhadas" % rotulo)
+			if aviso.is_empty() or donki_linha.is_empty() or rodape.is_empty():
+				root.remove_child(t)
+				t.free()
+				continue
+			var fim_aviso: float = aviso[2] + Desenho.altura_texto(aviso[0], 14, larg, true)
+			var fim_donki: float = donki_linha[2] + Desenho.altura_texto(donki_linha[0], 12, larg)
+			_verdade(fim_aviso <= donki_linha[2], "%s: o aviso acaba antes da frase do DONKI (%d <= %d)" % [rotulo, fim_aviso, donki_linha[2]])
+			_verdade(fim_donki <= rodape[2], "%s: a frase do DONKI acaba antes do rodapé (%d <= %d)" % [rotulo, fim_donki, rodape[2]])
+			var fechar: Array = t.ui()["fechar_card"]
+			_verdade(fechar[1] >= fim_donki - 2.0 or fechar[0] > aviso[1] + larg - 10.0, "%s: o Fechar não pisa no texto" % rotulo)
+			_verdade(fechar[1] + fechar[3] + 12 <= 314, "%s: o card cabe na tela do terminal (base do Fechar em %d)" % [rotulo, fechar[1] + fechar[3]])
+			root.remove_child(t)
+			t.free()
 	TranslationServer.set_locale(idioma)
 
 

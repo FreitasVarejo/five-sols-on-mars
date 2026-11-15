@@ -957,16 +957,20 @@ func _desenhar_card(alvo: Rect2) -> void:
 
 ## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação.
 func _desenhar_card_aviso() -> void:
-	var r := CARD
+	var larg := CARD.size.x - 28
+	var frase_donki := tr("DONKI_FRASE_HISTORICO") if donki.get("historico", true) \
+		else tr("DONKI_FRASE_ATUAL") % DadosDonki.data_br(_chegada_mais_recente())
+	# O texto do aviso e a frase do DONKI mandam na altura: o card cresce (centrado) se não couberem entre o
+	# alto e o rodapé, que fica a 12 + 28 px da base.
+	var h_aviso := Desenho.altura_texto(tr("AVISO_TEMPESTADE"), 14, larg, true)
+	var h_donki := Desenho.altura_texto(frase_donki, 12, larg)
+	var altura := maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_donki + 10.0 + 28.0 + 12.0)
+	var r := Rect2(CARD.position.x, CARD.position.y - (altura - CARD.size.y) / 2.0, CARD.size.x, altura)
 	draw_rect(r, Desenho.AZUL)
 	var x := r.position.x + 14
-	var larg := r.size.x - 28
 	var y := r.position.y + 12
 	y += _t(tr("AVISO_TEMPESTADE"), x, y, 14, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	if donki.get("historico", true):
-		_t(tr("DONKI_FRASE_HISTORICO"), x, y, 12, Desenho.TEXTO_ESCURO, larg)
-	else:
-		_t(tr("DONKI_FRASE_ATUAL") % DadosDonki.data_br(_chegada_mais_recente()), x, y, 12, Desenho.TEXTO_ESCURO, larg)
+	_t(frase_donki, x, y, 12, Desenho.TEXTO_ESCURO, larg)
 	var rodape := r.end.y - 12 - 28
 	var larg_rodape := larg - 134
 	Desenho.icone(self, "terra", Rect2(x, rodape + 1, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)

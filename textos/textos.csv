@@ -8,7 +8,7 @@ MEDIDOR,Radiation,Radiação
 CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
 SOL_N,Sol %d,Sol %d
-AVISO_TEMPESTADE,"The Sun is active this week. A new explosion could send fast particles in the next sols. When the meter goes up, go to the shelter.","O Sol está agitado nesta semana. Uma explosão nova pode mandar partículas rápidas nos próximos sóis. Quando o medidor subir, vá para o abrigo."
+AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in minutes. Watch the radiation meter. If it goes up, go to the shelter.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em minutos. Fique de olho no medidor de radiação. Se ele subir, vá para o abrigo."
 DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
 ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
@@ -94,7 +94,7 @@ MODOS_SEGURANCA,Safe modes,Modos de segurança
 DE_VERDADE,What really happened,O que aconteceu de verdade
 DE_VERDADE_DATA,May 2024,Maio de 2024
 DE_VERDADE_TEXTO,"In May 2024, NASA's forecast (DONKI) showed a week of solar storms heading to Mars. On 20 May, a huge explosion on the Sun launched fast particles that reached Mars in tens of minutes. Curiosity measured its biggest jump in radiation since landing.","Em maio de 2024, a previsão da NASA (DONKI) mostrou uma semana de tempestades solares a caminho de Marte. Em 20 de maio, uma explosão enorme no Sol lançou partículas rápidas, que chegaram a Marte em dezenas de minutos. O Curiosity mediu o maior salto de radiação desde o pouso."
-JOGAR_DE_NOVO,Play again,Jogar de novo
+JOGAR_DE_NOVO,Free play,Modo livre
 ABA_CAMERAS,Cameras,Câmeras
 ABA_TAREFAS,Tasks,Tarefas
 ABA_DIARIO,Log,Diário
@@ -175,3 +175,4 @@ SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"
 SOL1_CARD_TURNO,Your tasks are in the Terminal. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Terminal. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
 CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
 CARD_GERADOR,The oxygen machine broke! Fix it in the Terminal.,A máquina de oxigênio quebrou! Conserte no Terminal.
+RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.
