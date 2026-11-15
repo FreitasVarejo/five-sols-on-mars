@@ -45,8 +45,10 @@ var _tocador: AudioStreamPlayer
 var _playback: AudioStreamPlaybackPolyphonic
 
 
-## Cria o barramento SFX se ainda não existe (é seguro chamar de novo) e aplica o volume geral.
-## Devolve o índice do barramento.
+## Aplica o volume geral ao barramento SFX e devolve o índice dele. O barramento vem do
+## default_bus_layout.tres: criado só em tempo de execução, o Web (modo sample) perde o caminho até a
+## saída e fica mudo. A criação aqui é só a rede de segurança dos testes. Todo play_stream passa o
+## barramento na chamada (ver tocar()).
 static func garantir_barramento() -> int:
 	var i := AudioServer.get_bus_index(BARRAMENTO)
 	if i == -1:
@@ -103,7 +105,8 @@ func tocar(nome: String) -> void:
 	if historico.size() > MAX_HISTORICO:
 		historico.pop_front()
 	if _playback != null:
-		_playback.play_stream(SONS[nome])
+		# O barramento vai na chamada: no Web (modo sample) o som ignora o barramento do player e iria ao Master.
+		_playback.play_stream(SONS[nome], 0.0, 0.0, 1.0, AudioServer.PLAYBACK_TYPE_DEFAULT, BARRAMENTO)
 
 
 ## O clique da ação, se ela faz som.

@@ -26,7 +26,8 @@ func _igual(obtido, esperado, nome: String) -> void:
 
 
 func _barramento() -> void:
-	_igual(AudioServer.get_bus_index(Som.BARRAMENTO), -1, "sem o barramento antes")
+	# O barramento vem do default_bus_layout.tres: criado só em tempo de execução, o Web fica mudo.
+	_igual(AudioServer.get_bus_index(Som.BARRAMENTO), 1, "o barramento já vem do layout do projeto")
 	var i := Som.garantir_barramento()
 	_igual(AudioServer.get_bus_name(i), "SFX", "nome do barramento")
 	_igual(AudioServer.get_bus_send(i), &"Master", "envia ao Master")

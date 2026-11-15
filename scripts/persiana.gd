@@ -125,8 +125,9 @@ func laminas() -> int:
 
 
 func _tocar_batida() -> void:
-	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_DB + VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX))
+	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_DB + VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX),
+		AudioServer.PLAYBACK_TYPE_DEFAULT, Som.BARRAMENTO)
 
 
 func _tocar_destaque(som: AudioStream) -> void:
-	_som.play_stream(som, 0.0, VOLUME_DB)
+	_som.play_stream(som, 0.0, VOLUME_DB, 1.0, AudioServer.PLAYBACK_TYPE_DEFAULT, Som.BARRAMENTO)
