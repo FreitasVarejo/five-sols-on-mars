@@ -103,10 +103,14 @@ func _tudo() -> void:
 	await _esperar_terminal()
 	_igual(_main._terminal.tapa_a_sala(), false, "terminal abaixado de novo")
 
-	# O clique encerra o sol e toca o clique de confirmar.
+	# Na primeira vez o clique abre o card da Terra (test_card_confirmacao.gd cobre o card); confirmar encerra o
+	# sol e toca o clique de confirmar.
 	var tocados: int = _main._som.historico.size()
 	_main._ao_clicar("porta")
-	_igual(_main._missao.acelerado, true, "a porta encerra o sol")
+	_igual(_main._terminal.card_id, "confirmacao", "a primeira vez abre o card de confirmação")
+	_igual(_main._missao.acelerado, false, "com o card aberto o sol ainda não encerrou")
+	_main._terminal._acionar("card_confirmar")
+	_igual(_main._missao.acelerado, true, "confirmar encerra o sol")
 	_igual(_main._som.historico.slice(tocados), ["clique_confirmar"], "a porta toca o clique de confirmar")
 	_igual(_main._missao.pode_encerrar_sol(), false, "acelerado: não encerra de novo")
 	_igual(_main._clicavel("porta"), false, "acelerado: a porta deixa de se clicar")

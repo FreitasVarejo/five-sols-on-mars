@@ -127,6 +127,7 @@ func _ready() -> void:
 	_terminal.iniciar(_missao, _donki)
 	_terminal.desenhou.connect(_sonda_se_mudou)
 	_terminal.pediu_abrigo.connect(_virar_para_abrigo)
+	_terminal.zonas_a_evitar = _zonas_das_barras
 
 	var tamanho := _panorama.texture.get_size()
 	_panorama.size = tamanho
@@ -364,6 +365,23 @@ func _pode_iniciar(tarefa: String) -> bool:
 	return _missao.tarefas.get(tarefa, "") == "pendente" and not _missao.abrigado and _missao.tarefa_rodando == ""
 
 
+## Onde, na tela, estão agora as telas das barras (energia, oxigênio e a da radiação, com o medidor): o que um card
+## sobre a sala não pode cobrir. O retângulo que contém os quatro cantos de cada uma, como a sala as mostra.
+func _zonas_das_barras() -> Array:
+	var zonas: Array = []
+	for nome: String in ["energia", "oxigenio", "radiacao"]:
+		var r: Rect2 = _regioes_telas[nome]
+		var a := _panorama_para_tela(r.position)
+		var b := _panorama_para_tela(r.end)
+		var c := _panorama_para_tela(Vector2(r.position.x, r.end.y))
+		var d := _panorama_para_tela(Vector2(r.end.x, r.position.y))
+		var caixa := Rect2(a, Vector2.ZERO)
+		for q: Vector2 in [b, c, d]:
+			caixa = caixa.expand(q)
+		zonas.append(caixa)
+	return zonas
+
+
 ## A linha do abrigo foi tocada no terminal (já descendo): a sala vira até o botão do abrigo ficar à vista.
 ## Não abriga: abrigar é o toque no botão.
 func _virar_para_abrigo() -> void:
@@ -594,7 +612,11 @@ func _ao_clicar(nome: String) -> void:
 		"glovebox":
 			fez = _terminal.abrir_na_estacao("amostra")
 		"porta":
-			fez = _missao.encerrar_sol()
+			# Na primeira vez abre o card da Terra e a ação espera a confirmação (o terminal toca o clique dela).
+			if _missao.pode_encerrar_sol() and _terminal.pedir_confirmacao("dormir", func() -> void: _missao.encerrar_sol()):
+				pass
+			else:
+				fez = _missao.encerrar_sol()
 	if fez:
 		_som.clique(nome)
 	_sonda_teste()

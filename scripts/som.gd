@@ -36,6 +36,7 @@ const CLIQUE_DA_ACAO := {
 	"jogar_de_novo": "clique_confirmar", "estufa": "clique_confirmar", "glovebox": "clique_confirmar",
 	"abrigo": "clique_abrigo", "ir_ao_abrigo": "clique_navegar", "ir_chemcam": "clique_navegar", "ir_gerador": "clique_navegar",
 	"porta": "clique_confirmar",
+	"card_confirmar": "clique_confirmar", "card_cancelar": "clique_navegar",
 }
 
 ## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.

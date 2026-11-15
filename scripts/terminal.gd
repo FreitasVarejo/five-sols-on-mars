@@ -36,6 +36,11 @@ extends Control
 ## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
 ##
 ## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
+## Card da primeira vez com confirmação (pedir_confirmacao): na primeira vez que a criança toca uma ação da
+## sala no turno, abre um card azul embaixo, como o do primeiro turno, com "o que a ação faz" e dois botões;
+## a ação só roda se ela confirmar. O relógio fica parado e a sala não se clica enquanto ele está aberto. Vale
+## uma vez por carregamento da página, por ação: a flag mora em `_vistos`, que a missão não toca (o reinício
+## do sol restaura a missão, não o terminal).
 ## A aba câmeras é o visor (scripts/cameras/visor_cameras.gd), filho deste nó, por cima da aba. Ele só
 ## aparece com a aba na tela, o terminal parado no alto, sem card e sem escurecer. Escolher a câmera de
 ## uma tarefa de POR_PECA (missao.gd) pendente começa a tarefa e põe a peça dela (ChemCam, gerador) na
@@ -113,6 +118,11 @@ const CARD_X_ESQUERDA := 98.0
 # (nas bordas, de y 120 a 240).
 const CARD_TURNO_LARGURA := 340.0
 const CARD_TURNO_FUNDO := 322.0
+# O card de confirmação é mais estreito e escolhe o x: nunca cobre as telas das barras nem o medidor (zonas_a_evitar),
+# entre as setas (que ficam nas bordas, de x 0 a 48 e de 592 a 640).
+const CARD_CONF_LARGURA := 300.0
+const CARD_CONF_X_MIN := 52.0
+const CARD_CONF_X_MAX := 588.0
 
 # Tela cheia (relatório).
 const X_ESQ := 14.0
@@ -146,6 +156,10 @@ var fase_ui := "plano"      # a fase que a sala vê (atrasa o fim do turno, por 
 var aba := ""               # "" = a tela própria da fase; ou "cameras", "tarefas", "diario", "fontes"
 var card_id := ""           # o card da Terra na tela agora ("" = nenhum): "aviso" ou um de CARD_TEXTO
 var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
+## As zonas da tela (Rect2, px da tela de 640x360) que o card de confirmação não pode cobrir: as barras e o medidor,
+## como a sala os mostra agora (a main as liga). Sem ela, o card fica no centro.
+var zonas_a_evitar := Callable()
+var rect_do_card_confirmacao := Rect2()  # onde o último quadro desenhou o card de confirmação (a sonda e os testes leem)
 
 var _fase_logica := "plano"
 var _modos_vistos := 0      # quantas entradas no modo de segurança o terminal já viu (cada uma toca o desligar)
@@ -164,6 +178,8 @@ var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
 var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
+var _confirma_id := ""      # a ação do card de confirmação aberto ("" = nenhum); card_id é "confirmacao"
+var _confirma_acao := Callable()  # o que roda se a criança confirmar
 var _visor: VisorCameras    # o corpo da aba câmeras
 var _visor_chave := ""      # "sol|poeira" da última configuração do visor
 var _visor_pend := {}       # as últimas pendências enviadas ao visor
@@ -362,17 +378,22 @@ var card_aberto: bool:
 
 ## O card da tela está à vista? Os do plano, com o terminal no alto; o do primeiro turno, com ele embaixo.
 func _card_visivel() -> bool:
-	if card_id == "turno":
+	if _card_sobre_a_sala():
 		return _pos <= 0.0
 	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
 
 
+## O card da tela é dos que ficam sobre a sala, com o terminal embaixo (o do primeiro turno e o de confirmação)?
+func _card_sobre_a_sala() -> bool:
+	return card_id == "turno" or card_id == "confirmacao"
+
+
 ## O relógio do turno espera? Do "Confirmar plano" do sol 1 da missão fixa até o card do primeiro turno fechar
-## (uma vez por sessão). A main não avança a missão enquanto isto vale.
+## (uma vez por sessão), e enquanto um card de confirmação está aberto. A main não avança a missão enquanto isto vale.
 func segura_o_relogio() -> bool:
 	if missao == null:
 		return false
-	if _segura_turno:
+	if _segura_turno or card_id == "confirmacao":
 		return true
 	# Já no quadro em que a missão entrou no turno, antes de o terminal ver a troca de fase.
 	return missao.fase == "turno" and _fase_logica != "turno" and _tem_card_de_turno()
@@ -393,6 +414,8 @@ func _mostrar_na_tela(f: String) -> void:
 	_fase_tela = f
 	aba = ""
 	_zerar_rolagem()
+	_confirma_id = ""
+	_confirma_acao = Callable()
 	_fila = _cards_do_plano() if f == "plano" else []
 	card_id = ""
 	_abrir_proximo()
@@ -425,6 +448,35 @@ func _abrir_proximo() -> void:
 		return
 	card_id = _fila.pop_front()
 	_vistos[card_id] = true
+
+
+## Pede a confirmação da primeira vez de uma ação da sala, para quem chama (a main). `id` nomeia a ação e os
+## textos do card: CONFIRMA_<ID> (o que a ação faz), CONFIRMA_<ID>_SIM e CONFIRMA_<ID>_NAO (os botões), em
+## textos/textos.csv. `ao_confirmar` é o que a ação faz; roda só se a criança confirmar.
+## Devolve true se o card abriu (quem chama não age: a ação espera a confirmação) e false se a criança já viu o
+## card dessa ação neste carregamento da página (quem chama age direto). Confirmar ou cancelar conta como visto.
+## Só abre com o terminal embaixo e sem outro card; senão devolve true sem abrir (a ação não roda).
+func pedir_confirmacao(id: String, ao_confirmar: Callable) -> bool:
+	var chave := "confirmacao_" + id
+	if _vistos.has(chave):
+		return false
+	if aberto or _pos > 0.0 or card_aberto:
+		return true
+	_vistos[chave] = true
+	_confirma_id = id
+	_confirma_acao = ao_confirmar
+	card_id = "confirmacao"
+	queue_redraw()
+	return true
+
+
+## Fecha o card de confirmação e devolve o que ele guardava para rodar (vazio se não havia).
+func _fechar_confirmacao() -> Callable:
+	var acao := _confirma_acao
+	_confirma_id = ""
+	_confirma_acao = Callable()
+	card_id = ""
+	return acao
 
 
 ## Muda o alvo do terminal (sobe ou desce) e toca o som do começo do movimento. Se `valor` já é o
@@ -553,7 +605,7 @@ func _botao_em(p: Vector2) -> String:
 ## Faz a ação `nome` e, se ela aconteceu de fato, toca o clique do peso dela (som.gd). O botão TERMINAL
 ## não faz clique: tem o som de subir e descer.
 func _acionar(nome: String) -> void:
-	if card_aberto and nome != "fechar_card":
+	if card_aberto and nome != "fechar_card" and not (card_id == "confirmacao" and nome in ["card_confirmar", "card_cancelar"]):
 		return
 	var fez := true
 	match nome:
@@ -563,6 +615,12 @@ func _acionar(nome: String) -> void:
 			_abrir_proximo()
 			if card_id == "":
 				_segura_turno = false
+		"card_confirmar":
+			var acao := _fechar_confirmacao()
+			if acao.is_valid():
+				acao.call()
+		"card_cancelar":
+			_fechar_confirmacao()
 		"voltar_plano":
 			aba = ""
 			_zerar_rolagem()
@@ -867,7 +925,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
 		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
-		if card and card_id != "turno":
+		if card and not _card_sobre_a_sala():
 			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica. O card ao lado
 			# de um controle deixa esse controle claro, com contorno.
 			var alvo := _alvo_do_card()
@@ -882,6 +940,9 @@ func _draw() -> void:
 	if card and card_id == "turno":
 		_travado = false
 		_desenhar_card_turno()
+	elif card and card_id == "confirmacao":
+		_travado = false
+		_desenhar_card_confirmacao()
 	if alerta_sobre_o_terminal():
 		_desenhar_alerta()
 	if _fade > 0.0:
@@ -1307,6 +1368,57 @@ func _desenhar_card_turno() -> void:
 	for frase: String in frases:
 		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
 	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
+
+
+## O card de confirmação da primeira vez, sobre a sala, no lugar do card do primeiro turno (embaixo, longe do
+## medidor e das setas): o que a ação faz, o rótulo de procedimento gravado (no lugar do "há N min") e dois botões,
+## cancelar à esquerda e confirmar à direita. Confirmar é o verde de sempre; cancelar também é botão (todo botão é verde).
+func _desenhar_card_confirmacao() -> void:
+	var chave := "CONFIRMA_" + _confirma_id.to_upper()
+	var larg := CARD_CONF_LARGURA - 24.0
+	var frases := Abertura.frases(tr(chave))
+	var altura_texto := 0.0
+	for frase: String in frases:
+		altura_texto += Desenho.altura_texto(frase, CARD_TAM, larg, true) + 4.0
+	var altura := 12.0 + altura_texto + 4.0 + 14.0 + 10.0 + 36.0 + 12.0
+	var y0 := CARD_TURNO_FUNDO - altura
+	var r := Rect2(_x_do_card_confirmacao(y0, altura), y0, CARD_CONF_LARGURA, altura)
+	rect_do_card_confirmacao = r
+	draw_rect(r, Desenho.AZUL)
+	var x := r.position.x + 12.0
+	var yy := r.position.y + 12.0
+	for frase: String in frases:
+		yy += _t(frase, x, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	yy += 4.0
+	Desenho.icone(self, "terra", Rect2(x, yy + 1.0, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
+	_t(tr("ENVIADO_PACOTE_DA_MANHA"), x + 16.0, yy, 11, Desenho.TEXTO_ESCURO, larg - 16.0)
+	var y_botoes := r.end.y - 12.0 - 36.0
+	_botao("card_confirmar", Rect2(r.end.x - 12.0 - 110.0, y_botoes, 110, 36), tr(chave + "_SIM"), "", true, 13)
+	_botao("card_cancelar", Rect2(r.end.x - 12.0 - 110.0 - 8.0 - 110.0, y_botoes, 110, 36), tr(chave + "_NAO"), "", true, 13)
+
+
+## O x do card de confirmação: o mais perto do centro em que ele não cobre nenhuma zona de zonas_a_evitar (com 4 px
+## de folga). Se nenhum serve, o centro.
+func _x_do_card_confirmacao(y: float, altura: float) -> float:
+	var centro := roundf((640.0 - CARD_CONF_LARGURA) / 2.0)
+	if not zonas_a_evitar.is_valid():
+		return centro
+	var zonas: Array = zonas_a_evitar.call()
+	var melhor := centro
+	var achou := false
+	var x := CARD_CONF_X_MIN
+	while x + CARD_CONF_LARGURA <= CARD_CONF_X_MAX:
+		var r := Rect2(x, y, CARD_CONF_LARGURA, altura).grow(4.0)
+		var livre := true
+		for z: Rect2 in zonas:
+			if r.intersects(z):
+				livre = false
+				break
+		if livre and (not achou or absf(x - centro) < absf(melhor - centro)):
+			melhor = x
+			achou = true
+		x += 4.0
+	return melhor
 
 
 # --- aba câmeras -----------------------------------------------------------------

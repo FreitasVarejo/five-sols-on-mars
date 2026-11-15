@@ -193,3 +193,7 @@ SOL1_CARD_TURNO,Your tasks are in the Terminal. Shelter and bedroom are on the l
 CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
 CARD_GERADOR,"The generator broke! In the Terminal, press Cameras, then MOXIE.","O gerador quebrou! No Terminal, aperte Câmeras e depois MOXIE."
 RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.
+ENVIADO_PACOTE_DA_MANHA,Sent from Earth in the morning packet,Enviado da Terra no pacote da manhã
+CONFIRMA_DORMIR,Going to sleep ends the sol. The rest of the sol passes fast. Nothing is lost.,Ir dormir encerra o sol. O resto do sol passa rápido. Nada se perde.
+CONFIRMA_DORMIR_SIM,Sleep,Dormir
+CONFIRMA_DORMIR_NAO,Not yet,Ainda não
