@@ -1,7 +1,8 @@
 extends SceneTree
 ## Teste headless da planta na cena principal (main.tscn): tocar na estufa na sala começa a tarefa e sobe o
-## terminal já na aba câmeras com a peça à vista; os toques nos botões (pelo viewport) levam luz e água à
-## faixa; a peça conclui a tarefa (não o relógio); a barra da estação segue a peça.
+## terminal já na aba câmeras com a peça à vista, com o problema do sol da missão; os toques nos botões (pelo
+## viewport) acendem a luz e usam a ferramenta certa pelo `problema` da sonda; a peça conclui a tarefa (não o
+## relógio); a barra da estação segue a peça.
 ## Roda com: godot --headless --path . --script tests/test_planta_na_main.gd
 ## Sai com código 1 se algo falhar e imprime cada falha.
 
@@ -60,11 +61,28 @@ func _centro(r: Array) -> Vector2:
 	return Vector2(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0)
 
 
-## Toca no botão `nome` ("luz_mais", "agua_menos"...) da peça à vista, pelo viewport.
+## Toca no botão `nome` ("luz", "regador", "ventilador" ou "tesoura") da peça à vista, pelo viewport.
 func _tocar(nome: String) -> void:
 	var c := _centro(_main._terminal.minigame()["botoes"][nome])
 	root.push_input(_botao(c, true), true)
 	root.push_input(_botao(c, false), true)
+
+
+## A ferramenta certa agora, pela sonda: com mofo a tesoura, depois o ventilador (umidade acima de 0) ou o regador.
+func _certa(mg: Dictionary) -> String:
+	if mg["mofo"] > 0:
+		return "tesoura"
+	return "ventilador" if mg["umidade"] > 0 else "regador"
+
+
+## Os toques de um acerto pelo viewport: a luz e a ferramenta certa até a planta crescer.
+func _curar_pelo_viewport(peca) -> void:
+	if not peca.luz_acesa():
+		_tocar("luz")
+	var guarda := 0
+	while not peca.ocupada() and guarda < 8:
+		_tocar(_certa(_main._terminal.minigame()))
+		guarda += 1
 
 
 func _tudo() -> void:
@@ -118,23 +136,33 @@ func _tudo() -> void:
 	_verdade(is_instance_valid(t._visor.peca("estufa")), "a peça segue hospedada")
 	_igual(_main._terminal.progresso_da_tarefa("planta"), 0.0, "a barra segue a peça (0 até a planta crescer)")
 
-	# Os toques pelo viewport levam luz e água à faixa; a peça conclui.
-	var luz: int = mg["luz"]
-	var agua: int = mg["agua"]
-	var guarda := 0
-	while not peca.na_faixa(0) and guarda < 20:
-		_tocar("luz_mais" if peca.nivel(0) < Planta.FAIXA_DE else "luz_menos")
-		guarda += 1
-	_verdade(peca.na_faixa(0), "a luz entrou na faixa por toques (partiu de %d)" % luz)
-	_igual(m.tarefas["planta"], "rodando", "só a luz na faixa: a tarefa segue")
-	guarda = 0
-	while not peca.na_faixa(1) and guarda < 20:
-		_tocar("agua_mais" if peca.nivel(1) < Planta.FAIXA_DE else "agua_menos")
-		guarda += 1
-	_verdade(peca.na_faixa(1), "a água entrou na faixa por toques (partiu de %d)" % agua)
-	_igual(m.tarefas["planta"], "rodando", "os dois na faixa: a planta ainda cresce")
-	peca.avancar(Planta.T_CRESCER + 0.1)
+	# O problema da peça é o da missão: o sol 2 da missão fixa é a encharcada.
+	_igual(mg["problema"], "encharcada", "o sol 2 da fixa: a planta é a encharcada")
+	_igual(mg["problema"], m.problema_da_planta(), "o problema da peça é o da missão")
+	_igual(peca.problema(), "encharcada", "a peça hospedada tem o problema da missão")
+	_igual([mg["umidade"], mg["mofo"], mg["luz_acesa"]], [1, 0, false], "a peça abre sob a luz rosa")
+	for nome in ["luz", "regador", "ventilador", "tesoura"]:
+		_verdade(mg["botoes"][nome][2] >= 24 and mg["botoes"][nome][3] >= 24, "o botão %s tem ao menos 24 px na área real" % nome)
+	_igual(mg["botoes"]["luz"][2], 50, "na área real o botão da luz tem 50 px")
+
+	# Toques pelo viewport: a ferramenta antes da luz é ignorada; a luz acende; um erro piora e se desfaz.
+	_tocar("ventilador")
+	_igual(t.minigame()["umidade"], 1, "a ferramenta antes da luz é ignorada")
+	_tocar("luz")
+	_verdade(t.minigame()["luz_acesa"], "o toque na luz acende")
+	_tocar("regador")
+	_igual(t.minigame()["umidade"], 2, "o regador a mais piora (+2)")
+	_igual(m.tarefas["planta"], "rodando", "o erro não termina a tarefa")
+	_igual(peca.progresso(), 0.0, "e o progresso segue 0")
+	_curar_pelo_viewport(peca)
+	_verdade(peca.ocupada(), "a planta curou e cresce")
+	_igual(m.tarefas["planta"], "rodando", "a planta ainda cresce: a tarefa só acaba quando o crescimento termina")
+	peca.avancar(Planta.T_ATRASO_CRESCER + Planta.T_CRESCER + 0.1)
 	_igual(m.tarefas["planta"], "feita", "a peça conclui a tarefa")
+	var historico: Array = _main._som.historico
+	_verdade("estufa_luz" in historico and "estufa_regar" in historico and "estufa_ventilar" in historico, "a peça toca os sons da luz e das ferramentas")
+	_verdade("estufa_piorou" in historico, "o erro tocou o som de pior, mesmo com o toque seguinte logo depois")
+	_verdade("estufa_ploc" in historico, "o acerto final toca o ploc")
 	await _quadros(3)
 	_igual(t._visor.peca("estufa"), null, "a peça sai")
 	_igual(t._visor.vista_atual(), t._visor.camera_atual(), "a vista volta à câmera atual")
@@ -165,6 +193,11 @@ func _tudo() -> void:
 	_igual(m.tarefas["planta"], "rodando", "tocar na estufa inicia a planta")
 	var peca2 = t._visor.peca("estufa")
 	_verdade(peca2 != null, "a peça está na estufa")
+	_igual(t.minigame()["problema"], "mofo", "o sol 3 da fixa: a planta é o mofo")
+	_igual(peca2.problema(), m.problema_da_planta(), "o problema da peça é o da missão")
+	_tocar("luz")
+	_tocar("tesoura")
+	_igual(t.minigame()["mofo"], 0, "a tesoura corta o mofo, pelo viewport")
 
 	# Terminal abaixado no meio: a tarefa segue rodando e tocar na estufa de novo retoma a mesma peça.
 	t._acionar("terminal")
@@ -177,6 +210,7 @@ func _tudo() -> void:
 	_igual(t.aberto, true, "tocar a estufa sobe o terminal de novo")
 	_igual(t.aba_na_tela(), "cameras", "na aba câmeras")
 	_verdade(t._visor.peca("estufa") == peca2, "é a mesma peça, sem recriar")
+	_igual([t.minigame()["luz_acesa"], t.minigame()["mofo"]], [true, 0], "com o estado de antes: a luz acesa e o mofo cortado")
 	_igual(t.minigame().get("tipo", ""), "planta", "e está à vista")
 
 	_main.queue_free()

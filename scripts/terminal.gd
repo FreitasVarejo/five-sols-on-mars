@@ -269,6 +269,7 @@ func ui() -> Dictionary:
 ## O que a peça (minigame) à vista oferece, em px da tela, para o teste no navegador (a sonda de main.gd).
 ## Vazio sem peça visível. ChemCam: "alvos" (o centro de cada alvo pendente) e "raio". Gerador: "pecas" (o
 ## retângulo de cada peça na bandeja), "certa" (o índice da peça que encaixa), "formas" e "encaixe" (o centro).
+## Planta: "botoes" (luz, regador, ventilador e tesoura, em [x, y, w, h]), "problema", "umidade", "mofo" e "luz_acesa".
 func minigame() -> Dictionary:
 	if _visor == null or not _visor.visible:
 		return {}
@@ -294,14 +295,17 @@ func minigame() -> Dictionary:
 		var e: Vector2 = m * p.centro_do_encaixe()
 		return {"tipo": "gerador", "pecas": pecas, "certa": sorteio["certa"], "formas": sorteio["formas"],
 			"encaixe": [roundi(e.x), roundi(e.y)], "progresso": p.progresso()}
-	if p.has_method("retangulo_do_botao"):
+	if p.has_method("retangulo_da_luz"):
 		var botoes := {}
-		for c in 2:
-			for mais in [false, true]:
-				var rb: Rect2 = p.retangulo_do_botao(c, mais)
-				var ob: Vector2 = m * rb.position
-				botoes["%s_%s" % [["luz", "agua"][c], "mais" if mais else "menos"]] = [roundi(ob.x), roundi(ob.y), roundi(rb.size.x), roundi(rb.size.y)]
-		return {"tipo": "planta", "botoes": botoes, "luz": p.nivel(0), "agua": p.nivel(1), "progresso": p.progresso()}
+		var rl: Rect2 = p.retangulo_da_luz()
+		var ol: Vector2 = m * rl.position
+		botoes["luz"] = [roundi(ol.x), roundi(ol.y), roundi(rl.size.x), roundi(rl.size.y)]
+		for nome: String in p.FERRAMENTAS:
+			var rb: Rect2 = p.retangulo_da_ferramenta(nome)
+			var ob: Vector2 = m * rb.position
+			botoes[nome] = [roundi(ob.x), roundi(ob.y), roundi(rb.size.x), roundi(rb.size.y)]
+		return {"tipo": "planta", "botoes": botoes, "problema": p.problema(), "umidade": p.umidade(), "mofo": p.mofo(),
+			"luz_acesa": p.luz_acesa(), "progresso": p.progresso()}
 	if p.has_method("alvo_do_passo"):
 		var a: Rect2 = p.alvo_do_passo()
 		var o: Vector2 = m * a.position
@@ -812,8 +816,13 @@ func _ao_escolher_camera(cam: String) -> void:
 
 func _hospedar_peca(tarefa: String) -> void:
 	var peca: Control = PECAS[tarefa].new()
-	if peca.has_method("semente"):
+	if tarefa == "planta":
+		# O problema da estufa é o do sol na missão (fixo na fixa, sorteado e fixo no freeplay): o `modos` não entra.
+		peca.definir_problema(missao.problema_da_planta())
+	elif peca.has_method("semente"):
 		peca.semente(missao.sol * 100 + missao.modos)  # muda a cada conserto e segue determinística
+	if "som" in peca:
+		peca.som = som
 	peca.concluido.connect(_ao_concluir_peca.bind(tarefa))
 	_visor.hospedar(_lugar_da_peca(tarefa), peca)
 
