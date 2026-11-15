@@ -230,6 +230,13 @@ func _process(delta: float) -> void:
 		_dir_pressionada = false
 	_seta_esq.visible = not tapa
 	_seta_dir.visible = not tapa
+	# No limite do pan a seta daquele lado desabilita: verde é só no que se clica.
+	_seta_esq.disabled = _pan <= 0.0
+	_seta_dir.disabled = _pan >= _alcance()
+	if _seta_esq.disabled:
+		_esq_pressionada = false
+	if _seta_dir.disabled:
+		_dir_pressionada = false
 
 	var velocidade := 0.0
 	if not tapa:
@@ -520,7 +527,7 @@ func _ui_da_tela() -> Dictionary:
 			if r.size.x >= 4.0 and r.size.y >= 4.0:
 				ui[nome] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
 	for par in [["seta_esq", _seta_esq], ["seta_dir", _seta_dir]]:
-		if par[1].is_visible_in_tree():
+		if par[1].is_visible_in_tree() and not par[1].disabled:
 			var r: Rect2 = par[1].get_global_rect()
 			ui[par[0]] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
 	return ui
