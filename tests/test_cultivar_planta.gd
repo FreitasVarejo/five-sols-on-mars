@@ -7,7 +7,8 @@ const Planta := preload("res://scripts/minigames/cultivar_planta.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const Som := preload("res://scripts/som.gd")
 
-const AREAS := [Rect2(0, 0, 640, 360), Rect2(40, 30, 368, 207), Rect2(0, 0, 320, 180)]
+# Paisagem (o visor do terminal e os testes) e o retrato do vão da estufa na vista de perto (242x306, regioes.json).
+const AREAS := [Rect2(0, 0, 640, 360), Rect2(40, 30, 368, 207), Rect2(0, 0, 320, 180), Rect2(199, 42, 242, 306)]
 ## O caminho certo de cada problema (o mofo tem dois, em qualquer ordem).
 const CERTO := {"seca": [["regador"]], "encharcada": [["ventilador"]],
 	"mofo": [["tesoura", "ventilador"], ["ventilador", "tesoura"]]}
@@ -47,6 +48,7 @@ func _tudo() -> void:
 	for area in AREAS:
 		_toque_pelo_ponteiro(area)
 		_botoes_grandes(area)
+	_retrato()
 	_reinicio()
 	_cabe_em_dez_segundos()
 	_sons()
@@ -425,6 +427,51 @@ func _botoes_grandes(area: Rect2) -> void:
 			_igual(p.retangulo_da_ferramenta(f).size, Vector2(50, 50), "área real: o botão %s tem 50 px" % f)
 	_verdade(p.retangulo_da_camara().size.x >= 100.0 and p.retangulo_da_camara().size.y >= 100.0, "%s: a câmara tem tamanho para a planta" % nome_area)
 	p.free()
+
+
+## O layout em retrato (size.y > size.x), o do vão da estufa na vista de perto: a câmara em cima, na largura útil,
+## e os quatro botões numa fileira embaixo. A paisagem não muda (50 px por botão na área real, conferido acima).
+func _retrato() -> void:
+	for area: Rect2 in [Rect2(199, 42, 242, 306), Rect2(0, 0, 250, 300), Rect2(10, 20, 260, 340)]:
+		var nome_area := "retrato %dx%d" % [area.size.x, area.size.y]
+		var p := _nova("seca", area)
+		var tela := Rect2(Vector2.ZERO, area.size)
+		var cam: Rect2 = p.retangulo_da_camara()
+		var todos: Array = [["luz", p.retangulo_da_luz()]]
+		for f: String in Planta.FERRAMENTAS:
+			todos.append([f, p.retangulo_da_ferramenta(f)])
+		for par: Array in todos:
+			var r: Rect2 = par[1]
+			_verdade(tela.encloses(r), "%s: o botão %s cabe na área (%s)" % [nome_area, par[0], str(r)])
+			_verdade(r.size.x >= 40.0 and r.size.y >= 40.0, "%s: o botão %s tem ao menos 40 px (%s)" % [nome_area, par[0], str(r.size)])
+			_verdade(r.size.x <= Planta.LADO_MAX, "%s: o botão %s respeita o lado máximo" % [nome_area, par[0]])
+			_verdade(r.position.y >= cam.end.y, "%s: o botão %s fica embaixo da câmara" % [nome_area, par[0]])
+			_verdade(not r.intersects(cam), "%s: o botão %s não cobre a câmara" % [nome_area, par[0]])
+			_igual(r.position.y, todos[0][1].position.y, "%s: o botão %s está na mesma fileira da luz" % [nome_area, par[0]])
+		for i in todos.size():
+			for j in range(i + 1, todos.size()):
+				_verdade(not todos[i][1].grow(Planta.FOLGA_TOQUE).intersects(todos[j][1].grow(Planta.FOLGA_TOQUE)),
+					"%s: %s e %s não se sobrepõem, nem com a folga" % [nome_area, todos[i][0], todos[j][0]])
+		# A câmara ocupa a largura útil e a escala não encolhe a planta (a paisagem chega a 1,0 ou mais).
+		var escala := minf(cam.size.x / Planta.PROJETO_W, cam.size.y / Planta.PROJETO_H)
+		_verdade(escala >= 0.9, "%s: a câmara tem escala %.2f (mínimo 0,9)" % [nome_area, escala])
+		_verdade(tela.encloses(cam), "%s: a câmara cabe na área" % nome_area)
+		_verdade(cam.size.x >= area.size.x - 30.0, "%s: a câmara ocupa a largura útil (%d de %d)" % [nome_area, cam.size.x, area.size.x])
+		# Os toques valem: a luz acende, e a ferramenta certa pelo ponteiro cura.
+		_clicar(p, p.retangulo_da_luz().get_center())
+		_verdade(p.luz_acesa(), "%s: o toque na luz acende" % nome_area)
+		_clicar(p, p.retangulo_da_ferramenta("regador").get_center())
+		_verdade(p.ocupada(), "%s: o regador pelo ponteiro cura a seca" % nome_area)
+		p.free()
+	# Em paisagem o layout é o de antes: a luz à esquerda, as ferramentas à direita, o fio ligando a luz à câmara.
+	var q := _nova("seca", Rect2(0, 0, 368, 207))
+	_verdade(q.retangulo_da_luz().end.x <= q.retangulo_da_camara().position.x, "paisagem: a luz fica à esquerda da câmara")
+	_verdade(q.retangulo_da_ferramenta("regador").position.x >= q.retangulo_da_camara().end.x, "paisagem: as ferramentas ficam à direita")
+	_verdade(q._fio.size.x > 0.0, "paisagem: o fio da lâmpada existe")
+	q.free()
+	var r := _nova("seca", Rect2(0, 0, 242, 306))
+	_igual(r._fio.size, Vector2.ZERO, "retrato: sem fio da lâmpada (o botão da luz fica embaixo)")
+	r.free()
 
 
 func _reinicio() -> void:
