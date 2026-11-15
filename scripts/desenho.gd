@@ -81,6 +81,18 @@ static func altura_texto(s: String, tam: int, largura: float, negrito: bool = fa
 	return f.get_multiline_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, largura, tam).y
 
 
+## Uma célula com relevo: a cheia ganha 1 px mais claro no topo e 1 px mais escuro na base (a partir de
+## 6 px de altura); a vazia fica rebaixada, com 1 px mais escuro no topo.
+static func _celula(ci: CanvasItem, rc: Rect2, cor: Color, cheia: bool) -> void:
+	ci.draw_rect(rc, cor)
+	if cheia:
+		if rc.size.y >= 6.0:
+			ci.draw_rect(Rect2(rc.position, Vector2(rc.size.x, 1.0)), cor.lightened(0.3))
+			ci.draw_rect(Rect2(rc.position.x, rc.end.y - 1.0, rc.size.x, 1.0), cor.darkened(0.3))
+	else:
+		ci.draw_rect(Rect2(rc.position, Vector2(rc.size.x, 1.0)), cor.darkened(0.4))
+
+
 ## Barra de células: `valor` de `maximo`, cheia é bom. Cada célula é inteira ou vazia.
 static func celulas(ci: CanvasItem, r: Rect2, valor: float, maximo: int, cor: Color = TEXTO,
 		vazio: Color = CELULA_VAZIA) -> void:
@@ -88,8 +100,8 @@ static func celulas(ci: CanvasItem, r: Rect2, valor: float, maximo: int, cor: Co
 	var larg := (r.size.x - vao * (maximo - 1)) / maximo
 	var cheias := clampi(roundi(valor), 0, maximo)
 	for i in maximo:
-		ci.draw_rect(Rect2(r.position.x + i * (larg + vao), r.position.y, larg, r.size.y),
-			cor if i < cheias else vazio)
+		_celula(ci, Rect2(r.position.x + i * (larg + vao), r.position.y, larg, r.size.y),
+			cor if i < cheias else vazio, i < cheias)
 
 
 ## Barra de células "antes → depois": cheias até `depois`; as perdidas (entre `depois` e `antes`, quando
@@ -103,11 +115,11 @@ static func celulas_de_para(ci: CanvasItem, r: Rect2, antes: float, depois: floa
 	for i in maximo:
 		var rc := Rect2(r.position.x + i * (larg + vao), r.position.y, larg, r.size.y)
 		if i < n_depois:
-			ci.draw_rect(rc, cor)
+			_celula(ci, rc, cor, true)
 		elif i < n_antes:
 			ci.draw_rect(rc.grow(-0.5), cor, false, 1.0)
 		else:
-			ci.draw_rect(rc, vazio)
+			_celula(ci, rc, vazio, false)
 	var xm := r.position.x + n_antes * (larg + vao) - vao / 2.0
 	var ym := r.end.y + 2.0
 	ci.draw_colored_polygon(PackedVector2Array([
