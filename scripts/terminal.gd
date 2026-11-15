@@ -2141,11 +2141,10 @@ func _desenhar_seguranca() -> void:
 	_barra(x + 2 * larg_barra + 44, y + 4, larg_barra - 8, "radiacao", tr("MARGEM"), b["M"], 12, causa == "radiacao")
 	y += 38
 
-	# A causa: a barra que zerou e, se houver, o contexto (até 3 linhas no pior caso, medido).
-	var frase := tr("CAUSA_" + causa.to_upper())
+	# A causa: a frase do contexto, se houver (a spec: 1 a 2 frases, e a da barra somada a ela chegava a 91
+	# palavras); sem contexto, a frase da barra que zerou.
 	var contexto := missao.causa_contexto()
-	if contexto != "":
-		frase += " " + tr("CAUSA_" + contexto.to_upper())
+	var frase := tr("CAUSA_" + (contexto if contexto != "" else causa).to_upper())
 	y += _t(frase, x, y, 14, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 4
 	if not missao.tem_conserto:
 		y += _t(tr("SEM_CONSERTO"), x, y, 13, Desenho.TEXTO, w) + 4

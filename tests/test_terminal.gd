@@ -1841,7 +1841,7 @@ func _diario_cabe_no_pior_caso() -> void:
 	TranslationServer.set_locale(idioma)
 
 
-## O texto da tela traz a frase da barra e a do contexto; o quadro do caso real cabe até o botão, no
+## A tela traz só a frase do contexto (ou a da barra, sem contexto); o quadro do caso real cabe até o botão, no
 ## pior caso de cada contexto, em português e em inglês.
 func _frase_com_o_contexto() -> void:
 	var casos := {}
@@ -1891,10 +1891,13 @@ func _frase_com_o_contexto() -> void:
 			var desenhados: Array = []
 			for linha in textos:
 				desenhados.append(linha[0])
-			var esperada: String = t.tr(k[1])
+			var esperada: String = t.tr(k[2] if k[2] != "" else k[1])
+			_verdade(desenhados.has(esperada), "%s (%s): a frase do contexto (ou a da barra, sem contexto)" % [nome, loc])
 			if k[2] != "":
-				esperada += " " + t.tr(k[2])
-			_verdade(desenhados.has(esperada), "%s (%s): a frase da barra e a do contexto" % [nome, loc])
+				var solta := false
+				for desen: String in desenhados:
+					solta = solta or desen.begins_with(t.tr(k[1]))
+				_igual(solta, false, "%s (%s): com contexto, a frase da barra não aparece" % [nome, loc])
 			_verdade(desenhados.has(t.tr(k[3])) and desenhados.has(t.tr(k[4])), "%s (%s): o caso real que acompanha o contexto" % [nome, loc])
 			if k[2] == "":
 				_igual(desenhados.has(t.tr(k[1]) + " "), false, "%s (%s): sem contexto, sem sobra de espaço" % [nome, loc])
