@@ -25,7 +25,7 @@ INICIO_ST_DIARIO,%d of %d sols in the log,%d de %d sóis no diário
 INICIO_ST_FONTES_ATUAL,With recent NASA data,Com dado recente da NASA
 INICIO_ST_FONTES_HIST,Data from May 2024,Dados de maio de 2024
 SOL_N,Sol %d,Sol %d
-AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in tens of minutes. If the alarm sounds, go to the shelter. The shelter button is on the left wall.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em dezenas de minutos. Se o alarme tocar, vá para o abrigo. O botão do abrigo fica à esquerda."
+AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in tens of minutes. If the alarm sounds, go to the shelter. The shelter lever is on the left wall.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em dezenas de minutos. Se o alarme tocar, vá para o abrigo. A alavanca do abrigo fica à esquerda."
 DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s%s."
 DONKI_RASPAO,", a glancing blow",", de raspão"
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
@@ -160,7 +160,7 @@ FONTE_PAINEL_FONTE,"The Planetary Society, citing JPL; dates: NASA/JPL and Guzew
 FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem da Terra a Marte leva de 3 a 22 min.
 FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
-CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt)."
+CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt); photos: NASA/JPL-Caltech and NASA (public domain).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt); fotos: NASA/JPL-Caltech e NASA (domínio público)."
 CREDITOS_README,Full list in the README.,Lista completa no README.
 CAUSA_POEIRA,"Dust blocked the Sun. The solar panel made almost no energy, and the generator made no oxygen. Next time, leave more energy in the battery.","A poeira tapou o Sol. O painel solar quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, deixe mais energia na bateria."
 CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Panel, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Painel, aperte Câmeras e depois MOXIE."
@@ -246,3 +246,14 @@ DIARIO_PISTA_2,Earth warned us: the Sun is very active.,A Terra avisou: o Sol es
 DIARIO_PISTA_3,The horizon is turning brown. Strong wind coming?,O horizonte está ficando marrom. Vem vento forte?
 DIARIO_PISTA_5,The oxygen generator is making a strange noise.,O gerador de oxigênio está fazendo um barulho estranho.
 VOLTAR_DA_ESTACAO,Back,Voltar
+SLIDES_PROXIMO,Next,Próximo
+SLIDES_ENTENDI,Got it,Entendi
+SLIDES_CONSERTAR,Fix it,Consertar
+SLIDES_CHEMCAM_1,Scientists on Earth want to know what Mars rocks are made of. ChemCam can find out from far away. It zaps a rock with a laser and reads the light that comes back. Energy becomes science.,Os cientistas na Terra querem saber do que as rochas de Marte são feitas. O ChemCam descobre de longe. Ele atira um laser na rocha e lê a luz que volta. A energia vira ciência.
+SLIDES_CHEMCAM_2,"This is ChemCam, at the top of the Curiosity rover's mast. The round window is its eye.","Este é o ChemCam, no alto do mastro do rover Curiosity. A janela redonda é o olho dele."
+SLIDES_AMOSTRA_1,Rocks keep the story of Mars. The Perseverance rover puts a piece of rock in a tube and seals it tight. Scientists want to study these samples in labs on Earth. Energy becomes science.,As rochas guardam a história de Marte. O rover Perseverance põe um pedaço de rocha num tubo e o fecha bem fechado. Os cientistas querem estudar essas amostras em laboratórios na Terra. A energia vira ciência.
+SLIDES_AMOSTRA_2,Left: a sample tube. Right: a tube inside the Perseverance rover's drill.,À esquerda: um tubo de amostra. À direita: um tubo dentro da broca do rover Perseverance.
+SLIDES_PLANTA_1,"Astronauts need fresh food on long trips. On the space station, they grow plants to learn how. Plants need the right light and water. Energy becomes science.","Os astronautas precisam de comida fresca em viagens longas. Na estação espacial, eles cultivam plantas para aprender como. As plantas precisam de luz e água na medida certa. A energia vira ciência."
+SLIDES_PLANTA_2,Left: red lettuce grown on the space station. Right: young zinnia plants. Both grew in a small garden called Veggie.,À esquerda: alface vermelha cultivada na estação espacial. À direita: zínias novinhas. As duas cresceram numa pequena horta chamada Veggie.
+SLIDES_GERADOR_1,"Your crew breathes oxygen. The generator makes it from Mars air. But it can break. Without it, the air runs out. Fix it to keep the base alive.","Sua tripulação respira oxigênio. O gerador faz o oxigênio com o ar de Marte. Mas ele pode quebrar. Sem ele, o ar acaba. Conserte para manter a base viva."
+SLIDES_GERADOR_2,"This gold box is MOXIE, an oxygen maker that went to Mars on the Perseverance rover. Real crews also look after oxygen generators on the space station.","Esta caixa dourada é o MOXIE, um gerador de oxigênio que foi a Marte no rover Perseverance. Tripulações de verdade também cuidam de geradores de oxigênio na estação espacial."
