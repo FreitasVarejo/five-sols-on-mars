@@ -59,6 +59,10 @@ func _tudo() -> void:
 	_main.sobreposicao().acionar("jogar")
 	_main.sobreposicao().concluida.emit()
 	await _quadros(2)
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await _quadros(2)
 	_igual(_main.tela_atual(), "jogo", "depois da abertura, o jogo")
 	var regioes = JSON.parse_string(FileAccess.get_file_as_string("res://assets/comodo/regioes.json"))
 	_igual(regioes["botoes"].has("porta"), true, "regioes.json tem a porta clicável")

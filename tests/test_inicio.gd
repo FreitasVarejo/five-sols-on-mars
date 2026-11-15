@@ -169,7 +169,13 @@ func _fluxo_com_o_botao_final() -> void:
 	# Botão final -> plano do sol 1.
 	abertura.concluida.emit()
 	await process_frame
-	_igual(m.tela_atual(), "jogo", "a abertura leva ao jogo")
+	_igual(m.tela_atual(), "pagina", "a abertura leva à página do diário do sol 1")
+	_igual(m._terminal.is_processing_input(), false, "o terminal segue sem entrada na página")
+	_verdade(m._terminal.card_aberto, "a página é o primeiro item do plano")
+	m.sobreposicao().avancar(1.0)
+	m.sobreposicao().acionar("continuar")
+	await process_frame
+	_igual(m.tela_atual(), "jogo", "o Continuar da página leva ao jogo")
 	_verdade(m.sobreposicao() == null, "sem sobreposição")
 	_verdade(m._terminal.is_processing_input(), "o terminal volta a receber entrada")
 	_igual(m._missao.fase, "plano", "plano")
@@ -197,7 +203,11 @@ func _fluxo_com_o_pular() -> void:
 	e.position = pular
 	abertura._gui_input(e)
 	await process_frame
-	_igual(m.tela_atual(), "jogo", "o Pular leva ao jogo")
+	_igual(m.tela_atual(), "pagina", "o Pular leva à página do diário do sol 1")
+	m.sobreposicao().avancar(1.0)
+	m.sobreposicao().acionar("continuar")
+	await process_frame
+	_igual(m.tela_atual(), "jogo", "o Continuar leva ao jogo")
 	_verdade(m._terminal.is_processing_input(), "entrada do terminal de volta depois do Pular")
 	m.queue_free()
 	await process_frame
@@ -208,6 +218,9 @@ func _free_play_nao_passa_pela_tela_inicial() -> void:
 	var m: Control = await _nova_main()
 	m.sobreposicao().acionar("jogar")
 	m.sobreposicao().concluida.emit()
+	await process_frame
+	m.sobreposicao().avancar(1.0)
+	m.sobreposicao().acionar("continuar")
 	await process_frame
 	var missao = m._missao
 	missao.fase = "relatorio"

@@ -31,6 +31,10 @@ extends Control
 ## O aviso da tempestade é centrado e cobre o plano; os cards do sol 1 ficam ao lado do controle que nomeiam,
 ## que fica claro e com contorno enquanto o resto do plano escurece.
 ##
+## A página do diário (pagina_diario.gd, que a main desenha por cima de tudo) abre cada sol da missão fixa antes
+## de qualquer card: é o primeiro item da fila do plano ("pagina_<sol>"), uma vez por sol por sessão, e segura os
+## cards até fechar (fechar_pagina).
+##
 ## O card do primeiro turno (só no sol 1 da missão fixa, uma vez por sessão) abre quando o terminal chega
 ## embaixo, sobre a sala, perto do botão TERMINAL. O relógio do turno só corre depois que ele fecha
 ## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
@@ -160,6 +164,7 @@ var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1
 ## como a sala os mostra agora (a main as liga). Sem ela, o card fica no centro.
 var zonas_a_evitar := Callable()
 var rect_do_card_confirmacao := Rect2()  # onde o último quadro desenhou o card de confirmação (a sonda e os testes leem)
+var com_pagina := false     # o plano de cada sol da missão fixa abre com a página do diário (a main liga; ver _tem_pagina)
 
 var _fase_logica := "plano"
 var _modos_vistos := 0      # quantas entradas no modo de segurança o terminal já viu (cada uma toca o desligar)
@@ -428,6 +433,8 @@ func _mostrar_na_tela(f: String) -> void:
 ## evento ainda vale).
 func _cards_do_plano() -> Array:
 	var fila: Array = []
+	if _tem_pagina():
+		fila.append("pagina_%d" % missao.sol)
 	if missao.aviso_ativo():
 		fila.append("aviso")
 	if not missao.livre and missao.sol == 1:
@@ -439,6 +446,24 @@ func _cards_do_plano() -> Array:
 	if missao.st_inicio.get("gerador_quebrado", false) and not _vistos.has("gerador"):
 		fila.append("gerador")
 	return fila
+
+
+## O plano deste sol abre com a página do diário? Só se o hospedeiro a quer (com_pagina), só na missão fixa, só nos sóis que têm história, uma vez por sol.
+func _tem_pagina() -> bool:
+	var chave := "DIARIO_HISTORIA_%d" % missao.sol
+	return com_pagina and not missao.livre and tr(chave) != chave and not _vistos.has("pagina_%d" % missao.sol)
+
+
+## O sol da página do diário que está na tela agora (0 se o item da vez não é a página).
+func sol_da_pagina() -> int:
+	return int(card_id.trim_prefix("pagina_")) if card_id.begins_with("pagina_") else 0
+
+
+## A página fechou: abre o próximo item da fila (os cards do plano).
+func fechar_pagina() -> void:
+	if sol_da_pagina() > 0:
+		_abrir_proximo()
+		queue_redraw()
 
 
 ## Abre o próximo card da fila (ou deixa a tela sem card). O card se marca visto quando abre.
@@ -925,7 +950,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
 		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
-		if card and not _card_sobre_a_sala():
+		if card and not _card_sobre_a_sala() and sol_da_pagina() == 0:
 			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica. O card ao lado
 			# de um controle deixa esse controle claro, com contorno.
 			var alvo := _alvo_do_card()
