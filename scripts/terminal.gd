@@ -2235,7 +2235,7 @@ func _desenhar_relatorio() -> void:
 	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 1, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
 	# Só na missão fixa: o melhor sem modo de segurança (o TEORICO). No Modo livre o teto não existe.
 	if not missao.livre:
-		_t(tr("RELATORIO_MELHOR_SEM_MODO") % Modelo.N.TEORICO, x + 2, r2.end.y + 3, 12, Desenho.TEXTO_SUAVE, w - 4)
+		_t(tr("RELATORIO_MELHOR_SEM_MODO") % Modelo.N.TEORICO, x + 2, r2.end.y + 1, 12, Desenho.TEXTO_SUAVE, w - 4)
 
 	# A caixa das estrelas: os três ícones, "N de 3", a nota e, na base, a linha reservada (2.9).
 	var re := REL_ESTRELAS
