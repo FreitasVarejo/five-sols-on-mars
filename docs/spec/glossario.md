@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 23:17. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 15/11/2026 19:51. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Glossário
 
@@ -44,7 +44,7 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 
 - **Tarefa de manutenção** — minigame que a própria base pede no turno, como consequência do que aconteceu (painel sujo, gerador com falha). Protege um recurso. Não se escolhe: se faz ou se paga.
 
-- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. No jogo é um toque no botão do abrigo, ao lado da porta do dormitório, não minigame. Custa tempo de ciência, não energia: a ciência feita antes de abrigar conta, e depois o turno não rende mais. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
+- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. No jogo é um toque no botão do abrigo, ao lado da porta do dormitório, não minigame. Na sala, o sinal do abrigo é a persiana fechada; não é um sistema à parte. Custa tempo de ciência, não energia: a ciência feita antes de abrigar conta, e depois o turno não rende mais. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
    → painel-da-tripulacao-e-alertas (pesquisa no vault do dono)
 
 - **Modo de segurança** — o que acontece quando falta energia para o aquecimento, o oxigênio acaba ou a margem de radiação zera: a base corta o que não é essencial e a tripulação se protege, como no safe mode real dos rovers. Uma tela explica a causa com um número ou caso real. Se algum plano salva o sol, o simulador o reinicia; se não, a base segue em modo de segurança e o sol passa sem ciência. Cada modo de segurança conta contra a nota do relatório. Não é game over.
