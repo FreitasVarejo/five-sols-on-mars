@@ -58,6 +58,8 @@ const TELAS := {
 }
 # Estação de cada tarefa de ciência: tarefa -> botão da sala.
 const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
+# Botões da sala que não ganham realce de hover (o pato de borracha é objeto de cena, não controle: sem cantoneiras).
+const SEM_REALCE := ["pato"]
 
 @onready var _sala: Control = $Sala
 @onready var _vista_janela: Janela = $Sala/Vista
@@ -320,6 +322,8 @@ func _process(delta: float) -> void:
 	_aplicar_zoom(_perto.zoom())
 
 	var hover := _regiao_em(_mouse_pos) if (_mouse_real and _mouse_dentro) else ""
+	if SEM_REALCE.has(hover):
+		hover = ""
 	if hover != _hover:
 		_hover = hover
 		_realce.queue_redraw()
@@ -366,12 +370,16 @@ func _atualizar_sala() -> void:
 	_indicador_porta.atualizar(_missao.pode_encerrar_sol())
 
 
-## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
+## O que dá para clicar agora na sala: o pato de borracha sempre que a sala recebe clique (em qualquer fase, com o
+## Painel abaixado, sem card e sem sobreposição); o abrigo no turno; a estufa e a glovebox quando a tarefa
 ## delas está escolhida, pendente (ou já rodando: o toque volta à peça), sem outra rodando e fora do abrigo; a porta do dormitório quando dá
 ## para encerrar o sol (a lista acabou e o medidor não pede atenção). Nada, com a vista de perto à mostra.
 func _clicavel(nome: String) -> bool:
-	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _terminal.card_aberto \
-			or _sobreposicao != null or _perto.aberta():
+	if _terminal.tapa_a_sala() or _terminal.card_aberto or _sobreposicao != null or _perto.aberta():
+		return false
+	if nome == "pato":
+		return true
+	if _missao.fase != "turno" or _terminal.fase_ui != "turno":
 		return false
 	match nome:
 		"abrigo":
@@ -671,6 +679,9 @@ func _ao_clicar(nome: String) -> void:
 	_ultimo_clique = nome
 	var fez := false
 	match nome:
+		"pato":
+			# O easter egg: só o quack. Não mexe na missão, nas barras, no relógio nem no diário.
+			_som.quack()
 		"abrigo":
 			# Abrigar não tem volta no turno: na primeira vez, o card da Terra explica e pede confirmação.
 			if not _missao.abrigado and _terminal.pedir_confirmacao("abrigo", func() -> void: _missao.abrigar()):
@@ -836,7 +847,7 @@ func _rect_na_tela(r: Rect2) -> Rect2:
 
 
 ## Tudo que se clica agora, nome -> [x, y, w, h] em px da tela de 640x360: o terminal e o que ele
-## mostra, mais a sala (abrigo, estufa, glovebox, porta) e as setas, quando valem.
+## mostra, mais a sala (pato, abrigo, estufa, glovebox, porta) e as setas, quando valem.
 func _ui_da_tela() -> Dictionary:
 	if _sobreposicao != null:
 		var sobre := _ui_da_sobreposicao()
@@ -937,7 +948,8 @@ func _estado_da_sonda() -> Dictionary:
 			"duracao": _terminal.duracao, "fontes": _terminal.rolagem_fontes()},
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "card": _terminal.card_id, "relogio_parado": _terminal.segura_o_relogio(), "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
-		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
+		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico,
+			"pitches_quack": _som.pitches_quack, "simultaneos_quack": _som.simultaneos_quack},
 		"ui": _ui_da_tela(),
 		# O que a peça à vista oferece (alvos, bandeja, encaixe, botões), em px da tela: a da vista de perto (planta,
 		# amostra) quando ela está aberta, senão a do visor do terminal (ChemCam, gerador).

@@ -24,6 +24,14 @@ que leva a região, a tabela de cor do pilar e a prova de que fora dela os PNGs 
 render inteiro muda o tom do pilar na tempestade e uns pixels longe do objeto. Depois do render:
 `scripts/compor_sala.py --render <pasta do --saida> --regiao 154 131 272 258`, depois
 scripts/gerar_persiana.py. O `--saida` tem de ficar dentro do repo (o Blender é um Flatpak).
+O pato de borracha (15/11, `_pato`) entra do mesmo jeito, com a região de repintura x 848..891,
+y 192..221 (o pato, na quina direita do console, no tampo da rampa de oxigênio):
+`scripts/compor_sala.py --render <pasta> --regiao 848 192 892 222 --objeto pato_ --base <ref>
+--pilar parede_frente,janela_moldura_montante`, depois scripts/gerar_persiana.py e
+`scripts/compor_sala.py --persiana` com os mesmos argumentos (o fluxo completo está no docstring do
+compor_sala.py). Os pilares são as faces cujo tom o render inteiro muda perto dele.
+O pato não muda de um estado para outro: só a luz muda (nenhuma emissão). Ele é um botão do
+regioes.json (`botoes.pato`: o retângulo de todas as partes), clicável para o quack.
 
 Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
 em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
@@ -613,6 +621,65 @@ def _console(i):
     caixa("caneca_alca", (cx + 0.05, cy, BANCADA_Z + 0.055), (0.02, 0.012, 0.05), caneca, next(i))
 
 
+# O pato de borracha da tripulação: um brinquedo amarelo na quina direita de cima do console, no tampo
+# da rampa da tela de oxigênio, ao lado da grade de ventilação (easter egg: o clique faz quack).
+# Objeto de cena, não UI: não acende e é o mesmo em todos os estados. Original, sem nada do FNAF.
+PATO_BASE = (1.22, 1.869, 0.975)     # onde o pato pousa: o tampo da rampa de oxigênio, perto da quina
+PATO_GIRO = 183.0                    # graus em torno de z; o bico aponta para a janela (esquerda) e um pouco para o olho
+PATO_ESCALA = 0.85
+PATO_OBJS = ("pato_corpo", "pato_cola", "pato_cabeca", "pato_bico", "pato_asa", "pato_olho0",
+             "pato_olho1")
+
+
+def elipsoide(nome, centro, raios, mat_, indice, rot=(0, 0, 0), segs=12, aneis=8):
+    """Elipsóide de faces planas (poucos polígonos: cada faceta vira um tom na pixel art)."""
+    me = bpy.data.meshes.new(nome)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=aneis, radius=1.0)
+    for v in bm.verts:
+        v.co.x *= raios[0]
+        v.co.y *= raios[1]
+        v.co.z *= raios[2]
+    bm.to_mesh(me)
+    bm.free()
+    ob = _objeto(nome, me, mat_, indice)
+    ob.location = centro
+    ob.rotation_euler = [math.radians(a) for a in rot]
+    for p in me.polygons:
+        p.use_smooth = False
+    return ob
+
+
+def _pato(i):
+    """Pato de borracha de perfil, bico para a direita: corpo, cola erguida, cabeça, bico, asa e olhos,
+    cada parte com índice próprio (o contorno separa uma da outra). Medidas em metros, no referencial
+    do pato (x para o bico, z para cima); PATO_BASE e PATO_GIRO o põem na sala."""
+    amarelo_pato = mat("pato_amarelo", "eaa91c")
+    laranja_pato = mat("pato_laranja", "ee5f1c")
+    preto_pato = mat("pato_olho", "151d28")
+    giro = Matrix.Rotation(math.radians(PATO_GIRO), 3, "Z")
+    base = Vector(PATO_BASE)
+
+    def no_mundo(p):
+        return tuple(base + giro @ (Vector(p) * PATO_ESCALA))
+
+    def parte(nome, centro, raios, mat_, inclina=0.0, segs=16, aneis=10):
+        # `inclina`: graus em torno do eixo y do pato (positivo ergue a frente)
+        rot = (giro @ Matrix.Rotation(math.radians(-inclina), 3, "Y")).to_euler()
+        ob = elipsoide(nome, no_mundo(centro), [r * PATO_ESCALA for r in raios], mat_, next(i),
+                       segs=segs, aneis=aneis)
+        ob.rotation_euler = rot
+        return ob
+
+    parte("pato_corpo", (0.0, 0.0, 0.050), (0.075, 0.058, 0.050), amarelo_pato)
+    parte("pato_cola", (-0.068, 0.0, 0.085), (0.032, 0.022, 0.020), amarelo_pato, inclina=-35.0, segs=12, aneis=8)
+    parte("pato_cabeca", (0.048, 0.0, 0.122), (0.040, 0.036, 0.040), amarelo_pato)
+    parte("pato_bico", (0.098, 0.0, 0.108), (0.034, 0.032, 0.018), laranja_pato, inclina=8.0, segs=12, aneis=8)
+    parte("pato_asa", (-0.012, 0.0, 0.056), (0.044, 0.062, 0.027), amarelo_pato, inclina=-10.0, segs=14, aneis=8)
+    for k, lado in enumerate((-1, 1)):
+        parte(f"pato_olho{k}", (0.070, lado * 0.030, 0.132), (0.008, 0.008, 0.008), preto_pato, segs=6, aneis=4)
+
+
 def construir():
     """Módulo de comando, pronto para o render. Unidades em metros; o olho fica em OLHO.
 
@@ -806,6 +873,7 @@ def construir():
     _estufa(i, e, pz)
 
     _console(i)
+    _pato(i)
 
     # alarmes nos cantos de cima da frente
     for x in (-2.3, 2.3):
@@ -1240,6 +1308,8 @@ REGIOES = {
     # a alavanca: a placa e as duas posições do braço com o punho (o retângulo é a união)
     "abrigo": ["abrigo_aro", "abrigo_fenda", "abrigo_pino", "abrigo_braco_cima", "abrigo_punho_cima",
                "abrigo_braco_baixo", "abrigo_punho_baixo"],
+    # o pato de borracha: o retângulo é a caixa de todas as partes (o easter egg do quack)
+    "pato": list(PATO_OBJS),
     "porta": ["porta_folha", "porta_moldura_topo", "porta_moldura_tras", "porta_moldura_frente"],
     "porta_lampada": ["porta_lampada"],
     "estufa": ["estufa_moldura", "estufa_vidro"],
@@ -1251,7 +1321,7 @@ TELAS = ("energia", "oxigenio", "radiacao", "comunicacao")
 # em 1 a 3 px): o json guarda o retângulo inscrito (o que o Godot pinta), não a caixa envolvente. O resto do
 # trapézio continua escuro pelo próprio PNG.
 MARGEM_TELA = 2   # px: o traço do contorno come 1 a 2 px da borda da tela no PNG (medido em normal.png)
-BOTOES = ("abrigo", "estufa", "glovebox")
+BOTOES = ("abrigo", "estufa", "glovebox", "pato")
 # A porta é botão, mas fica na ponta esquerda do panorama (x < 60), sob a seta de pan quando o pan está
 # em 0: não segue ZONA_LIVRE_X nem FAIXA_CLIQUE, que valem para os botões do meio da sala. O Godot
 # esconde a seta no limite do pan para a porta se alcançar.
@@ -1396,6 +1466,11 @@ def validar_regioes(reg):
     checa(g["x"] + g["w"] <= e["x"] or e["x"] + e["w"] <= g["x"],
           f"glovebox x {g['x']}..{g['x'] + g['w']} e estufa x {e['x']}..{e['x'] + e['w']} "
           f"não se sobrepõem")
+    r, o, g = reg["pato"], reg["oxigenio"], reg["glovebox"]
+    checa(o["x"] + o["w"] - 40 <= r["x"] and r["x"] + r["w"] <= g["x"],
+          f"pato: x {r['x']}..{r['x'] + r['w']} na quina direita do console (de {o['x'] + o['w'] - 40} até a glovebox, x {g['x']})")
+    checa(r["y"] + r["h"] <= o["y"] or r["x"] >= o["x"] + o["w"] or r["x"] + r["w"] <= o["x"],
+          f"pato: y {r['y']}..{r['y'] + r['h']} não se sobrepõe à tela de oxigênio (x {o['x']}..{o['x'] + o['w']}, y {o['y']})")
     r = reg["comunicacao"]
     checa(r["x"] + r["w"] <= 420, f"comunicacao: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
     checa(r["w"] >= 70 and r["h"] >= 50,

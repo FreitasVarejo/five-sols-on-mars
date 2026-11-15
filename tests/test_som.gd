@@ -14,6 +14,7 @@ func _init() -> void:
 	_mudo()
 	_tocar()
 	_peso_dos_cliques()
+	_quack()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -100,4 +101,37 @@ func _peso_dos_cliques() -> void:
 	som.clique("abrigo")
 	_igual(som.historico, ["clique_navegar", "clique_abrigo"], "clique() toca só o que faz som")
 	_igual(Som.clique_da_acao("ir_ao_abrigo"), "clique_navegar", "a linha do abrigo no terminal navega")
+	som.free()
+
+
+func _quack() -> void:
+	var dur: float = Som.SONS["quack"].get_length()
+	_igual(dur > 0.2 and dur < 0.3, true, "o quack dura uns 0,25 s")
+	_igual(Som.clique_da_acao("pato"), "", "o pato não é clique de ação: tem o quack dele")
+	_igual(is_equal_approx(Som.pitch_do_quack(0.0), 0.9), true, "pitch mínimo: -10%")
+	_igual(is_equal_approx(Som.pitch_do_quack(0.5), 1.0), true, "pitch do meio: 1")
+	_igual(is_equal_approx(Som.pitch_do_quack(1.0), 1.1), true, "pitch máximo: +10%")
+	_igual(is_equal_approx(Som.pitch_do_quack(7.0), 1.1), true, "o sorteio fora de 0..1 fica preso")
+	# Dois toques seguidos diferem de pelo menos o passo: o sorteio repete até se afastar do anterior.
+	var fila := [0.5, 0.51, 0.52, 0.9]
+	var sorteio := func() -> float: return fila.pop_front()
+	var p: float = Som.proximo_pitch(1.0, sorteio)
+	_igual(is_equal_approx(p, 1.08), true, "o pitch perto demais do anterior é sorteado de novo")
+	_igual(fila.is_empty(), true, "e usou os sorteios até se afastar")
+	# Sem tocador (fora da árvore), quack() só registra: pitch dentro da faixa e diferente do anterior.
+	var som := Som.new()
+	var ultimo := 0.0
+	var todos_diferentes := true
+	var na_faixa := true
+	for i in 50:
+		som.quack()
+		var atual: float = som.pitches_quack[-1]
+		na_faixa = na_faixa and atual >= 0.9 - 0.0001 and atual <= 1.1 + 0.0001
+		todos_diferentes = todos_diferentes and absf(atual - ultimo) >= Som.PASSO_PITCH_QUACK - 0.0001
+		ultimo = atual
+	_igual(na_faixa, true, "todo pitch fica em 1 ± 10%")
+	_igual(todos_diferentes, true, "toques seguidos têm pitches diferentes")
+	_igual(som.total, 50, "cada quack conta")
+	_igual(som.historico.slice(-3), ["quack", "quack", "quack"], "o quack entra no histórico")
+	_igual(som.pitches_quack.size() <= Som.MAX_HISTORICO, true, "o histórico de pitches é limitado")
 	som.free()
