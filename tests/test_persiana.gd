@@ -62,7 +62,8 @@ func _carregar(nome: String) -> Image:
 	return Image.load_from_file(ProjectSettings.globalize_path(COMODO + nome))
 
 
-## A camada sobre o abrigo aberto refaz o abrigo.png, o índice marca a camada e tem as 10 lâminas.
+## A camada sobre o abrigo aberto refaz o abrigo.png, o índice marca a camada, a camada não cobre o
+## montante e tem as 10 lâminas.
 func _imagens() -> void:
 	var normal := _carregar("normal.png")
 	var abrigo := _carregar("abrigo.png")
@@ -78,6 +79,13 @@ func _imagens() -> void:
 	var fora_de_ordem := 0  # lâmina que diminui ao descer numa coluna
 	var vidro := 0
 	var laminas := {}
+	var colunas_vidro := []
+	for x in larg:
+		for y in alt:
+			if normal.get_pixel(x, y).a == 0.0:
+				colunas_vidro.append(x)
+				break
+	var no_montante := 0  # pixel da camada entre os dois vãos, sobre o montante
 	for x in larg:
 		var anterior := -1
 		for y in alt:
@@ -91,6 +99,8 @@ func _imagens() -> void:
 				incoerentes += 1
 			if e_vidro:
 				vidro += 1
+			if na_camada and not e_vidro and x > colunas_vidro[0] and x < colunas_vidro[-1] and not colunas_vidro.has(x):
+				no_montante += 1
 			if na_camada:
 				var lamina := roundi(r8 / 20.0 - 0.5)
 				laminas[lamina] = true
@@ -99,6 +109,7 @@ func _imagens() -> void:
 				anterior = lamina
 	_igual(diferentes, 0, "camada + abrigo aberto refazem o abrigo")
 	_igual(incoerentes, 0, "camada, índice e vidro coerentes")
+	_igual(no_montante, 0, "nenhum pixel da camada sobre o montante")
 	_igual(fora_de_ordem, 0, "lâmina nunca diminui ao descer")
 	_igual(vidro, 58318, "pixels de vidro")
 	_igual(laminas.size(), N_LAMINAS_ESPERADAS, "lâminas no índice")

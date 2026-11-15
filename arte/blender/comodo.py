@@ -8,11 +8,12 @@ Uso (da raiz do repo):
 Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
 Mesma câmera em todos os estados. A geometria também é a mesma, com uma única exceção
 permitida: a persiana da janela, que só o estado `abrigo` fecha. O estado muda luz e emissão.
-A persiana fica 6,5 cm na frente da moldura, então no `abrigo` ela cobre também o montante
-central e as bordas da janela, não só o vidro. Por isso há o estado extra `abrigo_aberto`: a
-mesma luz e emissão do `abrigo`, sem a persiana e com o vidro em alpha 0. Ele não entra no padrão
-de `--estados` (renderize com `--estados abrigo_aberto`); scripts/gerar_persiana.py usa a
-diferença entre `abrigo` e `abrigo_aberto` como a camada da persiana.
+A persiana fica dentro do vão da janela, entre a moldura de aço e o vidro, com a largura exata
+do vão: a moldura e o montante central a tapam e continuam visíveis por cima dela. Há o estado
+extra `abrigo_aberto`: a mesma luz e emissão do `abrigo`, sem a persiana e com o vidro em alpha 0.
+Ele não entra no padrão de `--estados` (renderize com `--estados abrigo,abrigo_aberto`);
+scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como a camada da
+persiana.
 
 A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG (menos no
 `abrigo`, onde a persiana o cobre) e o Godot põe a vista de Marte atrás, por composição. A vista
@@ -373,8 +374,9 @@ def construir():
     pitch = (jz1 - jz0) / N_PERSIANA
     for k in range(N_PERSIANA):
         mat_s = faixa if k in (0, N_PERSIANA - 1) else blindagem
-        PERSIANA.append(caixa(f"persiana_{k}", (0.0, F - 0.115, jz0 + (k + 0.5) * pitch),
-                              (jl + 0.04, 0.03, pitch + 0.004), mat_s, next(i)))
+        # dentro do vão: atrás da moldura (F-0,10 a F), na frente do vidro (F-0,02), na largura dele
+        PERSIANA.append(caixa(f"persiana_{k}", (0.0, F - 0.06, jz0 + (k + 0.5) * pitch),
+                              (jl, 0.03, pitch + 0.004), mat_s, next(i)))
 
     # bancada baixa e, atrás dela, a rampa: duas faces inclinadas, cada uma virada (em guinada)
     # para o olho, como um console que envolve quem olha. Cada tela fica rente à sua face, e assim
