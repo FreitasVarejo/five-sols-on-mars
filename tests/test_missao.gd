@@ -25,6 +25,8 @@ func _init() -> void:
 	_tarefa_nao_feita_e_teto()
 	_exposicao_e_dose()
 	_seguranca_no_meio_do_turno()
+	_abrigo_tardio_no_sol_solar()
+	_previsao_sem_reserva()
 	_seguranca_no_fim_do_turno()
 	_seguranca_sem_conserto()
 	_aquecimento_e_gerador()
@@ -610,6 +612,78 @@ func _exposicao_e_dose() -> void:
 	_igual(e.f_exposto(), 0.0, "sol comum: f 0")
 
 
+func _abrigo_tardio_no_sol_solar() -> void:
+	# Abrigou, mas tarde: a margem que sobra (2) não cobre o fundo dos 2 sóis que faltam (2 de dose cada
+	# um, com margem 2 <= 2): o sol da tempestade falha, a causa é o abrigo, e o simulador reinicia o sol.
+	var m = _solar(11, _st(6, 4, 12))
+	m.confirmar_plano()
+	_ate(m, m.t_pico + (m.turno_s - m.t_pico) * 0.6)
+	m.abrigar()
+	_ate_sair_do_turno(m, 0.05)
+	_igual(m.fase, "seguranca", "abrigo tardio (f 0,6): modo de segurança no próprio sol")
+	_igual(m.causa, "radiacao", "abrigo tardio: causa radiação")
+	_igual(m.causa_contexto(), "sem_abrigo", "abrigo tardio: contexto sem abrigo")
+	_igual(m.tem_conserto, true, "abrigo tardio: o abrigo na hora salva, o simulador reinicia")
+	_igual(m.modos, 1, "abrigo tardio: 1 modo")
+	_igual(m.registros.size(), 0, "abrigo tardio: o sol que falhou não vira registro")
+	_igual(m.ciencia_por_sol, [], "abrigo tardio: o sol que falhou não conta ciência")
+	# Abrigo no meio (margem 3 > 2): passa, como antes.
+	var b = _solar(11, _st(6, 4, 12))
+	b.confirmar_plano()
+	_ate(b, b.t_pico + (b.turno_s - b.t_pico) / 2.0)
+	b.abrigar()
+	_ate_sair_do_turno(b, 0.05)
+	_igual(b.fase, "fim_do_sol", "abrigo no meio (margem 3 > 2): passa")
+	# Missão fixa, sol 2: 13 s depois do pico passa (margem 4 > 3); 14 s ou mais entra em segurança.
+	for atraso in [13.0, 14.0, 17.0, 20.0]:
+		var f = Missao.new(1)
+		f.montar_sol(2, _st(12.0, 4.0, 11.0))
+		_igual(f.eh_sol_solar(), true, "fixa: o sol 2 é o da tempestade")
+		f.confirmar_plano()
+		_ate(f, f.t_pico + atraso)
+		f.abrigar()
+		_ate_sair_do_turno(f, 0.05)
+		if atraso < 14.0:
+			_igual(f.fase, "fim_do_sol", "fixa: abrigo %d s depois do pico passa" % int(atraso))
+			_igual(f.modos, 0, "fixa: abrigo %d s depois do pico, sem modo" % int(atraso))
+		else:
+			_igual(f.fase, "seguranca", "fixa: abrigo %d s depois do pico entra em segurança" % int(atraso))
+			_igual(f.causa_contexto(), "sem_abrigo", "fixa: abrigo %d s, contexto sem abrigo" % int(atraso))
+			_igual(f.tem_conserto, true, "fixa: abrigo %d s, o simulador reinicia" % int(atraso))
+			_igual(f.modos, 1, "fixa: abrigo %d s, 1 modo" % int(atraso))
+	# Margem já curta de antes (5 no sol 2: nem o abrigo na hora cobre os 3 sóis que faltam): 1 s de atraso
+	# não vira culpa do abrigo, e o sol passa.
+	var c = Missao.new(1)
+	c.montar_sol(2, _st(12.0, 4.0, 5.0))
+	c.confirmar_plano()
+	_ate(c, c.t_pico + 1.0)
+	c.abrigar()
+	_ate_sair_do_turno(c, 0.05)
+	_igual(c.fase, "fim_do_sol", "margem curta de antes: o atraso não é a causa, o sol passa")
+	_igual(c.modos, 0, "margem curta de antes: sem modo no sol da tempestade")
+
+
+func _previsao_sem_reserva() -> void:
+	# A bateria que o plano deixa não cobre o aquecimento da noite (1): aviso; no último sol, nunca.
+	var m = Missao.new(1)
+	m.montar_sol(2, _st(3, 6, 12))
+	m.mudar_q(1)
+	var livre: float = m.previsao()["bateria_apos_plano"]
+	_verdade(livre >= Modelo.N.AQUEC, "previsão: o plano de q 1 deixa reserva")
+	_igual(m.previsao()["sem_reserva"], false, "previsão: com reserva, sem aviso")
+	var v = Missao.new(1)
+	v.montar_sol(2, _st(3, 6, 12))
+	while v.mudar_q(1):
+		pass
+	_igual(v.previsao()["bateria_apos_plano"], 0.0, "previsão: gastando tudo, a bateria fica em 0")
+	_igual(v.previsao()["sem_reserva"], true, "previsão: bateria 0 antes da noite, sem reserva")
+	var u = Missao.new(1)
+	u.montar_sol(Modelo.N.SOLS, _st(3, 6, 12))
+	while u.mudar_q(1):
+		pass
+	_igual(u.previsao()["sem_reserva"], false, "previsão: no último sol não há noite, sem aviso")
+
+
 func _seguranca_no_meio_do_turno() -> void:
 	# Margem 4 exposta: a margem ao vivo (4 - round(12 f)) zera em f 0,29 e o modo entra ali.
 	var m = _solar(21, _st(6, 4, 4))
@@ -792,8 +866,8 @@ func _causa_pelo_contexto() -> void:
 	v.confirmar_plano()
 	v.avancar(v.turno_s)
 	_igual(v.causa, "oxigenio", "vazio: a causa é o oxigênio")
-	_igual(v.causa_contexto(), "", "vazio: sem contexto")
-	_igual(v.caso_real(), "oxigenio", "vazio: o caso real é o da barra")
+	_igual(v.causa_contexto(), "plano", "vazio: contexto do plano (algum plano salvava)")
+	_igual(v.caso_real(), "oxigenio", "vazio: o caso real é o do oxigênio")
 	_verdade(v.reiniciar_sol(), "vazio: há conserto")
 	# Gerador quebrado no começo do sol e não consertado, e o oxigênio acaba: contexto do gerador.
 	var g = Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
@@ -812,7 +886,7 @@ func _causa_pelo_contexto() -> void:
 	_igual(g.tarefas["gerador"], "feita", "gerador: o conserto terminou")
 	g.avancar(g.turno_s)
 	_igual(g.fase, "seguranca", "gerador consertado e q 0: o oxigênio acaba")
-	_igual(g.causa_contexto(), "", "gerador consertado: sem contexto")
+	_igual(g.causa_contexto(), "plano", "gerador consertado: contexto do plano")
 	# Poeira e oxigênio: contexto da poeira, e o caso real é o da energia (o Opportunity).
 	var p = Missao.new(1)
 	p.montar_sol(3, _st(6, 1, 12))
@@ -820,8 +894,15 @@ func _causa_pelo_contexto() -> void:
 	p.confirmar_plano()
 	p.avancar(p.turno_s)
 	_igual(p.causa, "oxigenio", "poeira: a causa é o oxigênio")
-	_igual(p.causa_contexto(), "poeira", "poeira e oxigênio: contexto da poeira")
-	_igual(p.caso_real(), "energia", "poeira: o caso real é o da energia")
+	_igual(p.causa_contexto(), "plano", "poeira e oxigênio com conserto: contexto do plano")
+	_igual(p.caso_real(), "oxigenio", "poeira com conserto: o caso real é o do oxigênio")
+	# Poeira e oxigênio sem plano que salve (O2 0, bateria 2): contexto da poeira, caso real da energia.
+	var ps = Missao.new(1)
+	ps.montar_sol(4, _st(2, 0, 12))
+	_igual(ps.causa, "oxigenio", "poeira sem conserto: a causa é o oxigênio")
+	_igual(ps.tem_conserto, false, "poeira sem conserto: nenhum plano salva")
+	_igual(ps.causa_contexto(), "poeira", "poeira e oxigênio sem conserto: contexto da poeira")
+	_igual(ps.caso_real(), "energia", "poeira sem conserto: o caso real é o da energia")
 	# Poeira e energia (bateria vazia no aquecimento): também poeira.
 	var e = Missao.new(1)
 	e.montar_sol(4, _st(0, 4, 12, 0.0))

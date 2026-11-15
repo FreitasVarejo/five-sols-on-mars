@@ -127,6 +127,7 @@ FECHAR,Close,Fechar
 AQUECIMENTO_DA_NOITE,Night heating,Aquecimento da noite
 CADA,each,cada
 BATERIA_CHEIA_PERDE,Battery full: %d is lost,Bateria cheia: %d se perde
+BATERIA_SEM_RESERVA,Battery empty: nothing saved,Bateria vazia: nada guardado
 SEM_CONTAR_TEMPESTADE,Not counting the storm,Sem contar a tempestade
 CAM_PAINEL,Solar panel,Painel solar
 CAM_ROCHA,Rock,Rocha
@@ -162,7 +163,8 @@ FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
 CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt); photos: NASA/JPL-Caltech and NASA (public domain).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt); fotos: NASA/JPL-Caltech e NASA (domínio público)."
 CREDITOS_README,Full list in the README.,Lista completa no README.
-CAUSA_POEIRA,"Dust blocked the Sun. The solar panel made almost no energy, and the generator made no oxygen. Next time, leave more energy in the battery.","A poeira tapou o Sol. O painel solar quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, deixe mais energia na bateria."
+CAUSA_PLANO,"The generator got too little energy. In the next plan, give it more energy.","O gerador recebeu pouca energia. No próximo plano, dê mais energia ao gerador."
+CAUSA_POEIRA,"Dust blocked the Sun. The solar panel made almost no energy. Next time, leave more energy in the battery.","A poeira tapou o Sol. O painel solar quase não fez energia. Da próxima vez, deixe mais energia na bateria."
 CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Panel, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Painel, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
