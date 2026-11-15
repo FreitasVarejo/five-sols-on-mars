@@ -52,6 +52,7 @@ func _esperar_terminal() -> void:
 ## Fecha os cards do plano, um por vez, e devolve quantos fechou.
 func _fechar_fila() -> int:
 	var n := 0
+	_main._terminal._acionar("inicio_fase")  # o plano abre na tela inicial do terminal: a fase leva ao plano
 	while _main._terminal.card_aberto and n < 20:
 		_main._terminal._acionar("fechar_card")
 		n += 1
@@ -65,8 +66,14 @@ func _tudo() -> void:
 	await process_frame
 	await process_frame
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
+	_igual(_main.tela_atual(), "pagina", "depois da abertura vem a página do diário do sol 1")
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await process_frame
 	var t = _main._terminal
 	var m = _main._missao
 	_igual(_fechar_fila(), 4, "o plano do sol 1 abre com quatro cards (aviso e os três do sol 1)")
@@ -115,6 +122,11 @@ func _tudo() -> void:
 	m.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
 	await process_frame
 	await process_frame
+	_igual(_main.tela_atual(), "pagina", "sol 2: a página do diário abre antes do plano")
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await process_frame
 	_igual(_fechar_fila(), 1 if m.aviso_ativo() else 0, "o plano do sol 2 leva só o aviso (se houver)")
 	t._acionar("confirmar")
 	_igual(t.segura_o_relogio(), false, "sol 2: o relógio não espera nada")

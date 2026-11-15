@@ -65,6 +65,12 @@ func _tocar() -> void:
 	_igual(Som.SONS["alarme"].get_length() <= 1.2, true, "o alarme é curto")
 	_igual(Som.SONS["alarme"].get_length() > 0.5, true, "e dura o bastante para dois tons")
 	_igual(Som.clique_da_acao("alarme"), "", "o alarme não é clique de ação")
+	som.tocar("viagem_ignicao")
+	som.tocar("viagem_pouso")
+	_igual(som.historico.slice(-2), ["viagem_ignicao", "viagem_pouso"], "os sons da viagem entram no histórico")
+	_igual(Som.SONS["viagem_ignicao"].get_length() > 2.0 and Som.SONS["viagem_ignicao"].get_length() < 3.0, true, "a ignição dura uns 2,5 s")
+	_igual(Som.SONS["viagem_pouso"].get_length() > 0.5 and Som.SONS["viagem_pouso"].get_length() < 1.0, true, "o pouso dura uns 0,7 s")
+	_igual(Som.clique_da_acao("viagem_pouso"), "", "os sons da viagem não são clique de ação")
 	for nome: String in Som.SONS:
 		_igual(Som.SONS[nome] is AudioStream, true, "som carregado: " + nome)
 	som.free()

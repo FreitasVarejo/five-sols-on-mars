@@ -54,11 +54,16 @@ func _tudo() -> void:
 	_main = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(_main)
 	await _quadros(3)
-	# O jogo abre na tela inicial e na abertura; o teste passa por elas até o plano do sol 1.
+	# O jogo abre na tela inicial, na viagem e na abertura; o teste passa por elas até o plano do sol 1.
 	_igual(_main.tela_atual(), "inicio", "o jogo abre na tela inicial")
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await _quadros(2)
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await _quadros(2)
 	_igual(_main.tela_atual(), "jogo", "depois da abertura, o jogo")
 	var regioes = JSON.parse_string(FileAccess.get_file_as_string("res://assets/comodo/regioes.json"))
 	_igual(regioes["botoes"].has("porta"), true, "regioes.json tem a porta clicável")

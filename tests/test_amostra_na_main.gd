@@ -70,12 +70,18 @@ func _tudo() -> void:
 	root.add_child(_main)
 	await _quadros(2)
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await process_frame
 	var t = _main._terminal
 	var m = _main._missao
 	m.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
 	await _quadros(2)
+	t._acionar("inicio_fase")  # o plano abre na tela inicial do Painel: a fase leva ao plano
 	var n := 0
 	while t.card_aberto and n < 20:
 		t._acionar("fechar_card")

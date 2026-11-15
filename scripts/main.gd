@@ -33,6 +33,8 @@ const Som := preload("res://scripts/som.gd")
 const Terminal := preload("res://scripts/terminal.gd")
 const Inicio := preload("res://scripts/inicio.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
+const PaginaDiario := preload("res://scripts/pagina_diario.gd")
+const Viagem := preload("res://scripts/abertura/viagem.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -102,16 +104,19 @@ var _mouse_pos := Vector2.ZERO
 # O pan por posição só vale com mouse de verdade e com o mouse dentro da janela.
 var _mouse_real := false
 var _mouse_dentro := true
-# O começo do jogo: tela inicial -> abertura -> plano do sol 1. Enquanto uma dessas sobreposições está na
+# O começo do jogo: tela inicial -> viagem -> abertura -> plano do sol 1. A página do diário (história do sol,
+# missão fixa) é a mesma sobreposição e abre antes do plano de cada sol. Enquanto uma dessas sobreposições está na
 # tela, nada por baixo responde (terminal, clique e pan da sala, setas); só o botão de mudo.
 var _sobreposicao: Control = null
-var _tela := "jogo"  # "inicio", "abertura" ou "jogo" (a sonda lê)
+var _tela := "jogo"  # "inicio", "viagem", "abertura", "pagina" ou "jogo" (a sonda lê)
 
 
 func _ready() -> void:
 	_parametros = _parametros_da_url()
 	_sondar = _parametros.get("sonda") == "1"
+	_terminal.com_inicio = true
 	_terminal.gravar_textos = _sondar
+	_terminal.com_pagina = true
 	_botao_mudo.som = _som
 	_terminal.som = _som
 	_terminal.duracao = Terminal.duracao_da_url(_parametros.get("terminal"))
@@ -265,11 +270,14 @@ func _notification(what: int) -> void:
 
 
 func _process(delta: float) -> void:
+	_vigiar_pagina()
 	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro. Parado enquanto a
 	# tela inicial ou a abertura estão na tela.
 	# Também parado enquanto o card do primeiro turno está aberto: o relógio só corre depois que ele fecha.
 	if _sobreposicao == null and not _terminal.segura_o_relogio():
 		_missao.avancar(minf(delta, 0.25))
+	if _tela == "viagem":
+		_sonda_se_mudou()  # o "Pular" aparece sozinho, depois de 1,5 s: a sonda o relê
 	if _missao.fixa_concluida and not _freeplay_gravado:
 		_freeplay_gravado = true
 		_gravar_freeplay_destravado()
@@ -518,11 +526,20 @@ func _abrir_inicio() -> void:
 	inicio.som = _som
 	inicio.marcar_idioma(TranslationServer.get_locale())
 	inicio.idioma_escolhido.connect(definir_idioma)
-	inicio.jogar.connect(_abrir_abertura)
+	inicio.jogar.connect(_abrir_viagem)
 	_por_sobreposicao(inicio, "inicio")
 
 
-## Troca a tela inicial pela abertura (instanciada por código, tela cheia).
+## Troca a tela inicial pela viagem Terra -> Marte (instanciada por código, tela cheia); ao fim ou ao pular,
+## vem a abertura.
+func _abrir_viagem() -> void:
+	var viagem := Viagem.new()
+	viagem.som = _som
+	viagem.concluida.connect(_abrir_abertura)
+	_por_sobreposicao(viagem, "viagem")
+
+
+## Troca a viagem pela abertura (instanciada por código, tela cheia).
 func _abrir_abertura() -> void:
 	var abertura := Abertura.new()
 	abertura.som = _som
@@ -532,6 +549,29 @@ func _abrir_abertura() -> void:
 
 ## A abertura acabou (botão final ou "Pular"): tira a sobreposição e devolve a entrada ao plano do sol 1.
 func _comecar_o_jogo() -> void:
+	_por_sobreposicao(null, "jogo")
+	_terminal.queue_redraw()
+	_vigiar_pagina()
+
+
+## O terminal pôs a página do diário na vez (o plano de um sol da missão fixa começou) e nenhuma sobreposição está
+## na tela: abre a página, que segura os cards do plano até o "Continuar".
+func _vigiar_pagina() -> void:
+	var sol_da_pagina: int = _terminal.sol_da_pagina()
+	if sol_da_pagina == 0 and _tela == "pagina":
+		_por_sobreposicao(null, "jogo")  # a página saiu da vez sem o Continuar (o terminal reiniciou o plano)
+		return
+	if sol_da_pagina == 0 or _sobreposicao != null:
+		return
+	var pagina := PaginaDiario.new()
+	pagina.som = _som
+	pagina.configurar(sol_da_pagina, tr("DIARIO_HISTORIA_%d" % sol_da_pagina), PaginaDiario.contexto_da_missao(_missao))
+	pagina.fechada.connect(_fechar_pagina)
+	_por_sobreposicao(pagina, "pagina")
+
+
+func _fechar_pagina() -> void:
+	_terminal.fechar_pagina()
 	_por_sobreposicao(null, "jogo")
 	_terminal.queue_redraw()
 
@@ -582,11 +622,21 @@ func _quadro_da_abertura() -> int:
 	return (_sobreposicao as Abertura).quadro_atual() if _tela == "abertura" else -1
 
 
-## O que se clica na sobreposição, nome -> [x, y, w, h]: a tela inicial (jogar, idioma_en, idioma_pt) ou a
-## abertura (pular e, no último quadro, comecar).
+## O que se clica na sobreposição, nome -> [x, y, w, h]: a tela inicial (jogar, idioma_en, idioma_pt), a
+## viagem (pular, depois de 1,5 s), a abertura (pular e, no último quadro, comecar) ou a página do diário
+## (continuar, depois da subida).
 func _ui_da_sobreposicao() -> Dictionary:
 	if _tela == "inicio":
 		return (_sobreposicao as Inicio).ui()
+	if _tela == "pagina":
+		return (_sobreposicao as PaginaDiario).ui()
+	if _tela == "viagem":
+		var v := _sobreposicao as Viagem
+		var ui_v := {}
+		if v.pode_pular():
+			var rv := v.rect_pular()
+			ui_v["pular"] = [roundi(rv.position.x), roundi(rv.position.y), roundi(rv.size.x), roundi(rv.size.y)]
+		return ui_v
 	var a := _sobreposicao as Abertura
 	var ui := {}
 	var itens := [["pular", a.rect_pular()]]

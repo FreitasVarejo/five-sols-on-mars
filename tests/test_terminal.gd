@@ -101,6 +101,14 @@ func _fechar_fila(t: Control) -> int:
 	return n
 
 
+## Espera o card da tela terminar de entrar (o movimento do primo, 0,35 s): só então o "Fechar" se clica.
+func _esperar_card(t: Control) -> void:
+	for i in 600:
+		await process_frame
+		if t.card_aberto and t._card_entrou():
+			return
+
+
 ## Roda `s` segundos de quadros: a missão avança e o terminal anda.
 func _rodar(t: Control, m: Missao, s: float) -> void:
 	var n := roundi(s / QUADRO)
@@ -1195,14 +1203,12 @@ func _cards_ao_lado_do_controle() -> void:
 		t.gravar_textos = true
 		t.iniciar(m, {})
 		root.add_child(t)
-		await process_frame
-		await process_frame
+		await _esperar_card(t)
 		_igual(t.card_id, "aviso", "%s: o aviso abre primeiro" % loc)
 		_igual(t.ui().keys(), ["fechar_card"], "%s: com o aviso, só o Fechar se clica" % loc)
 		t._acionar("fechar_card")
 		for id: String in ["sol1_o2", "sol1_ciencia", "sol1_confirmar"]:
-			await process_frame
-			await process_frame
+			await _esperar_card(t)
 			_igual(t.card_id, id, "%s: o card %s abre na ordem" % [loc, id])
 			var alvo: Rect2 = t._alvos[alvos[id]]
 			_verdade(alvo.size.x >= 24.0 and alvo.size.y >= 24.0, "%s: o controle %s foi registrado" % [loc, alvos[id]])
@@ -1273,8 +1279,7 @@ func _card_do_aviso_cabe() -> void:
 			t.gravar_textos = true
 			t.iniciar(m, dado)
 			root.add_child(t)
-			await process_frame
-			await process_frame
+			await _esperar_card(t)
 			_igual(t.card_id, "aviso", "%s: o aviso abre" % rotulo)
 			var f_atual: String = t._frase_donki_atual()
 			_igual(f_atual == "", historico, "%s: a frase do dado de hoje só existe com o dado do build" % rotulo)

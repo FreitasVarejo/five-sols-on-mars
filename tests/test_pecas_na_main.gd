@@ -73,8 +73,13 @@ func _tudo() -> void:
 	root.add_child(_main)
 	await _quadros(2)
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await process_frame
 	var t = _main._terminal
 	var m = _main._missao
 	# Sol 2 com o gerador quebrado e o ChemCam escolhido; cards fechados; o turno com o terminal no alto.
