@@ -25,6 +25,7 @@ const TelaBarra := preload("res://scripts/tela_barra.gd")
 const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
 const Estacoes := preload("res://scripts/estacoes.gd")
 const TelaComunicacao := preload("res://scripts/tela_comunicacao.gd")
+const IndicadorPorta := preload("res://scripts/indicador_porta.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
 const Som := preload("res://scripts/som.gd")
@@ -71,6 +72,7 @@ var _tela_energia: Control
 var _tela_oxigenio: Control
 var _tela_radiacao: Control
 var _estacoes: Control
+var _indicador_porta: Control
 var _parametros := {}  # parâmetros da URL (só Web)
 var _sonda_chave := ""
 var _sonda_t := 0.0
@@ -180,6 +182,14 @@ func _carregar_regioes() -> void:
 	comunicacao.size = rc.size
 	comunicacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_telas.add_child(comunicacao)
+
+	# A lâmpada da porta do dormitório e a lua de "pode dormir", na camada da sala.
+	_indicador_porta = IndicadorPorta.new()
+	_indicador_porta.size = _panorama.texture.get_size()
+	_indicador_porta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_indicador_porta.porta = _botoes["porta"]
+	_indicador_porta.lampada = _rect(dados["desenho"]["porta_lampada"])
+	_telas.add_child(_indicador_porta)
 
 	# Andamento das tarefas nas estações.
 	_estacoes = Estacoes.new()
@@ -295,10 +305,12 @@ func _atualizar_sala() -> void:
 				progresso[tarefa] = _missao.progresso_tarefa(tarefa)
 				clicaveis[tarefa] = _clicavel(ESTACOES[tarefa])
 	_estacoes.atualizar(estados, progresso, clicaveis)
+	_indicador_porta.atualizar(_missao.pode_encerrar_sol())
 
 
 ## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
-## delas está escolhida, pendente, sem outra rodando e fora do abrigo.
+## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
+## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
 	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala():
 		return false
@@ -309,6 +321,8 @@ func _clicavel(nome: String) -> bool:
 			return _pode_iniciar("planta")
 		"glovebox":
 			return _pode_iniciar("amostra")
+		"porta":
+			return _missao.pode_encerrar_sol()
 	return false
 
 
@@ -440,6 +454,8 @@ func _ao_clicar(nome: String) -> void:
 			fez = _missao.iniciar_tarefa("planta")
 		"glovebox":
 			fez = _missao.iniciar_tarefa("amostra")
+		"porta":
+			fez = _missao.encerrar_sol()
 	if fez:
 		_som.clique(nome)
 	_sonda_teste()
@@ -539,7 +555,7 @@ func _rect_na_tela(r: Rect2) -> Rect2:
 
 
 ## Tudo que se clica agora, nome -> [x, y, w, h] em px da tela de 640x360: o terminal e o que ele
-## mostra, mais a sala (abrigo, estufa, glovebox) e as setas, quando valem.
+## mostra, mais a sala (abrigo, estufa, glovebox, porta) e as setas, quando valem.
 func _ui_da_tela() -> Dictionary:
 	var ui: Dictionary = _terminal.ui()
 	for nome: String in _botoes:
@@ -623,6 +639,8 @@ func _sonda_teste() -> void:
 		"ui": _ui_da_tela(),
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
+		"pode_dormir": m.pode_encerrar_sol(), "porta_clicavel": _clicavel("porta"),
+		"porta_acesa": _indicador_porta.aceso,
 	}
 	estado.merge(_sonda_graficos())
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)

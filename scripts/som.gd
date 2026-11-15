@@ -34,7 +34,7 @@ const CLIQUE_DA_ACAO := {
 	"consertar_gerador": "clique_confirmar", "reiniciar": "clique_confirmar", "seguir": "clique_confirmar",
 	"jogar_de_novo": "clique_confirmar", "estufa": "clique_confirmar", "glovebox": "clique_confirmar",
 	"abrigo": "clique_abrigo",
-	"encerrar_sol": "clique_confirmar",  # provisório: o botão sai do terminal quando a porta entrar
+	"porta": "clique_confirmar",
 }
 
 ## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.

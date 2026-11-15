@@ -28,10 +28,9 @@ extends Control
 ##
 ## O card da Terra abre por cima do plano (card_aberto) e, enquanto aberto, só "Fechar" se clica.
 ##
-## No turno, "Encerrar o sol" (encerrar_sol) aparece quando Missao.pode_encerrar_sol(), com o terminal
-## aberto em qualquer aba ou abaixado, sempre no mesmo lugar: BOTAO_ENCERRAR, ao lado do botão
-## TERMINAL, na faixa da moldura abaixo da tela. "Consertar" (consertar_gerador) e
-## "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do terminal os substituem na próxima parte.
+## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
+## "Consertar" (consertar_gerador) e "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do
+## terminal os substituem na próxima parte.
 ##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
 
@@ -48,10 +47,6 @@ const DURACAO_PADRAO := 0.4
 const DURACAO_MIN := 0.15
 const DURACAO_MAX := 1.5
 const BOTAO := Rect2(260, 328, 120, 28)
-# "Encerrar o sol", aberto ou abaixado o terminal: ao lado do botão TERMINAL, na faixa de baixo (a
-# moldura, abaixo da tela do terminal, que não cobre aba nenhuma), longe das setas do pan (meio das
-# bordas), do medidor, das barras e dos chips do HUD.
-const BOTAO_ENCERRAR := Rect2(388, 328, 164, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
@@ -342,8 +337,6 @@ func _acionar(nome: String) -> void:
 			fez = missao.iniciar_tarefa("chemcam")
 		"consertar_gerador":
 			fez = missao.iniciar_tarefa("gerador")
-		"encerrar_sol":
-			fez = missao.encerrar_sol()
 		"enviar":
 			fez = missao.enviar_a_terra()
 		"reiniciar":
@@ -509,9 +502,6 @@ func _draw() -> void:
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
-	# O "Encerrar o sol" fica ao lado do botão TERMINAL, em qualquer aba, enquanto valer.
-	if fase_ui == "turno" and livre and not card and missao.pode_encerrar_sol():
-		_botao("encerrar_sol", BOTAO_ENCERRAR, tr("ENCERRAR_O_SOL"), "sol", true, 12)
 	if _fade > 0.0:
 		draw_rect(TELA, Color(Desenho.NOITE, _fade))
 	desenhou.emit()

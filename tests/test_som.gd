@@ -68,12 +68,13 @@ func _peso_dos_cliques() -> void:
 	var navegar := ["aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes", "voltar_plano", "fechar_card",
 		"o2_menos", "o2_mais", "tarefa_chemcam", "tarefa_amostra", "tarefa_planta"]
 	var confirmar := ["confirmar", "enviar", "iniciar_chemcam", "consertar_gerador", "reiniciar", "seguir",
-		"jogar_de_novo", "estufa", "glovebox"]
+		"jogar_de_novo", "estufa", "glovebox", "porta"]
 	for acao: String in navegar:
 		_igual(Som.clique_da_acao(acao), "clique_navegar", "navegar: " + acao)
 	for acao: String in confirmar:
 		_igual(Som.clique_da_acao(acao), "clique_confirmar", "confirmar: " + acao)
 	_igual(Som.clique_da_acao("abrigo"), "clique_abrigo", "o botão do abrigo na sala")
+	_igual(Som.clique_da_acao("encerrar_sol"), "", "o botão saiu do terminal: a ação não existe mais")
 	# Sem clique: o botão do terminal (tem o sobe e desce), as setas e o mudo.
 	for acao: String in ["terminal", "seta_esq", "seta_dir", "mudo", "", "não_existe"]:
 		_igual(Som.clique_da_acao(acao), "", "sem clique: " + acao)

@@ -2,7 +2,8 @@ extends Control
 ## HUD do turno, depois do shader (não curva e não muda com o pan). Só ícones e números, porque o
 ## turno não tem texto para ler:
 ##  - canto superior esquerdo, fixo: o sol atual, os eventos em curso (tempestade do Sol, poeira),
-##    o alerta do gerador quebrado e o alerta do medidor;
+##    o alerta do gerador quebrado, o alerta do medidor e a lua de "pode dormir" (a porta do dormitório
+##    fica na ponta da sala e só aparece virando);
 ##  - faixa do Sol no topo, no centro: o Sol anda da esquerda para a direita e é o relógio do turno.
 ## Sem cor de pôr do Sol: a cor do pôr do Sol em Marte ainda não tem fonte conferida.
 
@@ -53,6 +54,11 @@ func _draw() -> void:
 		_chip(Rect2(x, 6, 26, 22))
 		draw_rect(Rect2(x, 6, 26, 22), Desenho.AMARELO, false, 2.0)
 		Desenho.icone(self, "gerador", Rect2(x + 4, 9, 18, 16), Desenho.AMARELO, Desenho.NOITE)
+		x += 30
+	# Pode dormir (a lista acabou): a lua, firme. A porta do dormitório encerra o sol.
+	if missao.pode_encerrar_sol():
+		_chip(Rect2(x, 6, 26, 22))
+		Desenho.icone(self, "lua", Rect2(x + 4, 9, 18, 16), Desenho.TEXTO)
 		x += 30
 	# O alerta: amarelo em "atenção", vermelho em "abrigo", enquanto fora do abrigo. Fixo, sem piscar.
 	var m := missao.medidor()
