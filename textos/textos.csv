@@ -25,7 +25,7 @@ INICIO_ST_DIARIO,%d of %d sols in the log,%d de %d sóis no diário
 INICIO_ST_FONTES_ATUAL,With recent NASA data,Com dado recente da NASA
 INICIO_ST_FONTES_HIST,Data from May 2024,Dados de maio de 2024
 SOL_N,Sol %d,Sol %d
-AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in minutes. Watch the radiation meter. If it goes up, go to the shelter.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em minutos. Fique de olho no medidor de radiação. Se ele subir, vá para o abrigo."
+AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in tens of minutes. If the alarm sounds, go to the shelter. The shelter button is on the left wall.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em dezenas de minutos. Se o alarme tocar, vá para o abrigo. O botão do abrigo fica à esquerda."
 DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s, at %d km/s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s, a %d km/s%s."
 DONKI_RASPAO,", a glancing blow",", de raspão"
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
@@ -88,12 +88,12 @@ MODO_SEGURANCA,Safe mode,Modo de segurança
 CAUSA_ENERGIA,The base ran out of energy.,A base ficou sem energia.
 CAUSA_OXIGENIO,The oxygen ran out.,O oxigênio acabou.
 CAUSA_RADIACAO,The radiation margin ran out.,A margem de radiação acabou.
-CAUSA_SEM_ABRIGO,"The crew reached the shelter too late and took too much radiation in the storm. When the meter goes up, go to the shelter right away.","A tripulação foi para o abrigo tarde demais e recebeu radiação demais na tempestade. Quando o medidor subir, vá para o abrigo na hora."
+CAUSA_SEM_ABRIGO,"The crew reached the shelter too late. The storm gave them too much radiation. When the alarm sounds, go right away.","A tripulação chegou tarde ao abrigo. A tempestade deu radiação demais. Quando o alarme tocar, vá na hora."
 SEM_CONSERTO,"This came from earlier sols, so no plan today saves this sol.",Isso veio dos sóis anteriores. Nenhum plano de hoje salva este sol.
 CASO_REAL_ENERGIA,Real case · 2018,Caso real · 2018
 CASO_TEXTO_ENERGIA,"In 2018, Opportunity ran out of energy in a dust storm. Its panel fell from 645 to 22 Wh per sol.","Em 2018, o Opportunity ficou sem energia numa tempestade de poeira. O painel caiu de 645 para 22 Wh por sol."
 CASO_REAL_RADIACAO,Real case · October 1989,Caso real · outubro de 1989
-CASO_TEXTO_RADIACAO,"October 1989 is the reference event that NASA designs the shelter for. In the game, the dose was scaled up.","Outubro de 1989 é o evento de referência para o qual a NASA projeta o abrigo. No jogo, a dose foi ampliada."
+CASO_TEXTO_RADIACAO,"October 1989 is the reference solar storm NASA uses to design crew protection. In the game, the dose was scaled up.","Outubro de 1989 é a tempestade solar de referência que a NASA usa para projetar a proteção da tripulação. No jogo, a dose foi ampliada."
 CASO_REAL_OXIGENIO,Real number,Número real
 CASO_TEXTO_OXIGENIO,Each person breathes about 0.9 kg of oxygen per day.,"Cada pessoa respira cerca de 0,9 kg de oxigênio por dia."
 MODOS_NA_MISSAO,Safe modes in this mission: %d,Modos de segurança nesta missão: %d
@@ -161,7 +161,7 @@ FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
 CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt)."
 CREDITOS_README,Full list in the README.,Lista completa no README.
-CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the generator made no oxygen. Next time, save power in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, guarde energia na bateria."
+CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no energy, and the generator made no oxygen. Next time, leave more energy in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, deixe mais energia na bateria."
 CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Panel, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Painel, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
@@ -171,7 +171,7 @@ RELATORIO_26_MESES,"In the simulator, the ship arrives in 5 sols. In real life, 
 ABERTURA_ROLAR,scroll,role
 ABERTURA_1_TITULO,Mars. Gale Crater.,Marte. Cratera Gale.
 ABERTURA_1_A,This small base is yours.,Esta pequena base é sua.
-ABERTURA_1_B,You are the commander.,Você é o comandante.
+ABERTURA_1_B,You are the commander.,Você comanda a missão.
 ABERTURA_2_A,Your crew lives inside.,Sua tripulação mora aqui dentro.
 ABERTURA_2_B,"Outside, there is no air to breathe.","Lá fora, não há ar para respirar."
 ABERTURA_2_C,"On Mars, a day is called a sol.","Em Marte, um dia se chama sol."
@@ -187,7 +187,7 @@ ABERTURA_RAD_ROTULO,Radiation,Radiação
 ABERTURA_RAD_A,Sometimes the Sun throws out storms.,"Às vezes, o Sol solta tempestades."
 ABERTURA_RAD_B,"Fast, invisible particles reach the base.",Partículas rápidas e invisíveis chegam à base.
 ABERTURA_RAD_C,Too much radiation makes the crew sick.,Radiação demais deixa a tripulação doente.
-ABERTURA_RAD_D,This bar never fills back up.,Esta barra nunca enche de novo.
+ABERTURA_RAD_D,Margin is how much more they can take. It never fills back up.,Margem é quanto a tripulação ainda aguenta. Ela nunca enche de novo.
 ABERTURA_CI_ROTULO,Science,Ciência
 ABERTURA_CI_A,Scientists on Earth ask for experiments.,Cientistas na Terra pedem experimentos.
 ABERTURA_CI_B,Their messages take minutes to arrive.,As mensagens levam minutos para chegar.
@@ -219,10 +219,10 @@ VIAGEM_P6,Atmosphere entry,Entrada na atmosfera
 VIAGEM_P7,Parachutes open,Paraquedas abertos
 SOL1_CARD_O2,Give energy to the oxygen machine here.,Dê energia à máquina de oxigênio aqui.
 SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos da Terra ficam aqui. Cada um dá ciência.
-SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
-SOL1_CARD_TURNO,Your tasks are in the Panel. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Painel. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
+SOL1_CARD_CONFIRMAR,Leftover energy stays in the battery. The bars show your plan's result. Then press Confirm plan.,"A energia que sobra fica na bateria. As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
+SOL1_CARD_TURNO,ChemCam is in the Panel. Plant and Sample are on the right wall. Shelter and bedroom are on the left. Use the arrows to turn the room.,O ChemCam fica no Painel. Planta e Amostra ficam na parede direita. O abrigo e o dormitório ficam à esquerda. Use as setas para virar a sala.
 CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
-CARD_GERADOR,"The generator broke! In the Panel, press Cameras, then MOXIE.","O gerador quebrou! No Painel, aperte Câmeras e depois MOXIE."
+CARD_GERADOR,The oxygen generator broke! Fix it in the Panel.,O gerador de oxigênio quebrou! Conserte no Painel.
 RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.
 ENVIADO_PACOTE_DA_MANHA,Sent from Earth in the morning packet,Enviado da Terra no pacote da manhã
 CONFIRMA_DORMIR,Going to sleep ends the sol. The rest of the sol passes fast. Nothing is lost.,Ir dormir encerra o sol. O resto do sol passa rápido. Nada se perde.
