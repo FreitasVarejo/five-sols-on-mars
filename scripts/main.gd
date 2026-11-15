@@ -265,7 +265,8 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	# O relógio do jogo não dá salto se a aba ficou parada: no máximo 0,25 s por quadro. Parado enquanto a
 	# tela inicial ou a abertura estão na tela.
-	if _sobreposicao == null:
+	# Também parado enquanto o card do primeiro turno está aberto: o relógio só corre depois que ele fecha.
+	if _sobreposicao == null and not _terminal.segura_o_relogio():
 		_missao.avancar(minf(delta, 0.25))
 	if _missao.fixa_concluida and not _freeplay_gravado:
 		_freeplay_gravado = true
@@ -343,7 +344,8 @@ func _atualizar_sala() -> void:
 ## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
 ## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
-	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _sobreposicao != null:
+	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _terminal.card_aberto \
+			or _sobreposicao != null:
 		return false
 	match nome:
 		"abrigo":
@@ -429,7 +431,7 @@ func _panorama_para_tela(q: Vector2) -> Vector2:
 
 ## Nome do botão sob o ponto p da tela ("" se nenhum). As setas tapam.
 func _regiao_em(p: Vector2) -> String:
-	if _terminal.tapa_a_sala() or _sobreposicao != null:
+	if _terminal.tapa_a_sala() or _terminal.card_aberto or _sobreposicao != null:
 		return ""
 	for seta in [_seta_esq, _seta_dir]:
 		if seta.is_visible_in_tree() and seta.get_global_rect().has_point(p):
@@ -804,7 +806,7 @@ func _sonda_teste() -> void:
 		"terminal_aberto": _terminal.aberto,
 		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),
 			"duracao": _terminal.duracao},
-		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "card": _terminal.card_id, "textos": _terminal.textos(),
+		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "card": _terminal.card_id, "relogio_parado": _terminal.segura_o_relogio(), "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),

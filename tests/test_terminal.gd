@@ -291,8 +291,15 @@ func _cliques_so_quando_a_acao_acontece() -> void:
 	_rodar(t, m, QUADRO * 2.0)
 	_igual(som.historico, ["clique_confirmar", "terminal_desce"], "confirmar: clique e a descida")
 	som.historico.clear()
-	# No turno, a tecla desabilitada (diário) não faz nada.
+	# O terminal chega embaixo e o sol 1 abre o card do primeiro turno: o botão TERMINAL não vale, só o Fechar.
 	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.card_id, "turno", "o card do primeiro turno abre embaixo")
+	t._acionar("terminal")
+	t._acionar("aba_cameras")
+	_igual(som.historico, [], "com o card do turno aberto, só o Fechar faz algo")
+	_igual(_fechar_fila(t), 1, "o card do turno fecha com um Fechar")
+	som.historico.clear()
+	# No turno, a tecla desabilitada (diário) não faz nada.
 	t._acionar("aba_diario")
 	_igual(som.historico, [], "tecla desabilitada: sem som")
 	t._acionar("aba_cameras")
@@ -328,7 +335,10 @@ func _fila_de_cards() -> void:
 	_igual(t.card_id, "", "a fila acabou")
 	# Reinício do sol 1 (o2 1 sem produzir cai em segurança): volta só o aviso.
 	t._acionar("confirmar")
+	_igual(t.segura_o_relogio(), true, "o relógio espera o card do primeiro turno desde o Confirmar")
 	_rodar(t, m, t.duracao * 1.5)
+	_igual(_fechar_fila(t), 1, "o primeiro turno abre o card do turno")
+	_igual(t.segura_o_relogio(), false, "fechado o card, o relógio corre")
 	_ate_sair_do_turno(t, m)
 	_igual(m.fase, "seguranca", "o sol 1 caiu em segurança")
 	_rodar(t, m, QUADRO * 3.0)
@@ -412,6 +422,7 @@ func _desligar_pelo_relogio() -> void:
 	_igual(_fechar_fila(t), 4, "o sol 1 abre com o aviso da Terra e os três cards do sol 1")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
+	_igual(_fechar_fila(t), 1, "o primeiro turno abre o card do turno")
 	som.historico.clear()
 	_ate_sair_do_turno(t, m)
 	_igual(m.fase, "seguranca", "entrou no modo de segurança no fim do turno")
@@ -429,6 +440,7 @@ func _desligar_pelo_relogio() -> void:
 	_igual(_fechar_fila(t), 1, "o plano reiniciado abre só com o aviso de novo (os do sol 1 não voltam)")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.card_aberto, false, "o card do turno não volta no reinício do sol 1")
 	som.historico.clear()
 	_ate_sair_do_turno(t, m)
 	_rodar(t, m, QUADRO * 3.0)

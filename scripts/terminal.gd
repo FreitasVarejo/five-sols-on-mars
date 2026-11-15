@@ -31,6 +31,10 @@ extends Control
 ## O aviso da tempestade é centrado e cobre o plano; os cards do sol 1 ficam ao lado do controle que nomeiam,
 ## que fica claro e com contorno enquanto o resto do plano escurece.
 ##
+## O card do primeiro turno (só no sol 1 da missão fixa, uma vez por sessão) abre quando o terminal chega
+## embaixo, sobre a sala, perto do botão TERMINAL. O relógio do turno só corre depois que ele fecha
+## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
+##
 ## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
 ## "Consertar" (consertar_gerador) e "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do
 ## terminal os substituem na próxima parte.
@@ -89,6 +93,10 @@ const CARD_TAM := 13
 # Os cards ficam na coluna que não tem o controle: a da esquerda tem o O2 e a ciência; a da direita, o confirmar.
 const CARD_X_DIREITA := 372.0
 const CARD_X_ESQUERDA := 98.0
+# O card do primeiro turno: embaixo, acima do botão TERMINAL, longe do medidor (no alto da sala) e das setas
+# (nas bordas, de y 120 a 240).
+const CARD_TURNO_LARGURA := 340.0
+const CARD_TURNO_FUNDO := 322.0
 
 # Tela cheia (relatório).
 const X_ESQ := 14.0
@@ -125,6 +133,7 @@ var _mouse := Vector2(-100, -100)
 var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
+var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
 
 
 func iniciar(m: Missao, dado_donki: Dictionary) -> void:
@@ -228,8 +237,26 @@ var card_aberto: bool:
 		return card_id != ""
 
 
+## O card da tela está à vista? Os do plano, com o terminal no alto; o do primeiro turno, com ele embaixo.
 func _card_visivel() -> bool:
+	if card_id == "turno":
+		return _pos <= 0.0
 	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
+
+
+## O relógio do turno espera? Do "Confirmar plano" do sol 1 da missão fixa até o card do primeiro turno fechar
+## (uma vez por sessão). A main não avança a missão enquanto isto vale.
+func segura_o_relogio() -> bool:
+	if missao == null:
+		return false
+	if _segura_turno:
+		return true
+	# Já no quadro em que a missão entrou no turno, antes de o terminal ver a troca de fase.
+	return missao.fase == "turno" and _fase_logica != "turno" and _tem_card_de_turno()
+
+
+func _tem_card_de_turno() -> bool:
+	return not missao.livre and missao.sol == 1 and not _vistos.has("turno")
 
 
 ## A tela passa a mostrar a fase `f`: zera a aba e, no plano, monta a fila de cards.
@@ -320,6 +347,11 @@ func _process(delta: float) -> void:
 			if _fade <= 0.0:
 				_fade_estado = ""
 	var animou := _animar(delta)
+	# O card do primeiro turno abre quando o terminal chega embaixo.
+	if _segura_turno and card_id == "" and not aberto and _pos <= 0.0 and fase_ui == "turno":
+		card_id = "turno"
+		_vistos["turno"] = true
+		animou = true
 	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
@@ -336,6 +368,7 @@ func _vigiar_alarme() -> void:
 
 func _ao_mudar_de_fase(de: String, para: String) -> void:
 	_fase_logica = para
+	_segura_turno = para == "turno" and _tem_card_de_turno()
 	# O turno que acaba pelo relógio escurece para um cinza neutro antes do terminal subir.
 	# O modo de segurança no meio do turno entra direto.
 	if de == "turno" and (para == "fim_do_sol" or para == "seguranca") and missao.t >= missao.turno_s - 1e-6:
@@ -391,6 +424,8 @@ func _acionar(nome: String) -> void:
 			_definir_aberto(not aberto)
 		"fechar_card":
 			_abrir_proximo()
+			if card_id == "":
+				_segura_turno = false
 		"voltar_plano":
 			aba = ""
 		"aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes":
@@ -575,7 +610,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
 		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
-		if card:
+		if card and card_id != "turno":
 			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica. O card ao lado
 			# de um controle deixa esse controle claro, com contorno.
 			var alvo := _alvo_do_card()
@@ -587,6 +622,9 @@ func _draw() -> void:
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
+	if card and card_id == "turno":
+		_travado = false
+		_desenhar_card_turno()
 	if alerta_sobre_o_terminal():
 		_desenhar_alerta()
 	if _fade > 0.0:
@@ -952,6 +990,25 @@ func _desenhar_card_ao_lado(alvo: Rect2) -> void:
 		else:
 			draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, ponta_y - 8.0),
 				Vector2(r.end.x + 10.0, ponta_y), Vector2(r.end.x, ponta_y + 8.0)]), Desenho.AZUL)
+	draw_rect(r, Desenho.AZUL)
+	var yy := r.position.y + 12.0
+	for frase: String in frases:
+		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
+
+
+## O card do primeiro turno, sobre a sala, acima do botão TERMINAL (que fica apagado) e com a ponta para ele.
+func _desenhar_card_turno() -> void:
+	var larg := CARD_TURNO_LARGURA - 24.0
+	var frases := Abertura.frases(tr("SOL1_CARD_TURNO"))
+	var altura_texto := 0.0
+	for frase: String in frases:
+		altura_texto += Desenho.altura_texto(frase, CARD_TAM, larg, true) + 4.0
+	var altura := 12.0 + altura_texto + 4.0 + 36.0 + 12.0
+	var r := Rect2(roundf((640.0 - CARD_TURNO_LARGURA) / 2.0), CARD_TURNO_FUNDO - altura, CARD_TURNO_LARGURA, altura)
+	var cx := BOTAO.get_center().x
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - 8.0, r.end.y), Vector2(cx, BOTAO.position.y - 1.0),
+		Vector2(cx + 8.0, r.end.y)]), Desenho.AZUL)
 	draw_rect(r, Desenho.AZUL)
 	var yy := r.position.y + 12.0
 	for frase: String in frases:

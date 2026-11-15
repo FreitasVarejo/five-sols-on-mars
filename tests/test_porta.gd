@@ -43,6 +43,11 @@ func _turno(tarefas: Array) -> void:
 	_main._missao.confirmar_plano()
 	await _quadros(2)
 	await _esperar_terminal()
+	# O primeiro turno do sol 1 abre o card do turno (uma vez por sessão): o teste o fecha, e o relógio corre.
+	if _main._terminal.card_aberto:
+		_igual(_main._terminal.card_id, "turno", "o único card que abre no turno é o do primeiro turno")
+		_main._terminal._acionar("fechar_card")
+		await _quadros(2)
 
 
 func _tudo() -> void:
