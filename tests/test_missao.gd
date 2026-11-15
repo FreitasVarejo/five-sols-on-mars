@@ -21,6 +21,7 @@ func _init() -> void:
 	_pico_e_medidor()
 	_abrigo_e_tarefas()
 	_abrigo_de_mao_unica()
+	_tarefas_da_peca()
 	_tarefa_nao_feita_e_teto()
 	_exposicao_e_dose()
 	_seguranca_no_meio_do_turno()
@@ -73,6 +74,14 @@ func _ate_sair_do_turno(m, passo: float = 0.25) -> void:
 	while m.fase == "turno" and guarda < 100000:
 		m.avancar(passo)
 		guarda += 1
+
+
+## Um passo de 0,25 s do turno simulado, com a criança terminando a peça (chemcam, gerador) exatamente em
+## tarefa_s: o relógio não conclui essas tarefas, então quem joga as conclui no passo em que o tempo chega.
+func _passo(m, dt: float = 0.25) -> void:
+	m.avancar(dt)
+	if m.tarefa_rodando in Missao.POR_PECA and m.tarefa_t >= m.tarefa_s - Missao.EPS:
+		m.concluir_tarefa(m.tarefa_rodando)
 
 
 ## Missão em um sol de tempestade solar (3), com o estado dado, no plano. A poeira fica só no sol 5
@@ -321,6 +330,8 @@ func _abrigo_e_tarefas() -> void:
 	m.avancar(4.9)
 	_igual(m.tarefas["chemcam"], "rodando", "aos 9,9 s ainda roda")
 	m.avancar(0.2)
+	_igual(m.tarefas["chemcam"], "rodando", "passou de TAREFA_S e o relógio não a termina: só a peça")
+	_verdade(m.concluir_tarefa("chemcam"), "a peça conclui a tarefa que roda")
 	_igual(m.tarefas["chemcam"], "feita", "roda TAREFA_S e vira feita")
 	_igual(m.ciencia_do_sol(), 1, "feita rende +1 de ciência")
 	_igual(m.iniciar_tarefa("chemcam"), false, "tarefa feita não inicia de novo")
@@ -365,6 +376,7 @@ func _abrigo_de_mao_unica() -> void:
 	c.confirmar_plano()
 	c.iniciar_tarefa("chemcam")
 	c.avancar(10.0)
+	c.concluir_tarefa("chemcam")
 	_igual(c.tarefas["chemcam"], "feita", "chemcam feita antes do abrigo")
 	_verdade(c.abrigar(), "abrigar depois de uma tarefa feita")
 	_igual(c.tarefas["chemcam"], "feita", "a ciência feita não se perde ao abrigar")
@@ -390,6 +402,98 @@ func _abrigo_de_mao_unica() -> void:
 	_igual(g.iniciar_tarefa("gerador"), false, "abrigado não conserta o gerador")
 
 
+## As tarefas de POR_PECA (ChemCam e gerador) só acabam pelo `concluido` da peça: o relógio não as termina, e
+## concluir_tarefa só vale no turno, fora do abrigo e para a que está rodando.
+func _tarefas_da_peca() -> void:
+	_igual(Missao.POR_PECA, ["chemcam", "gerador"], "as tarefas que só a peça termina")
+	for nome in Missao.POR_PECA:
+		_verdade(nome in Missao.TAREFAS or nome in Missao.MANUTENCAO, "POR_PECA só tem tarefa da missão: " + nome)
+	_igual("painel" in Missao.TAREFAS or "painel" in Missao.MANUTENCAO or "painel" in Missao.POR_PECA, false,
+		"o painel não está na missão")
+	# O relógio não termina a da peça, e termina a das estações (amostra), no mesmo turno.
+	var m = Missao.new(1, {"sol_solar": 3})
+	m.alternar_tarefa("chemcam")
+	m.confirmar_plano()
+	_verdade(m.iniciar_tarefa("chemcam"), "chemcam inicia")
+	m.avancar(m.turno_s - 1.0)
+	_igual(m.tarefas["chemcam"], "rodando", "o relógio não termina o chemcam, nem aos 59 s")
+	_igual(m.tarefa_rodando, "chemcam", "e ele segue rodando")
+	_verdade(m.tarefa_t > m.tarefa_s, "o tempo da tarefa segue contando")
+	_igual(m.ciencia_do_sol(), 0, "sem a peça, nenhuma ciência")
+	var a = Missao.new(1, {"sol_solar": 3})
+	a.alternar_tarefa("amostra")
+	a.confirmar_plano()
+	a.iniciar_tarefa("amostra")
+	a.avancar(a.tarefa_s + 0.1)
+	_igual(a.tarefas["amostra"], "feita", "o relógio segue terminando a amostra")
+	_igual(a.concluir_tarefa("amostra"), false, "concluir uma já feita não vale")
+	# Falha: no plano, sem a tarefa rodando, com outra rodando, abrigado, depois do turno.
+	var f = Missao.new(1, {"sol_solar": 3})
+	f.alternar_tarefa("chemcam")
+	f.alternar_tarefa("amostra")
+	_igual(f.concluir_tarefa("chemcam"), false, "no plano não vale")
+	f.confirmar_plano()
+	var v: int = f.versao
+	_igual(f.concluir_tarefa("chemcam"), false, "pendente (nunca rodou) não vale")
+	f.iniciar_tarefa("amostra")
+	_igual(f.concluir_tarefa("chemcam"), false, "só a que está rodando vale: outra roda")
+	_igual(f.tarefas["amostra"], "rodando", "a que roda não muda")
+	_igual(f.versao, v + 1, "as falhas não mexem na versão (só o iniciar subiu)")
+	_igual(f.concluir_tarefa("inexistente"), false, "tarefa que não existe")
+	f.abrigar()
+	_igual(f.concluir_tarefa("chemcam"), false, "abrigado não vale")
+	_igual(f.concluir_tarefa("amostra"), false, "abrigado: nem a que rodava")
+	_igual(f.tarefas["chemcam"], "pendente", "abrigado: a tarefa segue pendente")
+	f.avancar(f.turno_s)
+	_igual(f.fase, "fim_do_sol", "o turno acabou")
+	_igual(f.concluir_tarefa("chemcam"), false, "fora do turno não vale")
+	# Falha pelo modo de segurança no meio do turno: a tarefa rodava, e concluir não vale mais.
+	var z = Missao.new(1, {"sol_solar": 3})
+	z.montar_sol(2, _st(6, 0, 12, 1.0, true))
+	z.confirmar_plano()
+	z.iniciar_tarefa("gerador")
+	z.avancar(z.turno_s)
+	_igual(z.fase, "seguranca", "o gerador não consertado e sem O2: modo de segurança")
+	_igual(z.concluir_tarefa("gerador"), false, "no modo de segurança não vale")
+	# Concluir o ChemCam rende ciência; zera o relógio da tarefa e sobe a versão.
+	var c = Missao.new(1, {"sol_solar": 3})
+	c.alternar_tarefa("chemcam")
+	c.confirmar_plano()
+	c.iniciar_tarefa("chemcam")
+	c.avancar(4.0)
+	var vc: int = c.versao
+	_verdade(c.concluir_tarefa("chemcam"), "o chemcam concluído pela peça")
+	_igual(c.tarefas["chemcam"], "feita", "feita")
+	_igual(c.tarefa_rodando, "", "nada roda depois")
+	_igual(c.tarefa_t, 0.0, "o relógio da tarefa zera")
+	_igual(c.versao, vc + 1, "a versão sobe")
+	_igual(c.progresso_tarefa("chemcam"), 1.0, "feita: o andamento é 1")
+	_igual(c.ciencia_do_sol(), 1, "concluir o chemcam rende ciência")
+	_igual(c.ciencia_ate_agora(), 1, "e conta até agora")
+	_igual(c.concluir_tarefa("chemcam"), false, "concluir duas vezes não vale")
+	c.avancar(c.turno_s)
+	_igual(c.registros[0]["ciencia"], 1, "registro: a ciência do chemcam")
+	_igual(c.registros[0]["feitas"], ["chemcam"], "registro: feitas")
+	_igual(c.ciencia_total(), 1, "a ciência da missão")
+	# Concluir o gerador libera o O2 do mesmo sol (como antes, quando o relógio o terminava); sem a peça, não.
+	var g = Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	g.montar_sol(2, _st(6, 0, 12, 1.0, true))
+	g.mudar_q(1)
+	g.mudar_q(1)
+	g.confirmar_plano()
+	g.iniciar_tarefa("gerador")
+	g.avancar(g.tarefa_s)
+	_igual(g.gerador_quebrado_agora(), true, "passou o tempo e o gerador segue quebrado: só a peça o conserta")
+	_verdade(g.concluir_tarefa("gerador"), "o gerador concluído pela peça")
+	_igual(g.gerador_quebrado_agora(), false, "consertado")
+	_igual(g.ciencia_do_sol(), 0, "o conserto não é ciência")
+	g.avancar(g.turno_s)
+	_igual(g.registros[0]["o2_produzido"], 2, "o conserto libera o O2 do mesmo sol")
+	_igual(g.registros[0]["consertou"], true, "registro: consertou")
+	_igual(g.st_fim["gerador_quebrado"], false, "o gerador volta a funcionar")
+	_igual(g.modos, 0, "sem modo de segurança")
+
+
 func _tarefa_nao_feita_e_teto() -> void:
 	# q 0 e 3 tarefas: sobram 13 - 6 = 7. Só chemcam feita: devolve 2 * 2 = 4, bateria 11.
 	var m = Missao.new(1, {"sol_solar": 3})
@@ -398,6 +502,7 @@ func _tarefa_nao_feita_e_teto() -> void:
 	m.confirmar_plano()
 	m.iniciar_tarefa("chemcam")
 	m.avancar(10.0)
+	m.concluir_tarefa("chemcam")
 	m.iniciar_tarefa("amostra")
 	_ate_sair_do_turno(m)  # a amostra roda até o fim do turno e termina; a planta nunca inicia
 	var r: Dictionary = m.registros[0]
@@ -696,6 +801,7 @@ func _causa_pelo_contexto() -> void:
 	g.confirmar_plano()
 	g.iniciar_tarefa("gerador")
 	g.avancar(g.tarefa_s)
+	g.concluir_tarefa("gerador")
 	_igual(g.tarefas["gerador"], "feita", "gerador: o conserto terminou")
 	g.avancar(g.turno_s)
 	_igual(g.fase, "seguranca", "gerador consertado e q 0: o oxigênio acaba")
@@ -901,8 +1007,9 @@ func _quebra_do_gerador() -> void:
 					m.confirmar_plano()
 					if m.eh_sol_solar():
 						m.abrigar()
-					if m.tarefas.has("gerador"):
-						m.iniciar_tarefa("gerador")
+					if m.tarefas.has("gerador") and m.iniciar_tarefa("gerador"):
+						m.avancar(m.tarefa_s)  # a criança acaba a peça exatamente em tarefa_s
+						m.concluir_tarefa("gerador")
 					m.avancar(m.turno_s)
 				"fim_do_sol":
 					m.enviar_a_terra()
@@ -955,6 +1062,8 @@ func _quebra_do_gerador() -> void:
 	_igual(c.progresso_tarefa("gerador"), 0.5, "andamento do conserto")
 	_igual(c.ciencia_do_sol(), 0, "consertar não conta como ciência")
 	c.avancar(5.0)
+	_igual(c.tarefas["gerador"], "rodando", "o relógio não termina o conserto")
+	c.concluir_tarefa("gerador")
 	_igual(c.tarefas["gerador"], "feita", "o conserto leva TAREFA_S")
 	_igual(c.ciencia_do_sol(), 0, "gerador feito: a ciência segue 0")
 	_igual(c.ciencia_ate_agora(), 0, "gerador feito: ciência até agora 0")
@@ -1041,6 +1150,7 @@ func _encerrar_sol() -> void:
 	_igual(t.lista_acabou(), false, "tarefa rodando: a lista não acabou")
 	_igual(t.encerrar_sol(), false, "tarefa rodando: não encerra")
 	t.avancar(10.0)
+	t.concluir_tarefa("chemcam")
 	_igual(t.lista_acabou(), true, "tarefa feita: a lista acabou")
 	_verdade(t.encerrar_sol(), "tarefa feita: encerra")
 	t.avancar(7.0)
@@ -1052,10 +1162,12 @@ func _encerrar_sol() -> void:
 	g.confirmar_plano()
 	g.iniciar_tarefa("chemcam")
 	g.avancar(10.0)
+	g.concluir_tarefa("chemcam")
 	_igual(g.lista_acabou(), false, "ciência feita, gerador por consertar: a lista não acabou")
 	_igual(g.encerrar_sol(), false, "gerador por consertar: não encerra")
 	g.iniciar_tarefa("gerador")
 	g.avancar(10.0)
+	g.concluir_tarefa("gerador")
 	_igual(g.lista_acabou(), true, "ciência e gerador feitos: a lista acabou")
 	_verdade(g.encerrar_sol(), "ciência e gerador feitos: encerra")
 	# Abrigado, a lista acabou mesmo com tarefa pendente.
@@ -1230,7 +1342,7 @@ func _jogar_sol(m) -> void:
 				if m.tarefas[nome] == "pendente":
 					m.iniciar_tarefa(nome)
 					break
-		m.avancar(0.25)
+		_passo(m)
 		guarda += 1
 
 
@@ -1330,7 +1442,7 @@ func _jogar_turno(m, espera_a_lista: bool) -> void:
 				if m.tarefas[nome] == "pendente":
 					m.iniciar_tarefa(nome)
 					break
-		m.avancar(0.25)
+		_passo(m)
 
 
 ## Monta o plano (q de O2 e n tarefas de ciência) e joga o turno.

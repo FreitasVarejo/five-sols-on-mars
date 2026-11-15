@@ -36,8 +36,12 @@ extends Control
 ## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
 ##
 ## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
-## "Consertar" (consertar_gerador) e "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do
-## terminal os substituem na próxima parte.
+## A aba câmeras é o visor (scripts/cameras/visor_cameras.gd), filho deste nó, por cima da aba. Ele só
+## aparece com a aba na tela, o terminal parado no alto, sem card e sem escurecer. Escolher a câmera de
+## uma tarefa de POR_PECA (missao.gd) pendente começa a tarefa e põe a peça dela (ChemCam, gerador) na
+## vista; a peça é quem conclui a tarefa (concluir_tarefa), e sai quando a tarefa deixa de rodar. Na aba
+## tarefas, o botão da linha (ir_chemcam, ir_gerador) leva à câmera. Com o visor à vista, o clique dentro
+## dele não é consumido aqui: segue para o visor e para a peça.
 ##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
 
@@ -48,6 +52,9 @@ const Desenho := preload("res://scripts/desenho.gd")
 const DadosDonki := preload("res://scripts/dados_donki.gd")
 const HudTurno := preload("res://scripts/hud_turno.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
+const VisorCameras := preload("res://scripts/cameras/visor_cameras.gd")
+const Chemcam := preload("res://scripts/minigames/chemcam.gd")
+const ConsertarGerador := preload("res://scripts/minigames/consertar_gerador.gd")
 
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
@@ -105,6 +112,10 @@ const X_ESQ := 14.0
 
 const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA",
 	"gerador": "TAREFA_GERADOR"}
+# Tarefa -> câmera onde ela se faz, e a peça (minigame) de cada uma; o som de começar pela câmera.
+const CAMERA_DA_TAREFA := {"chemcam": "rocha", "gerador": "moxie"}
+const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador}
+const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador"}
 const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
 const SEM_FONTE := []  # fatos do jogo que não levam linha de fonte
 const PASSO_LINHA := 42.0      # altura de uma linha da lista de tarefas, com o espaço entre elas
@@ -136,6 +147,9 @@ var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
 var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
+var _visor: VisorCameras    # o corpo da aba câmeras
+var _visor_chave := ""      # "sol|poeira" da última configuração do visor
+var _visor_pend := {}       # as últimas pendências enviadas ao visor
 
 
 func iniciar(m: Missao, dado_donki: Dictionary) -> void:
@@ -146,6 +160,13 @@ func iniciar(m: Missao, dado_donki: Dictionary) -> void:
 	_mostrar_fase(m.fase)
 	aberto = _abre_na_fase(m.fase)
 	_pos = 1.0 if aberto else 0.0
+	if _visor == null:
+		_visor = VisorCameras.new()
+		add_child(_visor)
+		_visor.camera_escolhida.connect(_ao_escolher_camera)
+	_visor_chave = ""
+	_visor_pend = {}
+	_atualizar_visor()
 
 
 func _ready() -> void:
@@ -159,7 +180,46 @@ func ui() -> Dictionary:
 	for nome: String in _botoes:
 		var r: Rect2 = _botoes[nome]
 		d[nome] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	# Com o visor à vista, o botão de cada câmera do mapa (em px da tela). Não entram em _botoes: quem trata
+	# o clique é o visor.
+	if _visor != null and _visor.visible:
+		var origem := _visor.get_global_rect().position
+		var alvos := _visor.alvos()
+		for cam: String in alvos:
+			var r: Rect2 = alvos[cam]
+			d["cam_" + cam] = [roundi(origem.x + r.position.x), roundi(origem.y + r.position.y), roundi(r.size.x), roundi(r.size.y)]
 	return d
+
+
+## O que a peça (minigame) à vista oferece, em px da tela, para o teste no navegador (a sonda de main.gd).
+## Vazio sem peça visível. ChemCam: "alvos" (o centro de cada alvo pendente) e "raio". Gerador: "pecas" (o
+## retângulo de cada peça na bandeja), "certa" (o índice da peça que encaixa), "formas" e "encaixe" (o centro).
+func minigame() -> Dictionary:
+	if _visor == null or not _visor.visible:
+		return {}
+	var p := _visor.peca(_visor.camera_atual())
+	if p == null or not p.visible:
+		return {}
+	var m := p.get_global_transform()
+	if p.has_method("alvos_na_area"):
+		var alvos: Array = []
+		var locais: PackedVector2Array = p.alvos_na_area()
+		for i in locais.size():
+			if p.estado_alvo(i) == "pendente":
+				var c: Vector2 = m * locais[i]
+				alvos.append([roundi(c.x), roundi(c.y)])
+		return {"tipo": "chemcam", "alvos": alvos, "raio": p.raio_toque(), "progresso": p.progresso()}
+	if p.has_method("centro_do_encaixe"):
+		var pecas: Array = []
+		for i in 3:
+			var r: Rect2 = p.alvo_da_peca(i)
+			var o: Vector2 = m * r.position
+			pecas.append([roundi(o.x), roundi(o.y), roundi(r.size.x), roundi(r.size.y)])
+		var sorteio: Dictionary = p.sorteio_atual()
+		var e: Vector2 = m * p.centro_do_encaixe()
+		return {"tipo": "gerador", "pecas": pecas, "certa": sorteio["certa"], "formas": sorteio["formas"],
+			"encaixe": [roundi(e.x), roundi(e.y)], "progresso": p.progresso()}
+	return {}
 
 
 ## Todo texto que o último quadro desenhou: [texto, x, y, tamanho, largura (-1 sem quebra), alinhamento, negrito, fonte própria (ou null)].
@@ -356,6 +416,7 @@ func _process(delta: float) -> void:
 			if _fade <= 0.0:
 				_fade_estado = ""
 	var animou := _animar(delta)
+	_atualizar_visor()
 	# O card do primeiro turno abre quando o terminal chega embaixo.
 	if _segura_turno and card_id == "" and not aberto and _pos <= 0.0 and fase_ui == "turno":
 		card_id = "turno"
@@ -411,6 +472,8 @@ func _input(event: InputEvent) -> void:
 		if nome != "":
 			_acionar(nome)
 			get_viewport().set_input_as_handled()
+		elif _visor != null and _visor.visible and _visor.get_global_rect().has_point(event.position):
+			pass  # o clique segue para o visor e para a peça hospedada (o _gui_input deles)
 		elif tapa_a_sala():
 			get_viewport().set_input_as_handled()
 
@@ -447,10 +510,13 @@ func _acionar(nome: String) -> void:
 			fez = missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
 		"confirmar":
 			fez = missao.confirmar_plano()
-		"iniciar_chemcam":
-			fez = missao.iniciar_tarefa("chemcam")
-		"consertar_gerador":
-			fez = missao.iniciar_tarefa("gerador")
+		"ir_chemcam", "ir_gerador":
+			# A linha da tarefa leva à câmera dela. Se a tarefa está pendente, escolher a câmera a começa.
+			var tarefa := nome.trim_prefix("ir_")
+			fez = _pode_ir_a_camera(tarefa)
+			if fez:
+				aba = "cameras"
+				_visor.escolher(CAMERA_DA_TAREFA[tarefa])
 		"enviar":
 			fez = missao.enviar_a_terra()
 		"reiniciar":
@@ -485,6 +551,84 @@ func _apertar_tecla(nome: String) -> bool:
 	if aba == _aba_da_fase(_fase_tela):
 		aba = ""
 	return true
+
+
+# --- aba câmeras: o visor e as peças -------------------------------------------------
+
+## O visor só aparece com a aba câmeras na tela, o terminal parado no alto, sem card e sem escurecer. Leva o
+## sol, o clima e as pendências, e tira a peça cuja tarefa deixou de rodar (feita, abrigo, fim do turno,
+## reinício). Roda todo quadro, com o visor à vista ou não.
+func _atualizar_visor() -> void:
+	if _visor == null:
+		return
+	var no_turno := missao.fase == "turno" and not missao.abrigado
+	_visor.visible = aba_na_tela() == "cameras" and _pos >= 1.0 and not _card_visivel() and _fade_estado == ""
+	var pend := {}
+	for tarefa: String in CAMERA_DA_TAREFA:
+		var cam: String = CAMERA_DA_TAREFA[tarefa]
+		var estado: String = missao.tarefas.get(tarefa, "")
+		var rodando := no_turno and missao.tarefa_rodando == tarefa
+		pend[cam] = no_turno and (estado == "pendente" or rodando)
+		if _visor.peca(cam) != null and not rodando:
+			_visor.hospedar(cam, null)
+	var chave := "%d|%s" % [missao.sol, missao.eh_poeira()]
+	if chave != _visor_chave:
+		_visor_chave = chave
+		_visor.configurar(Rect2(X0, Y_CORPO, X1 - X0, Y_FIM - Y_CORPO), missao.tarefa_s, missao.eh_poeira())
+		_visor.sol(missao.sol, Modelo.N.SOLS)
+		_visor_pend = {}  # configurar zera as pendências do visor: reenvia
+	if pend != _visor_pend:  # pendencias() redesenha: só quando muda
+		_visor_pend = pend
+		_visor.pendencias(pend)
+
+
+## A criança escolheu uma câmera. A tarefa dela pendente, sem outra rodando, no turno e fora do abrigo,
+## começa e a peça entra na vista. Se a tarefa já roda, só se mostra a peça que está lá. Outra tarefa
+## rodando (amostra, planta): nada começa, o marcador fica.
+func _ao_escolher_camera(cam: String) -> void:
+	for tarefa: String in CAMERA_DA_TAREFA:
+		if CAMERA_DA_TAREFA[tarefa] != cam:
+			continue
+		if missao.tarefa_rodando == tarefa:
+			if _visor.peca(cam) == null:
+				_hospedar_peca(tarefa)  # rodando sem peça (não deveria): só então se cria
+		elif missao.iniciar_tarefa(tarefa):
+			_hospedar_peca(tarefa)
+			if som != null:
+				som.clique(SOM_DE_INICIAR[tarefa])
+		return
+
+
+func _hospedar_peca(tarefa: String) -> void:
+	var peca: Control = PECAS[tarefa].new()
+	if peca.has_method("semente"):
+		peca.semente(missao.sol * 100 + missao.modos)  # muda a cada conserto e segue determinística
+	peca.concluido.connect(_ao_concluir_peca.bind(tarefa))
+	_visor.hospedar(CAMERA_DA_TAREFA[tarefa], peca)
+
+
+## A peça terminou: a tarefa vira feita; o quadro seguinte tira a peça.
+func _ao_concluir_peca(tarefa: String) -> void:
+	missao.concluir_tarefa(tarefa)
+	queue_redraw()
+
+
+## O botão da linha da tarefa vale no turno, fora do abrigo, quando a tarefa roda ou está pendente e
+## nenhuma outra roda.
+func _pode_ir_a_camera(tarefa: String) -> bool:
+	if missao.fase != "turno" or missao.abrigado:
+		return false
+	if missao.tarefa_rodando == tarefa:
+		return true
+	return missao.tarefas.get(tarefa, "") == "pendente" and missao.tarefa_rodando == ""
+
+
+## A barra da linha: a peça hospedada, para a tarefa que só acaba por ela; o relógio, para as demais.
+func _progresso_da_linha(nome: String) -> float:
+	if nome in Missao.POR_PECA:
+		var peca: Control = _visor.peca(CAMERA_DA_TAREFA[nome]) if _visor != null else null
+		return clampf(peca.progresso(), 0.0, 1.0) if peca != null else 0.0
+	return missao.progresso_tarefa(nome)
 
 
 # --- desenho: peças ------------------------------------------------------------
@@ -1063,14 +1207,11 @@ func _desenhar_card_turno() -> void:
 
 # --- aba câmeras -----------------------------------------------------------------
 
-## Placeholder: o conteúdo das câmeras é a próxima fatia.
+## O corpo é o visor (scripts/cameras/visor_cameras.gd), filho deste nó: aparece por cima com o terminal
+## parado no alto; subindo ou descendo, fica só a caixa vazia.
 func _desenhar_cameras() -> void:
 	_cabecalho_aba("cameras", missao.sol)
-	var r := Rect2(X0, Y_CORPO, X1 - X0, Y_FIM - Y_CORPO)
-	_caixa(r)
-	var c := r.get_center()
-	Desenho.icone(self, "camera", Rect2(c.x - 24, c.y - 40, 48, 48), Desenho.TEXTO_SUAVE, Desenho.FUNDO_TELA)
-	_t(tr("CAMERAS_VAZIO"), r.position.x, c.y + 20, 12, Desenho.TEXTO_SUAVE, r.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_caixa(Rect2(X0, Y_CORPO, X1 - X0, Y_FIM - Y_CORPO))
 
 
 # --- aba fontes ------------------------------------------------------------------
@@ -1250,7 +1391,7 @@ func _linha_tarefa(nome: String, r: Rect2) -> void:
 			Desenho.icone(self, "check", Rect2(xe, r.position.y + 12, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TERMINAL)
 			_t(_estado_texto("feita"), xe + 22, r.position.y + 13, 13, Desenho.TEXTO, 120)
 		"rodando":
-			var f := missao.progresso_tarefa(nome)
+			var f := _progresso_da_linha(nome)
 			_t(_estado_texto("rodando"), xe, r.position.y + 5, 11, Desenho.TEXTO)
 			var rb := Rect2(xe, r.position.y + 22, 150, 10)
 			draw_rect(rb, Desenho.CELULA_VAZIA)
@@ -1261,15 +1402,12 @@ func _linha_tarefa(nome: String, r: Rect2) -> void:
 			var cancelada := missao.abrigado
 			Desenho.icone(self, "circulo", Rect2(xe, r.position.y + 12, 16, 16), Desenho.TEXTO_SUAVE, Desenho.FUNDO_TERMINAL)
 			_t(_estado_texto("cancelada" if cancelada else "pendente"), xe + 22, r.position.y + 13, 13, Desenho.TEXTO_SUAVE, 140)
-	var livre := missao.fase == "turno" and estado == "pendente" and not missao.abrigado and missao.tarefa_rodando == ""
 	if missao.abrigado and estado == "pendente":
 		return  # cancelada: sem botão
-	if nome == "chemcam":
-		# Placeholder: o ChemCam de verdade se faz pelas câmeras do terminal (P1).
-		_botao("iniciar_chemcam", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("INICIAR"), "", livre, 12)
-	elif nome == "gerador":
-		# Placeholder: o conserto de verdade se faz pela câmera do MOXIE (próxima parte). Não gasta energia.
-		_botao("consertar_gerador", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("CONSERTAR"), "", livre, 12)
+	if CAMERA_DA_TAREFA.has(nome):
+		# A tarefa se faz pela câmera dela. Não gasta energia.
+		_botao("ir_" + nome, Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("ABA_CAMERAS"), "camera",
+			_pode_ir_a_camera(nome), 12)
 
 
 func _linha_abrigo(r: Rect2) -> void:
