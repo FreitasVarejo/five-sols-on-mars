@@ -403,15 +403,17 @@ func _abrigo_de_mao_unica() -> void:
 	_igual(g.iniciar_tarefa("gerador"), false, "abrigado não conserta o gerador")
 
 
-## As tarefas de POR_PECA (ChemCam, gerador e planta) só acabam pelo `concluido` da peça: o relógio não as termina, e
+## As tarefas de POR_PECA (ChemCam, gerador, planta e amostra) só acabam pelo `concluido` da peça: o relógio não as termina, e
 ## concluir_tarefa só vale no turno, fora do abrigo e para a que está rodando.
 func _tarefas_da_peca() -> void:
-	_igual(Missao.POR_PECA, ["chemcam", "gerador", "planta"], "as tarefas que só a peça termina")
+	_igual(Missao.POR_PECA, ["chemcam", "gerador", "planta", "amostra"], "as tarefas que só a peça termina")
 	for nome in Missao.POR_PECA:
 		_verdade(nome in Missao.TAREFAS or nome in Missao.MANUTENCAO, "POR_PECA só tem tarefa da missão: " + nome)
 	_igual("painel" in Missao.TAREFAS or "painel" in Missao.MANUTENCAO or "painel" in Missao.POR_PECA, false,
 		"o painel não está na missão")
-	# O relógio não termina a da peça, e termina a das estações (amostra), no mesmo turno.
+	# O relógio não termina a da peça; as de ciência e o gerador são todas de peça, nenhuma é de relógio.
+	for nome in Missao.TAREFAS + Missao.MANUTENCAO:
+		_verdade(nome in Missao.POR_PECA, "só a peça termina: " + nome)
 	var m = Missao.new(1, {"sol_solar": 3})
 	m.alternar_tarefa("chemcam")
 	m.confirmar_plano()
@@ -426,7 +428,8 @@ func _tarefas_da_peca() -> void:
 	a.confirmar_plano()
 	a.iniciar_tarefa("amostra")
 	a.avancar(a.tarefa_s + 0.1)
-	_igual(a.tarefas["amostra"], "feita", "o relógio segue terminando a amostra")
+	_igual(a.tarefas["amostra"], "rodando", "o relógio não termina a amostra: só a peça")
+	_verdade(a.concluir_tarefa("amostra"), "a peça conclui a amostra")
 	_igual(a.concluir_tarefa("amostra"), false, "concluir uma já feita não vale")
 	# Falha: no plano, sem a tarefa rodando, com outra rodando, abrigado, depois do turno.
 	var f = Missao.new(1, {"sol_solar": 3})
@@ -505,7 +508,9 @@ func _tarefa_nao_feita_e_teto() -> void:
 	m.avancar(10.0)
 	m.concluir_tarefa("chemcam")
 	m.iniciar_tarefa("amostra")
-	_ate_sair_do_turno(m)  # a amostra roda até o fim do turno e termina; a planta nunca inicia
+	m.avancar(10.0)
+	m.concluir_tarefa("amostra")
+	_ate_sair_do_turno(m)  # a amostra termina pela peça; a planta nunca inicia
 	var r: Dictionary = m.registros[0]
 	_igual(r["feitas"], ["chemcam", "amostra"], "registro: feitas")
 	_igual(r["nao_feitas"], ["planta"], "registro: não feitas")
@@ -1268,6 +1273,7 @@ func _encerrar_com(solar: bool, duracao: float, passo: float, abrigar_antes: boo
 	if tarefa:
 		m.iniciar_tarefa("amostra")
 		_ate(m, Missao.TAREFA_S)
+		m.concluir_tarefa("amostra")  # só a peça termina a amostra
 	if t_antes > 0.0:
 		_ate(m, t_antes)
 	if abrigar_antes:

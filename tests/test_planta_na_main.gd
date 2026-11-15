@@ -133,7 +133,7 @@ func _tudo() -> void:
 	_igual(t._visor.peca("estufa"), null, "a peça sai")
 	_igual(t._visor.vista_atual(), t._visor.camera_atual(), "a vista volta à câmera atual")
 
-	# Outro sol, pelo botão da linha da tarefa na aba tarefas: também começa a planta e leva à peça.
+	# Outro sol: a aba tarefas mostra a linha da planta sem botão, e o toque na estufa começa a peça.
 	m.montar_sol(3, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
 	await _quadros(2)
 	n = 0
@@ -146,13 +146,32 @@ func _tudo() -> void:
 	t._acionar("terminal")
 	await _esperar_terminal()
 	_igual(t.aba_na_tela(), "tarefas", "o turno abre na aba tarefas")
-	_verdade(t._pode_ir_a_camera("planta"), "a linha da planta pode ir à peça")
-	t._acionar("ir_planta")
-	await _esperar_terminal()
 	await _quadros(2)
-	_igual(m.tarefas["planta"], "rodando", "o botão da linha inicia a planta")
-	_igual(t.aba_na_tela(), "cameras", "e leva à aba câmeras")
-	_igual(t.minigame().get("tipo", ""), "planta", "com a peça à vista")
+	_igual(t.ui().has("ir_planta"), false, "a linha da planta não tem botão no terminal")
+	_igual(t._pode_ir_a_camera("planta"), true, "mas a tarefa pode começar (pela estufa)")
+	_igual(t._acionar("ir_planta"), null, "e a ação ir_planta não existe")
+	_igual(m.tarefas["planta"], "pendente", "ir_planta não inicia nada")
+	t._acionar("terminal")
+	await _esperar_terminal()
+	_verdade(_main._clicavel("estufa"), "a estufa é clicável")
+	_main._ao_clicar("estufa")
+	await _esperar_terminal()
+	_igual(m.tarefas["planta"], "rodando", "tocar na estufa inicia a planta")
+	var peca2 = t._visor.peca("estufa")
+	_verdade(peca2 != null, "a peça está na estufa")
+
+	# Terminal abaixado no meio: a tarefa segue rodando e tocar na estufa de novo retoma a mesma peça.
+	t._acionar("terminal")
+	await _esperar_terminal()
+	_igual(t.aberto, false, "o terminal desceu")
+	_igual(m.tarefas["planta"], "rodando", "a tarefa segue rodando")
+	_verdade(_main._clicavel("estufa"), "a estufa segue clicável com a planta rodando")
+	_main._ao_clicar("estufa")
+	await _esperar_terminal()
+	_igual(t.aberto, true, "tocar a estufa sobe o terminal de novo")
+	_igual(t.aba_na_tela(), "cameras", "na aba câmeras")
+	_verdade(t._visor.peca("estufa") == peca2, "é a mesma peça, sem recriar")
+	_igual(t.minigame().get("tipo", ""), "planta", "e está à vista")
 
 	_main.queue_free()
 	await process_frame

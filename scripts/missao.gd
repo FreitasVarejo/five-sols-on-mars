@@ -21,7 +21,7 @@ const Modelo := preload("res://scripts/modelo.gd")
 
 # Números do turno, todos [P], num lugar só.
 const TURNO_S := 60.0       # duração do turno; 1 s = 1 min
-const TAREFA_S := 10.0      # duração de cada tarefa pelo relógio (amostra, planta); das POR_PECA, é a duração de referência que a peça recebe
+const TAREFA_S := 10.0      # duração de referência que cada peça (POR_PECA) recebe; o relógio não termina nenhuma tarefa
 const PICO_MIN := 0.15      # o pico da tempestade solar é sorteado entre estas frações do turno
 const PICO_MAX := 0.70      # nunca depois de 70%: não coincide com o fim do turno
 const RAMPA_S := 3.0        # o medidor sobe de baixo até "abrigo" nos segundos antes do pico
@@ -61,7 +61,7 @@ const MEDIDOR_ALTO := 0.9
 const TAREFAS := ["chemcam", "amostra", "planta"]  # as de ciência, escolhidas no plano
 const MANUTENCAO := ["gerador"]  # as que a base pede; não contam como ciência
 # As tarefas que só acabam pelo `concluido` da peça (minigame), nunca pelo relógio: ver concluir_tarefa.
-const POR_PECA := ["chemcam", "gerador", "planta"]
+const POR_PECA := ["chemcam", "gerador", "planta", "amostra"]
 const EPS := 1e-9
 
 var rng := RandomNumberGenerator.new()

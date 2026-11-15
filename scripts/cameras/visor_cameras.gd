@@ -13,8 +13,8 @@ signal concluido
 signal camera_escolhida(nome: String)
 
 const CAMERAS := ["painel", "rocha", "moxie", "visao_geral"]  # a câmera do céu é P2 e fica fora
-# Estações da sala (não são câmeras do mapa, sem botão): hospedam a peça de uma tarefa que se faz lá (a estufa).
-const ESTACOES := ["estufa"]
+# Estações da sala (não são câmeras do mapa, sem botão): hospedam a peça de uma tarefa que se faz lá (a estufa, a glovebox).
+const ESTACOES := ["estufa", "glovebox"]
 
 const GAP := 6
 const TELEM_H := 30

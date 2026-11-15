@@ -342,7 +342,7 @@ func _atualizar_sala() -> void:
 
 
 ## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
-## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
+## delas está escolhida, pendente (ou já rodando: o toque volta à peça), sem outra rodando e fora do abrigo; a porta do dormitório quando dá
 ## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
 	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _terminal.card_aberto \
@@ -352,9 +352,9 @@ func _clicavel(nome: String) -> bool:
 		"abrigo":
 			return not _missao.abrigado
 		"estufa":
-			return _pode_iniciar("planta")
+			return _pode_iniciar("planta") or _missao.tarefa_rodando == "planta"
 		"glovebox":
-			return _pode_iniciar("amostra")
+			return _pode_iniciar("amostra") or _missao.tarefa_rodando == "amostra"
 		"porta":
 			return _missao.pode_encerrar_sol()
 	return false
@@ -592,7 +592,7 @@ func _ao_clicar(nome: String) -> void:
 		"estufa":
 			fez = _terminal.abrir_na_estacao("planta")
 		"glovebox":
-			fez = _missao.iniciar_tarefa("amostra")
+			fez = _terminal.abrir_na_estacao("amostra")
 		"porta":
 			fez = _missao.encerrar_sol()
 	if fez:
