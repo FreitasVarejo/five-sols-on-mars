@@ -49,6 +49,7 @@ func _tudo() -> void:
 	await _estacoes_fora_do_terminal()
 	_peca_conclui_abrigo_e_reinicio()
 	await _cliques_chegam_ao_visor_e_a_peca()
+	await _toque_nao_deixa_hover()
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
@@ -1188,6 +1189,78 @@ func _cliques_chegam_ao_visor_e_a_peca() -> void:
 	_igual(t.minigame()["alvos"].size(), 3, "um alvo a menos pendente")
 	root.remove_child(t)
 	som.free()
+	t.free()
+
+
+func _centro(ui: Dictionary, nome: String) -> Vector2:
+	var r: Array = ui[nome]
+	return Vector2(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0)
+
+
+## O sol 1 do plano, na tela inicial (blocos), com o terminal na árvore e desenhado.
+func _terminal_na_tela_inicial() -> Array:
+	var m := Missao.new(1)
+	var t: Control = Terminal.new()
+	t.com_inicio = true
+	t.som = Som.new()
+	t.gravar_textos = true
+	t.iniciar(m, {})
+	root.add_child(t)
+	for i in 3:
+		await process_frame
+	return [t, m]
+
+
+## O toque chega como clique de mouse emulado (device EMULATION), sem movimento depois: o ponto tocado não
+## pode ficar aceso. O toque ainda aciona o botão; o mouse de verdade acende como sempre.
+func _toque_nao_deixa_hover() -> void:
+	var par: Array = await _terminal_na_tela_inicial()
+	var t: Control = par[0]
+	var ui: Dictionary = t.ui()
+	# Mouse de verdade: passar sobre um bloco e sobre uma tecla de aba acende; sair apaga.
+	root.push_input(_movimento(_centro(ui, "inicio_fontes"), false), true)
+	_igual(t._hover, "inicio_fontes", "mouse: passar sobre o bloco o acende")
+	root.push_input(_movimento(_centro(ui, "aba_tarefas"), false), true)
+	_igual(t._hover, "aba_tarefas", "mouse: passar sobre a tecla de aba a acende")
+	root.push_input(_movimento(Vector2(320, 2), false), true)
+	_igual(t._hover, "", "mouse: sair do botão o apaga")
+	# Toque: o clique emulado aciona o bloco, e nada fica aceso.
+	root.push_input(_movimento(_centro(ui, "inicio_cameras"), false), true)
+	_igual(t._hover, "inicio_cameras", "mouse sobre outro bloco, antes do toque")
+	var toque := _mouse(_centro(ui, "inicio_fontes"), true)
+	toque.device = InputEvent.DEVICE_ID_EMULATION
+	root.push_input(toque, true)
+	_igual(t.aba_na_tela(), "fontes", "toque: o bloco faz a ação de sempre")
+	_igual(t._hover, "", "toque: o bloco tocado não fica aceso")
+	_igual(t._mouse, t.SEM_MOUSE, "toque: o terminal não guarda o ponto tocado como mouse")
+	var solto := _mouse(_centro(ui, "inicio_fontes"), false)
+	solto.device = InputEvent.DEVICE_ID_EMULATION
+	root.push_input(solto, true)
+	await process_frame
+	ui = t.ui()
+	# Toque na tecla de aba e em "Voltar ao plano".
+	toque = _mouse(_centro(ui, "aba_tarefas"), true)
+	toque.device = InputEvent.DEVICE_ID_EMULATION
+	root.push_input(toque, true)
+	_igual(t.aba_na_tela(), "tarefas", "toque: a tecla de aba faz a ação de sempre")
+	_igual(t._hover, "", "toque: a tecla de aba não fica acesa")
+	await process_frame
+	ui = t.ui()
+	_verdade(ui.has("voltar_plano"), "a aba das tarefas tem Voltar ao plano")
+	toque = _mouse(_centro(ui, "voltar_plano"), true)
+	toque.device = InputEvent.DEVICE_ID_EMULATION
+	root.push_input(toque, true)
+	_igual(t.aba_na_tela(), "plano", "toque: Voltar ao plano faz a ação de sempre")
+	_igual(t._hover, "", "toque: Voltar ao plano não deixa nada aceso")
+	# O movimento emulado do arrasto também não acende.
+	var arrasto := _movimento(_centro(ui, "aba_cameras"), true)
+	arrasto.device = InputEvent.DEVICE_ID_EMULATION
+	root.push_input(arrasto, true)
+	_igual(t._hover, "", "toque: o arrasto emulado não acende")
+	# E o mouse de verdade volta a acender depois de um toque.
+	root.push_input(_movimento(_centro(ui, "aba_cameras"), false), true)
+	_igual(t._hover, "aba_cameras", "mouse: acende de novo depois de um toque")
+	root.remove_child(t)
 	t.free()
 
 

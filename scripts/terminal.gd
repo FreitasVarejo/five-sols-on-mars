@@ -91,6 +91,7 @@ const BOTAO := Rect2(260, 328, 120, 28)
 ## BOTAO, onde não cobre tecla, tela nem botão.
 const ALERTA := Rect2(8, 328, 34, 28)
 const TELA := Rect2(0, 0, 640, 360)
+const SEM_MOUSE := Vector2(-100, -100)  # fora da tela: nenhum botão acende
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
 # A noite (Missao.NOITE_S = 2,0 s): parada, a barra de energia cai, parada de novo (os 0,7 s que sobram).
@@ -195,7 +196,7 @@ var _vistos := {}           # card -> true: o que já abriu nesta sessão (os do
 var _alvos := {}            # nome -> Rect2 dos controles que um card pode apontar, como o último quadro os pôs
 var _ponteiro: Control      # a seta e a moldura pulsante do card ao lado de um controle (ponteiro_tutorial.gd)
 var _textos: Array = []     # [texto, x, y, tamanho] de tudo que o quadro desenhou (para a sonda de teste)
-var _mouse := Vector2(-100, -100)
+var _mouse := SEM_MOUSE
 var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
@@ -608,7 +609,10 @@ func _input(event: InputEvent) -> void:
 	if missao == null or bloqueado:
 		return
 	if event is InputEventMouse:
-		_mouse = event.position
+		# O toque vira um clique de mouse emulado (device EMULATION) e não manda movimento depois: o ponto
+		# tocado ficaria aceso como hover. Só o mouse de verdade acende; o toque apaga e o clique segue
+		# pelo event.position, logo abaixo.
+		_mouse = SEM_MOUSE if event.device == InputEvent.DEVICE_ID_EMULATION else event.position
 		var h := _botao_em(_mouse)
 		if h != _hover:
 			_hover = h
