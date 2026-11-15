@@ -121,6 +121,7 @@ func _ready() -> void:
 	_depuracao.hide()
 	_donki = DadosDonki.carregar()
 	_missao = Missao.new(int(_parametros.get("semente", -1)), _opcoes_da_missao())
+	_missao.duracao_encerrar = Missao.duracao_da_url(_parametros.get("acelerar"))
 	_carregar_regioes()
 	_hud_turno.missao = _missao
 	_terminal.iniciar(_missao, _donki)

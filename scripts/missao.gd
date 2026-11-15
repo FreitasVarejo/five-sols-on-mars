@@ -47,7 +47,10 @@ const AGENDAS_LIVRES := [
 	[4, 5, 2],  # quebra 2, solar 4, poeira 5
 	[4, 5, 3],  # quebra 3, solar 4, poeira 5
 ]
-const ACELERAR := 8.0       # "Encerrar o sol": o relógio do turno corre tantas vezes mais rápido
+const ACELERAR := 8.0       # "Encerrar o sol": o piso do fator; o relógio do turno nunca corre menos vezes mais rápido que isto
+const ENCERRAR_S := 1.5     # "Encerrar o sol": o que sobrar do turno passa nesta duração real, qualquer que seja o resto
+const ENCERRAR_MIN := 0.3   # limites do ?acelerar=<s> da URL
+const ENCERRAR_MAX := 10.0
 
 # Medidor de radiação (0..1) e seus dois limiares.
 const LIMIAR_ATENCAO := 0.4
@@ -94,7 +97,9 @@ var abrigado := false
 var t_exposto := 0.0       # tempo fora do abrigo depois do pico
 var t_abrigado := 0.0      # tempo abrigado no turno
 var tarefas := {}          # nome -> "pendente" | "rodando" | "feita" (ciência escolhida e manutenção)
-var acelerado := false     # "Encerrar o sol": o relógio corre ACELERAR vezes até o pôr do Sol
+var acelerado := false     # "Encerrar o sol": o relógio corre `fator_acelerado` vezes até o pôr do Sol
+var duracao_encerrar := ENCERRAR_S  # segundos reais que o resto do turno leva ao encerrar o sol (?acelerar=)
+var fator_acelerado := ACELERAR     # fixado em encerrar_sol: restante do turno / duracao_encerrar, no mínimo ACELERAR
 var tarefa_rodando := ""
 var tarefa_t := 0.0
 
@@ -467,12 +472,22 @@ func abrigar() -> bool:
 	return true
 
 
-## "Encerrar o sol": o relógio do turno corre ACELERAR vezes até o pôr do Sol. A exposição e a dose
-## seguem contando em tempo de jogo (o relógio do turno), não em tempo real. No sol da tempestade, o
-## relógio acelerado para quando o medidor chega a "atenção" (ver _avancar_turno), e a criança decide.
+## Duração pedida na URL (?acelerar=<s>): vale de ENCERRAR_MIN a ENCERRAR_MAX; fora disso ou ausente, o padrão.
+static func duracao_da_url(valor: Variant) -> float:
+	var s := float(valor) if valor != null else 0.0
+	return s if s >= ENCERRAR_MIN and s <= ENCERRAR_MAX else ENCERRAR_S
+
+
+## "Encerrar o sol": o que sobra do turno passa em `duracao_encerrar` s reais (o fator é o restante
+## dividido por ela, nunca abaixo de ACELERAR). A exposição e a dose seguem contando em tempo de jogo
+## (o relógio do turno), não em tempo real: o resultado não depende do fator, porque _avancar_turno
+## integra o passo inteiro com o limiar de atenção, o pico e o fim do turno como limites. No sol da
+## tempestade, o relógio acelerado para quando o medidor chega a "atenção" (ver _avancar_turno), e a
+## criança decide; encerrar de novo recalcula o fator sobre o que sobrou.
 func encerrar_sol() -> bool:
 	if not pode_encerrar_sol():
 		return false
+	fator_acelerado = maxf(ACELERAR, (turno_s - t) / maxf(duracao_encerrar, EPS))
 	acelerado = true
 	versao += 1
 	return true
@@ -482,7 +497,7 @@ func encerrar_sol() -> bool:
 func avancar(delta: float) -> void:
 	match fase:
 		"turno":
-			_avancar_turno(delta * (ACELERAR if acelerado else 1.0))
+			_avancar_turno(delta * (fator_acelerado if acelerado else 1.0))
 		"noite":
 			t_noite += delta
 			if t_noite >= NOITE_S - EPS:
