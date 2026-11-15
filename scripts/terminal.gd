@@ -85,8 +85,10 @@ const Y_CORPO := 42.0
 const Y_FIM := 314.0
 const CARD := Rect2(147, 74, 420, 180)
 # Os cards ao lado do controle: o texto de cada um, o controle que nomeiam (_alvos) e o lado do card.
-const CARD_TEXTO := {"sol1_o2": "SOL1_CARD_O2", "sol1_ciencia": "SOL1_CARD_CIENCIA", "sol1_confirmar": "SOL1_CARD_CONFIRMAR"}
-const CARD_ALVO := {"sol1_o2": "o2", "sol1_ciencia": "ciencia", "sol1_confirmar": "confirmar"}
+const CARD_TEXTO := {"sol1_o2": "SOL1_CARD_O2", "sol1_ciencia": "SOL1_CARD_CIENCIA", "sol1_confirmar": "SOL1_CARD_CONFIRMAR",
+	"poeira": "CARD_POEIRA", "gerador": "CARD_GERADOR"}
+const CARD_ALVO := {"sol1_o2": "o2", "sol1_ciencia": "ciencia", "sol1_confirmar": "confirmar", "poeira": "poeira",
+	"gerador": "gerador"}
 const CARDS_SOL1 := ["sol1_o2", "sol1_ciencia", "sol1_confirmar"]
 const CARD_LARGURA := 236.0
 const CARD_TAM := 13
@@ -275,7 +277,10 @@ func _mostrar_na_tela(f: String) -> void:
 
 
 ## Os cards deste plano, na ordem: o aviso da tempestade (reabre em todo plano em que está ativo, inclusive no
-## reinício do sol), depois os do sol 1 da missão fixa, uma vez só por sessão.
+## reinício do sol), depois os do sol 1 da missão fixa e os da primeira vez da poeira e do gerador quebrado.
+## Cada um só abre uma vez por sessão: "primeira vez" é o primeiro plano que a criança de fato vê com o evento
+## (um sol que já começa em modo de segurança não monta plano, e o card fica para o próximo plano em que o
+## evento ainda vale).
 func _cards_do_plano() -> Array:
 	var fila: Array = []
 	if missao.aviso_ativo():
@@ -284,6 +289,10 @@ func _cards_do_plano() -> Array:
 		for id: String in CARDS_SOL1:
 			if not _vistos.has(id):
 				fila.append(id)
+	if missao.eh_poeira() and not _vistos.has("poeira"):
+		fila.append("poeira")
+	if missao.st_inicio.get("gerador_quebrado", false) and not _vistos.has("gerador"):
+		fila.append("gerador")
 	return fila
 
 
@@ -789,7 +798,9 @@ func _coluna_energia(r: Rect2) -> void:
 	y += 26
 	if missao.eh_poeira():
 		Desenho.icone(self, "poeira", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
-		y += _t(tr("PLANO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), x + 16, y, 11, Desenho.TEXTO, w - 16) + 4
+		var h_poeira := _t(tr("PLANO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), x + 16, y, 11, Desenho.TEXTO, w - 16)
+		_alvos["poeira"] = Rect2(x, y, w, maxf(h_poeira, 14.0))
+		y += h_poeira + 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
 	y += 9
 
@@ -806,7 +817,9 @@ func _coluna_energia(r: Rect2) -> void:
 	y += 48
 	if missao.st["gerador_quebrado"]:
 		Desenho.icone(self, "alerta", Rect2(x, y + 1, 12, 12), Desenho.AMARELO, Desenho.FUNDO_TELA)
-		y += _t(tr("GERADOR_QUEBRADO"), x + 16, y, 11, Desenho.AMARELO, w - 16) + 6
+		var h_gerador := _t(tr("GERADOR_QUEBRADO"), x + 16, y, 11, Desenho.AMARELO, w - 16)
+		_alvos["gerador"] = Rect2(x, y, w, maxf(h_gerador, 14.0))
+		y += h_gerador + 6
 	else:
 		y += 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)

@@ -39,6 +39,8 @@ func _tudo() -> void:
 	_pan_ate_o_botao_do_abrigo()
 	_da_noite_para_a_seguranca()
 	_fila_de_cards()
+	_cards_da_poeira_e_do_gerador()
+	_cards_com_o_sol_em_seguranca()
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	print("%d verificações, %d falhas" % [total, falhas])
@@ -375,6 +377,134 @@ func _fila_de_cards() -> void:
 	t3._process(QUADRO)
 	_igual(t3.fase_ui, "plano", "o plano do freeplay")
 	_igual(_fechar_fila(t3), 1 if f.aviso_ativo() else 0, "no freeplay do mesmo terminal, só o aviso (os do sol 1 não repetem)")
+	t3.som.free()
+	t3.free()
+
+
+## Leva a missão e o terminal ao plano do sol `n` com o estado `estado`, pela noite (o terminal vê a troca de fase).
+func _ir_ao_sol(t: Control, m: Missao, n: int, estado: Dictionary) -> void:
+	m.fase = "noite"
+	m.versao += 1
+	t._process(QUADRO)
+	m.montar_sol(n, estado)
+	t._process(QUADRO)
+	t._process(QUADRO)
+
+
+## Os ids dos cards que a fila do plano atual abre, na ordem (fecha todos).
+func _ordem_da_fila(t: Control) -> Array:
+	var ordem: Array = []
+	while t.card_aberto and ordem.size() < 10:
+		ordem.append(t.card_id)
+		t._acionar("fechar_card")
+	return ordem
+
+
+## Com a agenda fixa, a poeira abre no sol 3 (e não no 4), o gerador no sol 5; cada um uma vez só na sessão.
+func _cards_da_poeira_e_do_gerador() -> void:
+	var m := Missao.new(1)
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	var bom := {"E": 10.0, "O": 10.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false}
+	_igual(_ordem_da_fila(t), ["aviso", "sol1_o2", "sol1_ciencia", "sol1_confirmar"], "sol 1: sem poeira nem gerador")
+	_ir_ao_sol(t, m, 2, bom)
+	_igual(m.fase, "plano", "sol 2: plano")
+	_igual(_ordem_da_fila(t), ["aviso"], "sol 2: só o aviso")
+	_ir_ao_sol(t, m, 3, bom)
+	_verdade(m.eh_poeira(), "sol 3: poeira")
+	_igual(_ordem_da_fila(t), ["poeira"], "sol 3: o card da poeira abre (o aviso já acabou)")
+	_ir_ao_sol(t, m, 4, bom)
+	_verdade(m.eh_poeira(), "sol 4: ainda poeira")
+	_igual(_ordem_da_fila(t), [], "sol 4: a poeira já foi vista, sem card")
+	var quebrado := bom.duplicate()
+	quebrado["gerador_quebrado"] = true
+	_ir_ao_sol(t, m, 5, quebrado)
+	_igual(m.fase, "plano", "sol 5: plano")
+	_verdade(m.st_inicio["gerador_quebrado"], "sol 5: gerador quebrado")
+	_igual(_ordem_da_fila(t), ["gerador"], "sol 5: o card do gerador abre")
+	# Reiniciar o plano do sol 5 (ou jogá-lo de novo): os dois já foram vistos.
+	_ir_ao_sol(t, m, 5, quebrado)
+	_igual(_ordem_da_fila(t), [], "o gerador não volta")
+	# Um freeplay depois na mesma sessão com poeira: os vistos valem para a sessão inteira.
+	var l := Missao.new(1, {"livre": true, "sol_poeira": 2})
+	l.montar_sol(2, bom)
+	t.missao = l
+	t._fase_logica = l.fase
+	t._mostrar_fase("plano")
+	_verdade(l.eh_poeira() and l.livre, "freeplay com poeira")
+	_igual(_ordem_da_fila(t), ["aviso"] if l.aviso_ativo() else [], "o freeplay não repete o card da poeira")
+	som.free()
+	t.free()
+	# No sol 3 de uma sessão nova o card do gerador não abre sem o gerador quebrado, e a poeira abre sozinha.
+	var m2 := Missao.new(1)
+	m2.montar_sol(3, bom)
+	var t2: Control = Terminal.new()
+	t2.som = Som.new()
+	t2.iniciar(m2, {})
+	_igual(_ordem_da_fila(t2), ["aviso", "poeira"] if m2.aviso_ativo() else ["poeira"], "sol 3 direto: a poeira")
+	t2.som.free()
+	t2.free()
+
+
+## O sol que já começa em modo de segurança não monta plano: nenhum card abre por cima da tela de segurança,
+## e o card fica para o plano seguinte que a criança vê (o reinício, ou o próximo sol em que o evento vale).
+func _cards_com_o_sol_em_seguranca() -> void:
+	# Poeira: o sol 3 começa em segurança (sem salvação).
+	var m := Missao.new(1)
+	m.montar_sol(3, _sem_salvacao())
+	var t: Control = Terminal.new()
+	t.som = Som.new()
+	t.iniciar(m, {})
+	_igual(m.fase, "seguranca", "poeira: o sol 3 começa em segurança")
+	_igual(t.card_aberto, false, "poeira: nenhum card na tela de segurança")
+	_igual(t._vistos.has("poeira"), false, "poeira: não conta como vista")
+	_rodar(t, m, 0.5)
+	_igual(t.card_aberto, false, "poeira: segue sem card na segurança")
+	# Reiniciar o sol (o tem_conserto e o estado de partida são forçados: o jogo só dá conserto a um sol que
+	# falhou no turno): o plano volta e o card abre ali.
+	m.tem_conserto = true
+	m.st_inicio = {"E": 10.0, "O": 10.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false}
+	t._acionar("reiniciar")
+	_igual(m.fase, "plano", "poeira: o reinício volta ao plano")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(t.card_id, "poeira", "poeira: o card abre no plano do reinício")
+	_igual(_ordem_da_fila(t), ["poeira"], "poeira: só ele")
+	t.som.free()
+	t.free()
+	# Seguir em modo de segurança: o sol passa sem plano e o card abre no próximo plano em que a poeira vale (sol 4).
+	var m2 := Missao.new(1)
+	m2.montar_sol(3, _sem_salvacao())
+	var t2: Control = Terminal.new()
+	t2.som = Som.new()
+	t2.iniciar(m2, {})
+	_igual(m2.fase, "seguranca", "seguir: o sol 3 começa em segurança")
+	t2._acionar("seguir")
+	_igual(m2.fase, "fim_do_sol", "seguir: fim do sol")
+	_rodar(t2, m2, t2.duracao * 1.5)
+	_igual(t2.card_aberto, false, "seguir: sem card no fim do sol")
+	_igual(t2._vistos.has("poeira"), false, "seguir: a poeira segue não vista")
+	_ir_ao_sol(t2, m2, 4, {"E": 10.0, "O": 10.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+	_verdade(m2.eh_poeira(), "sol 4: poeira")
+	_igual(_ordem_da_fila(t2), ["poeira"], "seguir: o card da poeira abre no sol 4, o próximo plano visto")
+	t2.som.free()
+	t2.free()
+	# Gerador: o sol 5 começa em segurança e é o último; seguir leva ao relatório e o card nunca abre.
+	var m3 := Missao.new(1)
+	m3.montar_sol(5, {"E": 4.0, "O": 5.0, "M": 0.0, "P": 1.0, "gerador_quebrado": true})
+	var t3: Control = Terminal.new()
+	t3.som = Som.new()
+	t3.iniciar(m3, {})
+	_igual(m3.fase, "seguranca", "gerador: o sol 5 começa em segurança")
+	_igual(t3.card_aberto, false, "gerador: nenhum card na tela de segurança")
+	t3._acionar("seguir")
+	_rodar(t3, m3, t3.duracao * 1.5)
+	t3._acionar("enviar")
+	_igual(m3.fase, "relatorio", "gerador: depois do sol 5, o relatório")
+	_rodar(t3, m3, t3.duracao * 1.5)
+	_igual(t3.card_aberto, false, "gerador: o relatório não leva o card")
+	_igual(t3._vistos.has("gerador"), false, "gerador: nunca abriu")
 	t3.som.free()
 	t3.free()
 
