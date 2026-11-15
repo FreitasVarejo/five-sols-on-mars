@@ -51,6 +51,7 @@ func _tudo() -> void:
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
+	await _card_do_aviso_no_modo_livre()
 	await _aba_fontes_cabe()
 	await _aba_fontes_rola()
 	await _relatorio_cabe()
@@ -1327,7 +1328,48 @@ func _card_do_aviso_cabe() -> void:
 				# Tudo derivado do dado do build, que o publicar.sh recoleta.
 				_verdade(f_atual.contains(str(real["chegadas_marte"].size())), "%s: a frase traz quantas chegadas há na janela" % rotulo)
 				_verdade(f_atual.contains(DadosDonki.data_texto(str(real["coletado_em"]), loc)), "%s: a data da coleta, no formato do idioma" % rotulo)
-				_verdade(f_atual.contains(" km/s"), "%s: a frase traz a velocidade" % rotulo)
+				_verdade(not f_atual.contains("km/s"), "%s: a frase não traz a velocidade" % rotulo)
+				var ultima := DadosDonki.mais_recente(real)
+				_verdade(f_atual.contains(DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc)),
+					"%s: a última é a mais recente de todas as chegadas, com ou sem velocidade" % rotulo)
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## No Modo livre o card do aviso não abre com a frase histórica ("19 May 2024"): ela é da missão fixa. O aviso e a
+## frase do dado de hoje seguem, e nada pisa no Fechar.
+func _card_do_aviso_no_modo_livre() -> void:
+	var idioma := TranslationServer.get_locale()
+	var real := DadosDonki.carregar()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for historico in [true, false]:
+			var dado := real.duplicate()
+			dado["historico"] = historico
+			var rotulo := "livre, %s, %s" % [loc, "histórico" if historico else "atual"]
+			var m := Missao.new(1, {"livre": true, "sol_solar": 2})
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, dado)
+			root.add_child(t)
+			await _esperar_card(t)
+			_igual(t.card_id, "aviso", "%s: o aviso abre" % rotulo)
+			var desenhados: Array = []
+			var tem_aviso := false
+			var tem_atual := false
+			for linha in t.textos():
+				desenhados.append(linha[0])
+				tem_aviso = tem_aviso or linha[0] == t.tr("AVISO_TEMPESTADE")
+				tem_atual = tem_atual or (linha[0] == t._frase_donki_atual() and linha[0] != "")
+			_verdade(tem_aviso, "%s: o texto do aviso está no card" % rotulo)
+			_igual(tem_atual, not historico, "%s: a frase do dado de hoje só com o dado do build" % rotulo)
+			_igual(desenhados.has(t.tr("DONKI_FRASE_HISTORICO")), false, "%s: sem a frase histórica de 19 de maio de 2024" % rotulo)
+			for desen: String in desenhados:
+				_verdade(not desen.begins_with("19 May 2024") and not desen.begins_with("19 de maio de 2024"),
+					"%s: nenhuma linha abre com a data de 19 de maio (%s)" % [rotulo, desen.substr(0, 24)])
+			var fechar_a: Array = t.ui().get("fechar_card", [])
+			_verdade(not fechar_a.is_empty(), "%s: o Fechar está na tela" % rotulo)
 			root.remove_child(t)
 			t.free()
 	TranslationServer.set_locale(idioma)

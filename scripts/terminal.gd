@@ -1499,11 +1499,11 @@ func _desenhar_card(alvo: Rect2) -> void:
 
 
 ## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação. Três partes
-## de cima para baixo: o aviso (14, negrito), a frase do histórico de maio de 2024 (sempre) e, quando há dado
-## do build, a frase datada do dado de hoje. O rodapé (enviado da Terra) fica ao lado do "Fechar".
+## de cima para baixo: o aviso (14, negrito), a frase do histórico de maio de 2024 (só na missão fixa: no Modo
+## livre a data de 19/05/2024 não é a da missão) e, quando há dado do build, a frase datada do dado de hoje. O rodapé (enviado da Terra) fica ao lado do "Fechar".
 func _desenhar_card_aviso() -> void:
 	var larg := CARD.size.x - 28
-	var f_hist := tr("DONKI_FRASE_HISTORICO")
+	var f_hist := "" if missao.livre else tr("DONKI_FRASE_HISTORICO")
 	var f_atual := _frase_donki_atual()
 	# As três partes mandam na altura: o card cresce (centrado) se não couberem entre o alto e o "Fechar", que
 	# fica a 12 px da base. O texto acaba 10 px acima do "Fechar".
@@ -1513,7 +1513,7 @@ func _desenhar_card_aviso() -> void:
 	var altura := 0.0
 	for tentativa in [12, 11]:
 		tam_donki = tentativa
-		var h_hist := Desenho.altura_texto(f_hist, tam_donki, larg)
+		var h_hist := Desenho.altura_texto(f_hist, tam_donki, larg) + 6.0 if f_hist != "" else 0.0
 		var h_atual := Desenho.altura_texto(f_atual, tam_donki, larg) + 6.0 if f_atual != "" else 0.0
 		altura = maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_hist + h_atual + 10.0 + 36.0 + 12.0)
 		if CARD.get_center().y - altura / 2.0 >= Y_CORPO:
@@ -1523,7 +1523,8 @@ func _desenhar_card_aviso() -> void:
 	var x := r.position.x + 14
 	var y := r.position.y + 12
 	y += _t(tr("AVISO_TEMPESTADE"), x, y, 14, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	y += _t(f_hist, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg) + 6
+	if f_hist != "":
+		y += _t(f_hist, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg) + 6
 	if f_atual != "":
 		_t(f_atual, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg)
 	# O rodapé na altura do meio do "Fechar", à esquerda dele.
@@ -1536,22 +1537,18 @@ func _desenhar_card_aviso() -> void:
 
 ## A frase do dado do build, datada ("Dados do DONKI de 14/11/2026: 25 chegadas previstas a Marte em 60 dias. A
 ## última: ..."), para o card do aviso (a aba fontes não o mostra). "" quando o dado é o histórico ou não há chegada. A
-## "última" é a mais recente que traz velocidade (o DONKI manda algumas sem ela, e "0 km/s" seria dado falso).
+## "última" é a mais recente de todas. A velocidade não entra: a documentação do DONKI não diz se é a da saída do
+## Sol ou a da chegada, e ao lado da data ela se lê como chegada.
 func _frase_donki_atual() -> String:
 	if donki.get("historico", true):
 		return ""
-	var com_velocidade := []
-	for c in donki.get("chegadas_marte", []):
-		if c is Dictionary and (c.get("velocidade_kms") is float or c.get("velocidade_kms") is int):
-			com_velocidade.append(c)
-	var ultima := DadosDonki.mais_recente({"chegadas_marte": com_velocidade})
+	var ultima := DadosDonki.mais_recente(donki)
 	if ultima.is_empty():
 		return ""
 	var loc := TranslationServer.get_locale()
 	var raspao := tr("DONKI_RASPAO") if ultima.get("raspao", false) == true else ""
 	return tr("DONKI_FRASE_ATUAL") % [DadosDonki.data_texto(str(donki.get("coletado_em", "")), loc),
-		donki["chegadas_marte"].size(), DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc),
-		roundi(float(ultima["velocidade_kms"])), raspao]
+		donki["chegadas_marte"].size(), DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc), raspao]
 
 
 ## O card ao lado do controle `alvo`, na coluna que não o tem, com uma frase por linha. O ponteiro (seta do card

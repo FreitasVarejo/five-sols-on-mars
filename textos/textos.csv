@@ -26,7 +26,7 @@ INICIO_ST_FONTES_ATUAL,With recent NASA data,Com dado recente da NASA
 INICIO_ST_FONTES_HIST,Data from May 2024,Dados de maio de 2024
 SOL_N,Sol %d,Sol %d
 AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in tens of minutes. If the alarm sounds, go to the shelter. The shelter button is on the left wall.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em dezenas de minutos. Se o alarme tocar, vá para o abrigo. O botão do abrigo fica à esquerda."
-DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s, at %d km/s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s, a %d km/s%s."
+DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s%s."
 DONKI_RASPAO,", a glancing blow",", de raspão"
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
 ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
