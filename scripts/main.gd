@@ -28,6 +28,7 @@ const TelaComunicacao := preload("res://scripts/tela_comunicacao.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
 const Som := preload("res://scripts/som.gd")
+const Terminal := preload("res://scripts/terminal.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -97,6 +98,8 @@ func _ready() -> void:
 	_sondar = _parametros.get("sonda") == "1"
 	_terminal.gravar_textos = _sondar
 	_botao_mudo.som = _som
+	_terminal.som = _som
+	_terminal.duracao = Terminal.duracao_da_url(_parametros.get("terminal"))
 	_aplicar_stretch_da_url()
 	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
 	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
@@ -281,7 +284,7 @@ func _atualizar_sala() -> void:
 	if estado != _estado:
 		_definir_estado(estado)
 	_vista_janela.acompanhar(fase_ui, _missao.relogio(), _missao.turno_s, _missao.eh_poeira())
-	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto
+	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto and _terminal.posicao() <= 0.0
 	var estados := {}
 	var progresso := {}
 	var clicaveis := {}
@@ -477,7 +480,8 @@ func _atualizar_depuracao() -> void:
 
 # --- parâmetros da URL (só Web) -------------------------------------------------
 
-## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?semente=<int>,
+## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?terminal=<s> (duração
+## do terminal subir e descer, 0,15 a 1,5; padrão 0,4), ?semente=<int>,
 ## ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):
@@ -562,11 +566,11 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
-		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total]
+		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala()]
 	var agora := Time.get_ticks_msec() / 1000.0
-	if chave != _sonda_chave or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
+	if chave != _sonda_chave or _terminal.animando() or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
 		_sonda_teste()
 
@@ -608,6 +612,8 @@ func _sonda_teste() -> void:
 		"causa": m.causa if m.fase == "seguranca" else null,
 		"estrelas": m.estrelas(),
 		"terminal_aberto": _terminal.aberto,
+		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),
+			"duracao": _terminal.duracao},
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
