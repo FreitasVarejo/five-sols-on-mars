@@ -53,20 +53,26 @@ func _draw() -> void:
 
 
 func _desenhar_ampla() -> void:
+	# Cabe em ~202x80 px: o retângulo inscrito no trapézio que a câmera faz da tela da rampa
+	# (regioes.json). Ícone e nome à esquerda, número à direita, barra embaixo; nada passa da borda.
 	var fonte := ThemeDB.fallback_font
-	var margem := 8.0
-	var lado_icone := 22.0
+	var margem := 7.0
+	var lado_icone := 20.0
 	var tam_nome := 14
-	var tam_num := 34
+	var tam_num := 30
 	draw_rect(Rect2(Vector2.ZERO, size), FUNDO)
 
 	var topo := margem
+	var texto_num := "%d/%d" % [valor, maximo]
+	var larg_num := fonte.get_string_size(texto_num, HORIZONTAL_ALIGNMENT_LEFT, -1, tam_num).x
 	Desenho.icone(self, icone, Rect2(margem, topo + 2.0, lado_icone, lado_icone), cor, FUNDO)
-	draw_string(fonte, Vector2(margem + lado_icone + 6.0, topo + lado_icone - 1.0), nome,
-		HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.5, tam_nome, TEXTO)
+	# o nome ocupa o que o número deixa livre (a barra de baixo já ocupa a largura toda)
+	var x_nome := margem + lado_icone + 5.0
+	draw_string(fonte, Vector2(x_nome, topo + lado_icone - 1.0), nome, HORIZONTAL_ALIGNMENT_LEFT,
+		size.x - margem - larg_num - 6.0 - x_nome, tam_nome, TEXTO)
 	# número à direita, na altura da linha do ícone
-	draw_string(fonte, Vector2(margem, topo + tam_num * 0.8), "%d/%d" % [valor, maximo],
+	draw_string(fonte, Vector2(margem, topo + tam_num * 0.8), texto_num,
 		HORIZONTAL_ALIGNMENT_RIGHT, size.x - margem * 2.0, tam_num, TEXTO)
 
-	var alt_barra := 16.0
+	var alt_barra := 14.0
 	Desenho.celulas(self, Rect2(margem, size.y - margem - alt_barra, size.x - margem * 2.0, alt_barra), valor, maximo, cor)
