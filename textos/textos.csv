@@ -8,7 +8,7 @@ MEDIDOR,Radiation,Radiação
 CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
 SOL_N,Sol %d,Sol %d
-AVISO_TEMPESTADE,"The Sun is active this week. A new explosion could send fast particles in the next sols. When the meter goes up, go to the shelter.","O Sol está agitado nesta semana. Uma explosão nova pode mandar partículas rápidas nos próximos sóis. Quando o medidor subir, vá para o abrigo."
+AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in minutes. Watch the radiation meter. If it goes up, go to the shelter.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em minutos. Fique de olho no medidor de radiação. Se ele subir, vá para o abrigo."
 DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
 ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
@@ -94,7 +94,7 @@ MODOS_SEGURANCA,Safe modes,Modos de segurança
 DE_VERDADE,What really happened,O que aconteceu de verdade
 DE_VERDADE_DATA,May 2024,Maio de 2024
 DE_VERDADE_TEXTO,"In May 2024, NASA's forecast (DONKI) showed a week of solar storms heading to Mars. On 20 May, a huge explosion on the Sun launched fast particles that reached Mars in tens of minutes. Curiosity measured its biggest jump in radiation since landing.","Em maio de 2024, a previsão da NASA (DONKI) mostrou uma semana de tempestades solares a caminho de Marte. Em 20 de maio, uma explosão enorme no Sol lançou partículas rápidas, que chegaram a Marte em dezenas de minutos. O Curiosity mediu o maior salto de radiação desde o pouso."
-JOGAR_DE_NOVO,Play again,Jogar de novo
+JOGAR_DE_NOVO,Free play,Modo livre
 ABA_CAMERAS,Cameras,Câmeras
 ABA_TAREFAS,Tasks,Tarefas
 ABA_DIARIO,Log,Diário
@@ -133,3 +133,46 @@ FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm ab
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
 RELATORIO_CIENCIA_ENVIADA,Science sent home: %d of %d,Ciência enviada: %d de %d
 RELATORIO_26_MESES,"In the simulator, the ship arrives in 5 sols. In real life, the way to Mars opens about every 26 months.","No simulador, a nave chega em 5 sóis. De verdade, o caminho para Marte abre a cada 26 meses, mais ou menos."
+ABERTURA_ROLAR,scroll,role
+ABERTURA_1_TITULO,Mars. Gale Crater.,Marte. Cratera Gale.
+ABERTURA_1_A,This small base is yours.,Esta pequena base é sua.
+ABERTURA_1_B,You are the commander.,Você é o comandante.
+ABERTURA_2_A,Your crew lives inside.,Sua tripulação mora aqui dentro.
+ABERTURA_2_B,"Outside, there is no air to breathe.","Lá fora, não há ar para respirar."
+ABERTURA_2_C,"On Mars, a day is called a sol.","Em Marte, um dia se chama sol."
+ABERTURA_O2_ROTULO,Oxygen,Oxigênio
+ABERTURA_O2_A,Your crew breathes it every sol.,A tripulação respira oxigênio todo sol.
+ABERTURA_O2_B,This machine makes it from Mars air.,Esta máquina faz oxigênio do ar de Marte.
+ABERTURA_O2_C,The machine needs energy to work.,A máquina precisa de energia para funcionar.
+ABERTURA_EN_ROTULO,Energy,Energia
+ABERTURA_EN_A,Solar panels charge the battery.,Os painéis solares carregam a bateria.
+ABERTURA_EN_B,Mars nights are very cold.,As noites de Marte são muito frias.
+ABERTURA_EN_C,"Heaters use energy every night. No energy, no oxygen.","O aquecedor gasta energia toda noite. Sem energia, sem oxigênio."
+ABERTURA_RAD_ROTULO,Radiation,Radiação
+ABERTURA_RAD_A,Sometimes the Sun throws out storms.,"Às vezes, o Sol solta tempestades."
+ABERTURA_RAD_B,"Fast, invisible particles reach the base.",Partículas rápidas e invisíveis chegam à base.
+ABERTURA_RAD_C,Too much radiation makes the crew sick.,Radiação demais deixa a tripulação doente.
+ABERTURA_RAD_D,This bar never fills back up.,Esta barra nunca enche de novo.
+ABERTURA_CI_ROTULO,Science,Ciência
+ABERTURA_CI_A,Scientists on Earth ask for experiments.,Cientistas na Terra pedem experimentos.
+ABERTURA_CI_B,Their messages take minutes to arrive.,As mensagens levam minutos para chegar.
+ABERTURA_CI_C,Experiments use energy too.,Experimentos também gastam energia.
+ABERTURA_CI_D,Every choice has a cost.,Toda escolha tem um custo.
+ABERTURA_PR_NAVE,SHIP,NAVE
+ABERTURA_PR_LIVRE,FREE,LIVRE
+ABERTURA_PR_A,"In 5 sols, a ship arrives.","Em 5 sóis, uma nave chega."
+ABERTURA_PR_B,It takes your science to Earth.,Ela leva sua ciência para a Terra.
+ABERTURA_PR_C,"Each sol: plan, work, report.","Cada sol: planejar, trabalhar, relatar."
+ABERTURA_PR_D,Real NASA data · May 2024,Dados reais da NASA · maio de 2024
+ABERTURA_FIM_A,Keep the base alive.,Mantenha a base viva.
+ABERTURA_FIM_B,Send science home.,Mande ciência para casa.
+ABERTURA_FIM_BOTAO,Start mission,Começar a missão
+ABERTURA_PULAR,Skip,Pular
+JOGAR,Play,Jogar
+SOL1_CARD_O2,Give energy to the oxygen machine here.,Dê energia à máquina de oxigênio aqui.
+SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos da Terra ficam aqui. Cada um dá ciência.
+SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
+SOL1_CARD_TURNO,Your tasks are in the Terminal. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Terminal. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
+CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
+CARD_GERADOR,The oxygen machine broke! Fix it in the Terminal.,A máquina de oxigênio quebrou! Conserte no Terminal.
+RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.

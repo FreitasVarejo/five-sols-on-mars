@@ -43,12 +43,23 @@ func _turno(tarefas: Array) -> void:
 	_main._missao.confirmar_plano()
 	await _quadros(2)
 	await _esperar_terminal()
+	# O primeiro turno do sol 1 abre o card do turno (uma vez por sessão): o teste o fecha, e o relógio corre.
+	if _main._terminal.card_aberto:
+		_igual(_main._terminal.card_id, "turno", "o único card que abre no turno é o do primeiro turno")
+		_main._terminal._acionar("fechar_card")
+		await _quadros(2)
 
 
 func _tudo() -> void:
 	_main = (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(_main)
 	await _quadros(3)
+	# O jogo abre na tela inicial e na abertura; o teste passa por elas até o plano do sol 1.
+	_igual(_main.tela_atual(), "inicio", "o jogo abre na tela inicial")
+	_main.sobreposicao().acionar("jogar")
+	_main.sobreposicao().concluida.emit()
+	await _quadros(2)
+	_igual(_main.tela_atual(), "jogo", "depois da abertura, o jogo")
 	var regioes = JSON.parse_string(FileAccess.get_file_as_string("res://assets/comodo/regioes.json"))
 	_igual(regioes["botoes"].has("porta"), true, "regioes.json tem a porta clicável")
 	_igual(regioes["desenho"].has("porta_lampada"), true, "regioes.json tem a lâmpada da porta (desenho)")

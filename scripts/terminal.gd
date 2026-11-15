@@ -26,7 +26,14 @@ extends Control
 ## (plano -> o plano; turno -> tarefas; fim_do_sol -> diário). Mudar de fase zera `aba`.
 ## seguranca, noite e relatorio não levam teclas.
 ##
-## O card da Terra abre por cima do plano (card_aberto) e, enquanto aberto, só "Fechar" se clica.
+## Os cards da Terra abrem por cima do plano numa fila, um por vez (card_id é o da tela; card_aberto, se
+## há algum). Cada um leva o botão "Fechar", que abre o próximo da fila; enquanto há card, só "Fechar" se clica.
+## O aviso da tempestade é centrado e cobre o plano; os cards do sol 1 ficam ao lado do controle que nomeiam,
+## que fica claro e com contorno enquanto o resto do plano escurece.
+##
+## O card do primeiro turno (só no sol 1 da missão fixa, uma vez por sessão) abre quando o terminal chega
+## embaixo, sobre a sala, perto do botão TERMINAL. O relógio do turno só corre depois que ele fecha
+## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
 ##
 ## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
 ## "Consertar" (consertar_gerador) e "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do
@@ -40,6 +47,7 @@ const Modelo := preload("res://scripts/modelo.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const DadosDonki := preload("res://scripts/dados_donki.gd")
 const HudTurno := preload("res://scripts/hud_turno.gd")
+const Abertura := preload("res://scripts/abertura/abertura.gd")
 
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
@@ -76,6 +84,21 @@ const X1 := 624.0
 const Y_CORPO := 42.0
 const Y_FIM := 314.0
 const CARD := Rect2(147, 74, 420, 180)
+# Os cards ao lado do controle: o texto de cada um, o controle que nomeiam (_alvos) e o lado do card.
+const CARD_TEXTO := {"sol1_o2": "SOL1_CARD_O2", "sol1_ciencia": "SOL1_CARD_CIENCIA", "sol1_confirmar": "SOL1_CARD_CONFIRMAR",
+	"poeira": "CARD_POEIRA", "gerador": "CARD_GERADOR"}
+const CARD_ALVO := {"sol1_o2": "o2", "sol1_ciencia": "ciencia", "sol1_confirmar": "confirmar", "poeira": "poeira",
+	"gerador": "gerador"}
+const CARDS_SOL1 := ["sol1_o2", "sol1_ciencia", "sol1_confirmar"]
+const CARD_LARGURA := 236.0
+const CARD_TAM := 13
+# Os cards ficam na coluna que não tem o controle: a da esquerda tem o O2 e a ciência; a da direita, o confirmar.
+const CARD_X_DIREITA := 372.0
+const CARD_X_ESQUERDA := 98.0
+# O card do primeiro turno: embaixo, acima do botão TERMINAL, longe do medidor (no alto da sala) e das setas
+# (nas bordas, de y 120 a 240).
+const CARD_TURNO_LARGURA := 340.0
+const CARD_TURNO_FUNDO := 322.0
 
 # Tela cheia (relatório).
 const X_ESQ := 14.0
@@ -93,7 +116,7 @@ var som: Som                # os sons de subir e descer (main.gd o liga)
 var duracao := DURACAO_PADRAO  # segundos para subir ou descer por inteiro (?terminal=<s>)
 var fase_ui := "plano"      # a fase que a sala vê (atrasa o fim do turno, por causa do fade)
 var aba := ""               # "" = a tela própria da fase; ou "cameras", "tarefas", "diario", "fontes"
-var card_aberto := false    # o card da Terra por cima do plano
+var card_id := ""           # o card da Terra na tela agora ("" = nenhum): "aviso" ou um de CARD_TEXTO
 var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
 
 var _fase_logica := "plano"
@@ -104,11 +127,15 @@ var _fade := 0.0
 var _fade_estado := ""      # "", "escurecendo" ou "clareando"
 var _botoes := {}           # nome -> Rect2, só o que se clica agora
 var _travado := false       # card aberto: o que está por baixo é desenhado mas não se clica
+var _fila: Array = []       # os cards que ainda faltam abrir neste plano
+var _vistos := {}           # card -> true: o que já abriu nesta sessão (os do sol 1 não voltam)
+var _alvos := {}            # nome -> Rect2 dos controles que um card pode apontar, como o último quadro os pôs
 var _textos: Array = []     # [texto, x, y, tamanho] de tudo que o quadro desenhou (para a sonda de teste)
 var _mouse := Vector2(-100, -100)
 var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
+var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
 
 
 func iniciar(m: Missao, dado_donki: Dictionary) -> void:
@@ -206,21 +233,76 @@ func _aba_habilitada(nome: String) -> bool:
 	return _fase_tela != "turno" or nome == "cameras" or nome == "tarefas"
 
 
+## Há card na tela (ou na fila de abrir)? A sonda e os testes leem.
+var card_aberto: bool:
+	get:
+		return card_id != ""
+
+
+## O card da tela está à vista? Os do plano, com o terminal no alto; o do primeiro turno, com ele embaixo.
 func _card_visivel() -> bool:
+	if card_id == "turno":
+		return _pos <= 0.0
 	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
 
 
-## A tela passa a mostrar a fase `f`: zera a aba e, no plano, abre o card se há aviso.
+## O relógio do turno espera? Do "Confirmar plano" do sol 1 da missão fixa até o card do primeiro turno fechar
+## (uma vez por sessão). A main não avança a missão enquanto isto vale.
+func segura_o_relogio() -> bool:
+	if missao == null:
+		return false
+	if _segura_turno:
+		return true
+	# Já no quadro em que a missão entrou no turno, antes de o terminal ver a troca de fase.
+	return missao.fase == "turno" and _fase_logica != "turno" and _tem_card_de_turno()
+
+
+func _tem_card_de_turno() -> bool:
+	return not missao.livre and missao.sol == 1 and not _vistos.has("turno")
+
+
+## A tela passa a mostrar a fase `f`: zera a aba e, no plano, monta a fila de cards.
 func _mostrar_fase(f: String) -> void:
 	fase_ui = f
 	_mostrar_na_tela(f)
 
 
-## O terminal passa a desenhar a fase `f`: zera a aba e, no plano, abre o card se há aviso.
+## O terminal passa a desenhar a fase `f`: zera a aba e, no plano, monta a fila de cards e abre o primeiro.
 func _mostrar_na_tela(f: String) -> void:
 	_fase_tela = f
 	aba = ""
-	card_aberto = f == "plano" and missao.aviso_ativo()
+	_fila = _cards_do_plano() if f == "plano" else []
+	card_id = ""
+	_abrir_proximo()
+
+
+## Os cards deste plano, na ordem: o aviso da tempestade (reabre em todo plano em que está ativo, inclusive no
+## reinício do sol), depois os do sol 1 da missão fixa e os da primeira vez da poeira e do gerador quebrado.
+## Cada um só abre uma vez por sessão: "primeira vez" é o primeiro plano que a criança de fato vê com o evento
+## (um sol que já começa em modo de segurança não monta plano, e o card fica para o próximo plano em que o
+## evento ainda vale).
+func _cards_do_plano() -> Array:
+	var fila: Array = []
+	if missao.aviso_ativo():
+		fila.append("aviso")
+	if not missao.livre and missao.sol == 1:
+		for id: String in CARDS_SOL1:
+			if not _vistos.has(id):
+				fila.append(id)
+	if missao.eh_poeira() and not _vistos.has("poeira"):
+		fila.append("poeira")
+	if missao.st_inicio.get("gerador_quebrado", false) and not _vistos.has("gerador"):
+		fila.append("gerador")
+	return fila
+
+
+## Abre o próximo card da fila (ou deixa a tela sem card). O card se marca visto quando abre.
+func _abrir_proximo() -> void:
+	if _fila.is_empty():
+		card_id = ""
+		return
+	card_id = _fila.pop_front()
+	_vistos[card_id] = true
 
 
 ## Muda o alvo do terminal (sobe ou desce) e toca o som do começo do movimento. Se `valor` já é o
@@ -274,6 +356,11 @@ func _process(delta: float) -> void:
 			if _fade <= 0.0:
 				_fade_estado = ""
 	var animou := _animar(delta)
+	# O card do primeiro turno abre quando o terminal chega embaixo.
+	if _segura_turno and card_id == "" and not aberto and _pos <= 0.0 and fase_ui == "turno":
+		card_id = "turno"
+		_vistos["turno"] = true
+		animou = true
 	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
@@ -290,6 +377,7 @@ func _vigiar_alarme() -> void:
 
 func _ao_mudar_de_fase(de: String, para: String) -> void:
 	_fase_logica = para
+	_segura_turno = para == "turno" and _tem_card_de_turno()
 	# O turno que acaba pelo relógio escurece para um cinza neutro antes do terminal subir.
 	# O modo de segurança no meio do turno entra direto.
 	if de == "turno" and (para == "fim_do_sol" or para == "seguranca") and missao.t >= missao.turno_s - 1e-6:
@@ -344,7 +432,9 @@ func _acionar(nome: String) -> void:
 		"terminal":
 			_definir_aberto(not aberto)
 		"fechar_card":
-			card_aberto = false
+			_abrir_proximo()
+			if card_id == "":
+				_segura_turno = false
 		"voltar_plano":
 			aba = ""
 		"aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes":
@@ -518,6 +608,7 @@ func _nome_tarefa(nome: String) -> String:
 func _draw() -> void:
 	_botoes.clear()
 	_textos.clear()
+	_alvos.clear()
 	if missao == null:
 		return
 	_versao_vista = missao.versao
@@ -528,16 +619,21 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
 		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
-		if card:
-			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica.
-			_escurecer_corpos()
+		if card and card_id != "turno":
+			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica. O card ao lado
+			# de um controle deixa esse controle claro, com contorno.
+			var alvo := _alvo_do_card()
+			_escurecer_corpos(alvo)
 			_travado = anima
-			_desenhar_card()
+			_desenhar_card(alvo)
 		draw_set_transform(Vector2.ZERO)
 	_travado = card
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
+	if card and card_id == "turno":
+		_travado = false
+		_desenhar_card_turno()
 	if alerta_sobre_o_terminal():
 		_desenhar_alerta()
 	if _fade > 0.0:
@@ -605,12 +701,35 @@ func _aro(r: Rect2) -> void:
 	draw_rect(r.grow(1.0), Desenho.MOLDURA, false, 1.0)
 
 
-## O card da Terra por cima: o plano (a tela e as teclas, sem a sala em volta) fica escurecido.
-func _escurecer_corpos() -> void:
+## O card da Terra por cima: o plano (a tela e as teclas, sem a sala em volta) fica escurecido. O retângulo
+## `claro`, se houver, fica de fora (o controle que o card aponta).
+func _escurecer_corpos(claro: Rect2 = Rect2()) -> void:
 	var cor := Color(Desenho.NOITE, 0.6)
-	draw_rect(_retangulo_da_tela(), cor)
-	for r: Rect2 in _retangulos_das_teclas():
-		draw_rect(r, cor)
+	for r: Rect2 in [_retangulo_da_tela()] + _retangulos_das_teclas():
+		for pedaco: Rect2 in _menos(r, claro):
+			draw_rect(pedaco, cor)
+
+
+## O retângulo `r` sem a parte de `furo`: até quatro pedaços (em cima, embaixo, à esquerda, à direita).
+static func _menos(r: Rect2, furo: Rect2) -> Array:
+	if furo.size.x <= 0.0 or not r.intersects(furo):
+		return [r]
+	var f := r.intersection(furo)
+	var saida: Array = []
+	if f.position.y > r.position.y:
+		saida.append(Rect2(r.position.x, r.position.y, r.size.x, f.position.y - r.position.y))
+	if f.end.y < r.end.y:
+		saida.append(Rect2(r.position.x, f.end.y, r.size.x, r.end.y - f.end.y))
+	if f.position.x > r.position.x:
+		saida.append(Rect2(r.position.x, f.position.y, f.position.x - r.position.x, f.size.y))
+	if f.end.x < r.end.x:
+		saida.append(Rect2(f.end.x, f.position.y, r.end.x - f.end.x, f.size.y))
+	return saida
+
+
+## O controle que o card da tela aponta, como o último quadro o desenhou (vazio se o card não aponta nada).
+func _alvo_do_card() -> Rect2:
+	return _alvos.get(CARD_ALVO.get(card_id, ""), Rect2())
 
 
 # --- cabeçalhos ------------------------------------------------------------------
@@ -679,7 +798,9 @@ func _coluna_energia(r: Rect2) -> void:
 	y += 26
 	if missao.eh_poeira():
 		Desenho.icone(self, "poeira", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
-		y += _t(tr("PLANO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), x + 16, y, 11, Desenho.TEXTO, w - 16) + 4
+		var h_poeira := _t(tr("PLANO_POEIRA") % roundi(Modelo.N.FATOR_POEIRA * 100.0), x + 16, y, 11, Desenho.TEXTO, w - 16)
+		_alvos["poeira"] = Rect2(x, y, w, maxf(h_poeira, 14.0))
+		y += h_poeira + 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
 	y += 9
 
@@ -689,13 +810,16 @@ func _coluna_energia(r: Rect2) -> void:
 	y += 24
 	var q := missao.plano_q
 	var n := missao.plano_tarefas.size()
+	_alvos["o2"] = Rect2(x, y, w, 42)
 	_botao("o2_menos", Rect2(x, y, 64, 42), "−", "", q > 0, 22)
 	_t(str(q), x + 64, y + (42.0 - Desenho.fonte().get_height(24)) / 2.0, 24, Desenho.TEXTO, w - 128, HORIZONTAL_ALIGNMENT_CENTER, true)
 	_botao("o2_mais", Rect2(x + w - 64, y, 64, 42), "+", "", missao.plano_cabe(q + 1, n), 22)
 	y += 48
 	if missao.st["gerador_quebrado"]:
 		Desenho.icone(self, "alerta", Rect2(x, y + 1, 12, 12), Desenho.AMARELO, Desenho.FUNDO_TELA)
-		y += _t(tr("GERADOR_QUEBRADO"), x + 16, y, 11, Desenho.AMARELO, w - 16) + 6
+		var h_gerador := _t(tr("GERADOR_QUEBRADO"), x + 16, y, 11, Desenho.AMARELO, w - 16)
+		_alvos["gerador"] = Rect2(x, y, w, maxf(h_gerador, 14.0))
+		y += h_gerador + 6
 	else:
 		y += 4
 	draw_line(Vector2(x, y), Vector2(x + w, y), Desenho.BORDA, 1.0)
@@ -705,6 +829,7 @@ func _coluna_energia(r: Rect2) -> void:
 	_cabeca_linha(x, y, "ciencia", tr("CIENCIA"))
 	_custo_cada(x + w, y, Modelo.N.CIENCIA_CUSTO)
 	y += 24
+	_alvos["ciencia"] = Rect2(x, y, w, 60)
 	var cx := x
 	for nome in Missao.TAREFAS:
 		_cartao_tarefa(nome, Rect2(cx, y, 78, 60))
@@ -744,6 +869,7 @@ func _cartao_tarefa(nome: String, r: Rect2) -> void:
 ## O que acontece se confirmar: uma barra "antes → depois" por recurso, a ciência e o botão.
 func _coluna_previsao(r: Rect2, p: Dictionary) -> void:
 	_caixa(r)
+	_alvos["confirmar"] = r
 	var x := r.position.x + 8
 	var w := r.size.x - 16
 	var y := r.position.y + 10
@@ -821,18 +947,30 @@ func _nota(x: float, y: float, w: float, texto: String, cor: Color, negrito: boo
 
 # --- card da Terra -------------------------------------------------------------
 
+## O card da tela: o aviso (centrado) ou o que fica ao lado de um controle.
+func _desenhar_card(alvo: Rect2) -> void:
+	if card_id == "aviso":
+		_desenhar_card_aviso()
+	else:
+		_desenhar_card_ao_lado(alvo)
+
+
 ## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação.
-func _desenhar_card() -> void:
-	var r := CARD
+func _desenhar_card_aviso() -> void:
+	var larg := CARD.size.x - 28
+	var frase_donki := tr("DONKI_FRASE_HISTORICO") if donki.get("historico", true) \
+		else tr("DONKI_FRASE_ATUAL") % DadosDonki.data_br(_chegada_mais_recente())
+	# O texto do aviso e a frase do DONKI mandam na altura: o card cresce (centrado) se não couberem entre o
+	# alto e o rodapé, que fica a 12 + 28 px da base.
+	var h_aviso := Desenho.altura_texto(tr("AVISO_TEMPESTADE"), 14, larg, true)
+	var h_donki := Desenho.altura_texto(frase_donki, 12, larg)
+	var altura := maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_donki + 10.0 + 28.0 + 12.0)
+	var r := Rect2(CARD.position.x, CARD.position.y - (altura - CARD.size.y) / 2.0, CARD.size.x, altura)
 	draw_rect(r, Desenho.AZUL)
 	var x := r.position.x + 14
-	var larg := r.size.x - 28
 	var y := r.position.y + 12
 	y += _t(tr("AVISO_TEMPESTADE"), x, y, 14, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	if donki.get("historico", true):
-		_t(tr("DONKI_FRASE_HISTORICO"), x, y, 12, Desenho.TEXTO_ESCURO, larg)
-	else:
-		_t(tr("DONKI_FRASE_ATUAL") % DadosDonki.data_br(_chegada_mais_recente()), x, y, 12, Desenho.TEXTO_ESCURO, larg)
+	_t(frase_donki, x, y, 12, Desenho.TEXTO_ESCURO, larg)
 	var rodape := r.end.y - 12 - 28
 	var larg_rodape := larg - 134
 	Desenho.icone(self, "terra", Rect2(x, rodape + 1, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
@@ -843,6 +981,56 @@ func _desenhar_card() -> void:
 		_t(tr("DONKI_DADO_DE") % DadosDonki.data_br(str(donki.get("coletado_em", ""))), x, rodape + 14, 11,
 			Desenho.TEXTO_ESCURO, larg_rodape)
 	_botao("fechar_card", Rect2(r.end.x - 14 - 120, r.end.y - 12 - 36, 120, 36), tr("FECHAR"), "", true, 13)
+
+
+## O card ao lado do controle `alvo`, na coluna que não o tem, com uma frase por linha e uma ponta
+## apontando para ele. O controle leva um contorno azul (a Terra fala); o resto do plano já está escurecido.
+func _desenhar_card_ao_lado(alvo: Rect2) -> void:
+	var texto := tr(CARD_TEXTO[card_id])
+	var larg := CARD_LARGURA - 24.0
+	var altura_texto := 0.0
+	var frases := Abertura.frases(texto)
+	for frase: String in frases:
+		altura_texto += Desenho.altura_texto(frase, CARD_TAM, larg, true) + 4.0
+	var altura := 12.0 + altura_texto + 4.0 + 36.0 + 12.0
+	# O controle na esquerda: o card vai para a direita (e a ponta aponta para a esquerda); o da direita, o contrário.
+	var na_direita := alvo.get_center().x < 360.0
+	var x := CARD_X_DIREITA if na_direita else CARD_X_ESQUERDA
+	var y := clampf(alvo.get_center().y - altura / 2.0, Y_CORPO + 6.0, Y_FIM - altura - 6.0)
+	var r := Rect2(x, y, CARD_LARGURA, altura)
+	if alvo.size.x > 0.0:
+		draw_rect(alvo.grow(2.0), Desenho.AZUL, false, 2.0)
+		var ponta_y := clampf(alvo.get_center().y, r.position.y + 10.0, r.end.y - 10.0)
+		if na_direita:
+			draw_colored_polygon(PackedVector2Array([Vector2(r.position.x, ponta_y - 8.0),
+				Vector2(r.position.x - 10.0, ponta_y), Vector2(r.position.x, ponta_y + 8.0)]), Desenho.AZUL)
+		else:
+			draw_colored_polygon(PackedVector2Array([Vector2(r.end.x, ponta_y - 8.0),
+				Vector2(r.end.x + 10.0, ponta_y), Vector2(r.end.x, ponta_y + 8.0)]), Desenho.AZUL)
+	draw_rect(r, Desenho.AZUL)
+	var yy := r.position.y + 12.0
+	for frase: String in frases:
+		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
+
+
+## O card do primeiro turno, sobre a sala, acima do botão TERMINAL (que fica apagado) e com a ponta para ele.
+func _desenhar_card_turno() -> void:
+	var larg := CARD_TURNO_LARGURA - 24.0
+	var frases := Abertura.frases(tr("SOL1_CARD_TURNO"))
+	var altura_texto := 0.0
+	for frase: String in frases:
+		altura_texto += Desenho.altura_texto(frase, CARD_TAM, larg, true) + 4.0
+	var altura := 12.0 + altura_texto + 4.0 + 36.0 + 12.0
+	var r := Rect2(roundf((640.0 - CARD_TURNO_LARGURA) / 2.0), CARD_TURNO_FUNDO - altura, CARD_TURNO_LARGURA, altura)
+	var cx := BOTAO.get_center().x
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - 8.0, r.end.y), Vector2(cx, BOTAO.position.y - 1.0),
+		Vector2(cx + 8.0, r.end.y)]), Desenho.AZUL)
+	draw_rect(r, Desenho.AZUL)
+	var yy := r.position.y + 12.0
+	for frase: String in frases:
+		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
 
 
 ## A chegada a Marte com `chegada_prevista` mais recente (dado atual do DONKI).
