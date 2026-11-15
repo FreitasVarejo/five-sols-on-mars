@@ -48,7 +48,8 @@ extends Control
 ## A aba câmeras é o visor (scripts/cameras/visor_cameras.gd), filho deste nó, por cima da aba. Ele só
 ## aparece com a aba na tela, o terminal parado no alto, sem card e sem escurecer. Escolher a câmera de
 ## uma tarefa de POR_PECA (missao.gd) pendente começa a tarefa e põe a peça dela (ChemCam, gerador) na
-## vista; a planta e a amostra começam pela estação da sala (abrir_na_estacao), sem botão aqui; a peça é quem conclui a tarefa (concluir_tarefa), e sai quando a tarefa deixa de rodar. Na aba
+## vista; a planta e a amostra começam pela estação da sala e abrem na vista de perto (vista_de_perto.gd), sem
+## botão aqui; a peça é quem conclui a tarefa (concluir_tarefa), e sai quando a tarefa deixa de rodar. Na aba
 ## tarefas, o botão da linha (ir_chemcam, ir_gerador) leva à câmera. Com o visor à vista, o clique dentro
 ## dele não é consumido aqui: segue para o visor e para a peça.
 ##
@@ -71,8 +72,7 @@ const VisorCameras := preload("res://scripts/cameras/visor_cameras.gd")
 const ColunaFontes := preload("res://scripts/coluna_fontes.gd")
 const Chemcam := preload("res://scripts/minigames/chemcam.gd")
 const ConsertarGerador := preload("res://scripts/minigames/consertar_gerador.gd")
-const CultivarPlanta := preload("res://scripts/minigames/cultivar_planta.gd")
-const SelarAmostra := preload("res://scripts/minigames/selar_amostra.gd")
+const SondaDaPeca := preload("res://scripts/minigames/sonda_da_peca.gd")
 const MovimentoAviso := preload("res://scripts/movimento_aviso.gd")
 const SeloCiencia := preload("res://scripts/selo_ciencia.gd")
 const TelaInicial := preload("res://scripts/tela_inicial_terminal.gd")
@@ -141,13 +141,11 @@ const X_ESQ := 14.0
 const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA",
 	"gerador": "TAREFA_GERADOR"}
 # Tarefa -> câmera onde ela se faz, e a peça (minigame) de cada uma; o som de começar pela câmera.
-# A planta e a amostra não têm câmera nem botão no terminal: começam na estação da sala (a estufa, a glovebox)
-# e, aqui, só aparecem como linha com estado e andamento. A estação é onde o visor hospeda a peça delas.
+# A planta e a amostra não têm câmera nem botão no terminal: começam na estação da sala (a estufa, a glovebox) e
+# a peça delas mora na vista de perto (vista_de_perto.gd). Aqui só aparecem como linha com estado e andamento.
 const CAMERA_DA_TAREFA := {"chemcam": "rocha", "gerador": "moxie"}
-const ESTACAO_DA_TAREFA := {"planta": "estufa", "amostra": "glovebox"}
-const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador, "planta": CultivarPlanta, "amostra": SelarAmostra}
-const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador", "planta": "estufa",
-	"amostra": "glovebox"}
+const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador}
+const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador"}
 const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "ABRIGO", "PAINEL", "ATRASO"]
 # A coluna "de onde vêm os números" da aba fontes: a caixa, o interior dela (onde o filho recorta) e a margem
 # da lista dentro do interior. A lista começa 7 px abaixo da caixa e 8 px à direita da borda; a faixa de 8 px
@@ -172,6 +170,12 @@ var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1
 ## como a sala os mostra agora (a main as liga). Sem ela, o card fica no centro.
 var zonas_a_evitar := Callable()
 var rect_do_card_confirmacao := Rect2()  # onde o último quadro desenhou o card de confirmação (a sonda e os testes leem)
+var vista: Control          # a vista de perto (a main liga): a peça da planta e a da amostra, de onde vem o andamento delas
+var bloqueado := false:     # a vista de perto está aberta ou em transição: o botão TERMINAL fica apagado e nada aqui responde
+	set(valor):
+		if valor != bloqueado:
+			bloqueado = valor
+			queue_redraw()
 var com_pagina := false     # o plano de cada sol da missão fixa abre com a página do diário (a main liga; ver _tem_pagina)
 
 var _fase_logica := "plano"
@@ -266,48 +270,16 @@ func ui() -> Dictionary:
 	return d
 
 
-## O que a peça (minigame) à vista oferece, em px da tela, para o teste no navegador (a sonda de main.gd).
-## Vazio sem peça visível. ChemCam: "alvos" (o centro de cada alvo pendente) e "raio". Gerador: "pecas" (o
-## retângulo de cada peça na bandeja), "certa" (o índice da peça que encaixa), "formas" e "encaixe" (o centro).
+## O que a peça (minigame) à vista no visor oferece, em px da tela, para o teste no navegador (a sonda de
+## main.gd): ChemCam e gerador (veja sonda_da_peca.gd). A planta e a amostra moram na vista de perto, que tem a
+## sua. Vazio sem peça visível.
 func minigame() -> Dictionary:
 	if _visor == null or not _visor.visible:
 		return {}
 	var p := _visor.peca(_visor.vista_atual())
 	if p == null or not p.visible:
 		return {}
-	var m := p.get_global_transform()
-	if p.has_method("alvos_na_area"):
-		var alvos: Array = []
-		var locais: PackedVector2Array = p.alvos_na_area()
-		for i in locais.size():
-			if p.estado_alvo(i) == "pendente":
-				var c: Vector2 = m * locais[i]
-				alvos.append([roundi(c.x), roundi(c.y)])
-		return {"tipo": "chemcam", "alvos": alvos, "raio": p.raio_toque(), "progresso": p.progresso()}
-	if p.has_method("centro_do_encaixe"):
-		var pecas: Array = []
-		for i in 3:
-			var r: Rect2 = p.alvo_da_peca(i)
-			var o: Vector2 = m * r.position
-			pecas.append([roundi(o.x), roundi(o.y), roundi(r.size.x), roundi(r.size.y)])
-		var sorteio: Dictionary = p.sorteio_atual()
-		var e: Vector2 = m * p.centro_do_encaixe()
-		return {"tipo": "gerador", "pecas": pecas, "certa": sorteio["certa"], "formas": sorteio["formas"],
-			"encaixe": [roundi(e.x), roundi(e.y)], "progresso": p.progresso()}
-	if p.has_method("retangulo_do_botao"):
-		var botoes := {}
-		for c in 2:
-			for mais in [false, true]:
-				var rb: Rect2 = p.retangulo_do_botao(c, mais)
-				var ob: Vector2 = m * rb.position
-				botoes["%s_%s" % [["luz", "agua"][c], "mais" if mais else "menos"]] = [roundi(ob.x), roundi(ob.y), roundi(rb.size.x), roundi(rb.size.y)]
-		return {"tipo": "planta", "botoes": botoes, "luz": p.nivel(0), "agua": p.nivel(1), "progresso": p.progresso()}
-	if p.has_method("alvo_do_passo"):
-		var a: Rect2 = p.alvo_do_passo()
-		var o: Vector2 = m * a.position
-		return {"tipo": "amostra", "passo": p.passo(), "alvo": [roundi(o.x), roundi(o.y), roundi(a.size.x), roundi(a.size.y)],
-			"profundidade": p.profundidade(), "graus": p.graus(), "progresso": p.progresso()}
-	return {}
+	return SondaDaPeca.descrever(p)
 
 
 ## Todo texto que o último quadro desenhou: [texto, x, y, tamanho, largura (-1 sem quebra), alinhamento, negrito, fonte própria (ou null)].
@@ -630,7 +602,7 @@ func _ao_mudar_de_fase(de: String, para: String) -> void:
 # --- entrada -----------------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
-	if missao == null:
+	if missao == null or bloqueado:
 		return
 	if event is InputEventMouse:
 		_mouse = event.position
@@ -775,11 +747,10 @@ func _atualizar_visor() -> void:
 	_visor.visible = aba_na_tela() == "cameras" and _pos >= 1.0 and not _card_visivel() and _fade_estado == ""
 	var pend := {}
 	for tarefa: String in PECAS:
-		var cam := _lugar_da_peca(tarefa)
+		var cam: String = CAMERA_DA_TAREFA[tarefa]
 		var estado: String = missao.tarefas.get(tarefa, "")
 		var rodando := no_turno and missao.tarefa_rodando == tarefa
-		if CAMERA_DA_TAREFA.has(tarefa):  # as estações da sala não são câmera do mapa: sem pendência
-			pend[cam] = no_turno and (estado == "pendente" or rodando)
+		pend[cam] = no_turno and (estado == "pendente" or rodando)
 		if _visor.peca(cam) != null and not rodando:
 			_visor.hospedar(cam, null)
 	var chave := "%d|%s" % [missao.sol, missao.eh_poeira()]
@@ -795,10 +766,10 @@ func _atualizar_visor() -> void:
 
 ## A criança escolheu uma câmera. A tarefa dela pendente, sem outra rodando, no turno e fora do abrigo,
 ## começa e a peça entra na vista. Se a tarefa já roda, só se mostra a peça que está lá. Outra tarefa
-## rodando (amostra, planta): nada começa, o marcador fica.
+## rodando (a amostra ou a planta, na vista de perto): nada começa, o marcador fica.
 func _ao_escolher_camera(cam: String) -> void:
 	for tarefa: String in PECAS:
-		if _lugar_da_peca(tarefa) != cam:
+		if CAMERA_DA_TAREFA[tarefa] != cam:
 			continue
 		if missao.tarefa_rodando == tarefa:
 			if _visor.peca(cam) == null:
@@ -814,39 +785,16 @@ func _hospedar_peca(tarefa: String) -> void:
 	var peca: Control = PECAS[tarefa].new()
 	if peca.has_method("semente"):
 		peca.semente(missao.sol * 100 + missao.modos)  # muda a cada conserto e segue determinística
+	if "som" in peca:
+		peca.som = som
 	peca.concluido.connect(_ao_concluir_peca.bind(tarefa))
-	_visor.hospedar(_lugar_da_peca(tarefa), peca)
-
-
-## Onde o visor hospeda a peça da tarefa: a câmera dela (ChemCam, gerador) ou a estação da sala (planta, amostra).
-func _lugar_da_peca(tarefa: String) -> String:
-	return CAMERA_DA_TAREFA.get(tarefa, ESTACAO_DA_TAREFA.get(tarefa, ""))
+	_visor.hospedar(CAMERA_DA_TAREFA[tarefa], peca)
 
 
 ## A peça terminou: a tarefa vira feita; o quadro seguinte tira a peça.
 func _ao_concluir_peca(tarefa: String) -> void:
 	missao.concluir_tarefa(tarefa)
 	queue_redraw()
-
-
-## Tocar na estação da sala (a estufa, a glovebox): a tarefa começa, o terminal sobe já na aba câmeras com a
-## peça dela à vista e a peça fica hospedada. Se a tarefa já roda (o terminal foi abaixado no meio), a mesma
-## peça volta à vista, sem recriar. O som de começar é o clique da própria estação (main.gd), por isso aqui não
-## toca. Devolve se aconteceu.
-func abrir_na_estacao(tarefa: String) -> bool:
-	if not ESTACAO_DA_TAREFA.has(tarefa) or not _pode_ir_a_camera(tarefa):
-		return false
-	if missao.tarefa_rodando != tarefa:
-		missao.iniciar_tarefa(tarefa)
-		_hospedar_peca(tarefa)
-	elif _visor.peca(_lugar_da_peca(tarefa)) == null:
-		_hospedar_peca(tarefa)
-	aba = "cameras"
-	_zerar_rolagem()
-	_definir_aberto(true)
-	_visor.escolher(_lugar_da_peca(tarefa))
-	queue_redraw()
-	return true
 
 
 ## O botão da linha da tarefa vale no turno, fora do abrigo, quando a tarefa roda ou está pendente e
@@ -859,8 +807,9 @@ func _pode_ir_a_camera(tarefa: String) -> bool:
 	return missao.tarefas.get(tarefa, "") == "pendente" and missao.tarefa_rodando == ""
 
 
-## O andamento da tarefa `nome` (0 a 1): a peça hospedada, para a tarefa que só acaba por ela; o relógio,
-## para as demais. A barra da linha e a barra da estação na sala leem daqui.
+## O andamento da tarefa `nome` (0 a 1): a peça hospedada (no visor, ou na vista de perto para a planta e a
+## amostra), para a tarefa que só acaba por ela; o relógio, para as demais. A barra da linha e a barra da
+## estação na sala leem daqui.
 func progresso_da_tarefa(nome: String) -> float:
 	return _progresso_da_linha(nome)
 
@@ -868,7 +817,9 @@ func progresso_da_tarefa(nome: String) -> float:
 ## A barra da linha: a peça hospedada, para a tarefa que só acaba por ela; o relógio, para as demais.
 func _progresso_da_linha(nome: String) -> float:
 	if nome in Missao.POR_PECA:
-		var peca: Control = _visor.peca(_lugar_da_peca(nome)) if _visor != null else null
+		if not CAMERA_DA_TAREFA.has(nome):
+			return vista.progresso_da_tarefa(nome) if vista != null else 0.0
+		var peca: Control = _visor.peca(CAMERA_DA_TAREFA[nome]) if _visor != null else null
 		return clampf(peca.progresso(), 0.0, 1.0) if peca != null else 0.0
 	return missao.progresso_tarefa(nome)
 
@@ -1067,7 +1018,7 @@ func _draw() -> void:
 	_travado = card
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
-	_botao_painel("terminal", BOTAO, tr("TERMINAL"), no_jogo and livre and not card, 12, aberto)
+	_botao_painel("terminal", BOTAO, tr("TERMINAL"), no_jogo and livre and not card and not bloqueado, 12, aberto)
 	if card and card_id == "turno":
 		_travado = not _card_entrou()
 		draw_set_transform_matrix(MovimentoAviso.transformacao(_t_do_card(), _pivo_do_card(Rect2()), CARD_DISTANCIA))

@@ -46,6 +46,7 @@ func _tudo() -> void:
 	_cards_com_o_sol_em_seguranca()
 	await _botoes_das_pecas_e_visor()
 	_pecas_nas_cameras()
+	await _estacoes_fora_do_terminal()
 	_peca_conclui_abrigo_e_reinicio()
 	await _cliques_chegam_ao_visor_e_a_peca()
 	await _frase_com_o_contexto()
@@ -941,6 +942,76 @@ func _pecas_nas_cameras() -> void:
 		_verdade(r[2] >= 24 and r[3] >= 24, "a peça da bandeja é um alvo de 24 px ou mais")
 	# A semente muda com os modos de segurança: outro modo, outro sorteio.
 	_igual(ConsertarGerador.sorteio(200) == ConsertarGerador.sorteio(201), false, "outro número, outro sorteio")
+	som.free()
+	t.free()
+
+
+## Uma vista de perto de mentira: guarda só o andamento que o terminal lê.
+class VistaFalsa extends Control:
+	var andamento := 0.4
+
+	func progresso_da_tarefa(_nome: String) -> float:
+		return andamento
+
+
+## A planta e a amostra não moram mais no terminal: as estações da sala levam à vista de perto (vista_de_perto.gd).
+## O terminal só hospeda as peças das câmeras (ChemCam, gerador); o visor só conhece as quatro câmeras; o andamento da
+## planta e da amostra vem da vista ligada (`vista`); e, com a vista à mostra (`bloqueado`), o botão TERMINAL apaga e
+## não abre nada.
+func _estacoes_fora_do_terminal() -> void:
+	var c := _turno_nas_cameras(true, true)
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	_igual(Terminal.PECAS.keys(), ["chemcam", "gerador"], "o terminal só hospeda as peças das câmeras")
+	_igual(Terminal.CAMERA_DA_TAREFA.keys(), ["chemcam", "gerador"], "só o ChemCam e o gerador têm câmera")
+	_igual(Terminal.SOM_DE_INICIAR.keys(), ["chemcam", "gerador"], "e só eles têm o som de começar pela câmera")
+	_igual(t.get_script().get_script_constant_map().has("ESTACAO_DA_TAREFA"), false, "o terminal não conhece estações")
+	_igual(t.has_method("abrir_na_estacao"), false, "e não abre na estação")
+	_igual(Terminal.VisorCameras.CAMERAS, ["painel", "rocha", "moxie", "visao_geral"], "o visor só conhece as quatro câmeras")
+	_igual(t._visor.get_script().get_script_constant_map().has("ESTACOES"), false, "o visor não tem estações")
+	var camera: String = t._visor.camera_atual()
+	_igual(t._visor.escolher("estufa"), false, "o visor não escolhe a estufa")
+	_igual(t._visor.escolher("glovebox"), false, "nem a glovebox")
+	_igual(t._visor.camera_atual(), camera, "e a câmera atual não mudou")
+	_igual(t._visor.peca("estufa"), null, "sem peça na estufa")
+	_igual(t._visor_pend, {"rocha": true, "moxie": true}, "a planta e a amostra não são pendência do mapa")
+	_igual(t.minigame(), {}, "sem peça no visor, nada para a sonda")
+	# O andamento da planta e da amostra: 0 sem a vista ligada; com ela, o dela. O ChemCam segue sendo do visor.
+	_igual(t.vista, null, "sem a vista de perto ligada")
+	_igual(t.progresso_da_tarefa("planta"), 0.0, "sem a vista, a planta não tem andamento")
+	_igual(t.progresso_da_tarefa("amostra"), 0.0, "nem a amostra")
+	var vista := VistaFalsa.new()
+	t.vista = vista
+	_igual(t.progresso_da_tarefa("planta"), 0.4, "com a vista ligada, o andamento da planta é o dela")
+	_igual(t._progresso_da_linha("amostra"), 0.4, "e o da amostra também, na linha da aba tarefas")
+	_igual(t.progresso_da_tarefa("chemcam"), 0.0, "o ChemCam segue sendo o da peça do visor (nenhuma, 0)")
+	vista.andamento = 0.9
+	_igual(t.progresso_da_tarefa("planta"), 0.9, "o andamento acompanha a vista")
+	# O botão TERMINAL: com a vista à mostra (bloqueado), apaga, sai de ui() e o clique não abre o terminal.
+	t._acionar("terminal")
+	_rodar(t, m, t.duracao * 1.5)
+	await process_frame
+	await process_frame
+	_igual(t.aberto, false, "o terminal desceu")
+	_verdade(t.ui().has("terminal"), "abaixado, o botão TERMINAL se clica")
+	t.bloqueado = true
+	await process_frame
+	await process_frame
+	_igual(t.ui().has("terminal"), false, "bloqueado, o botão TERMINAL sai de ui()")
+	root.push_input(_mouse(Vector2(320, 342), true), true)
+	root.push_input(_mouse(Vector2(320, 342), false), true)
+	_igual(t.aberto, false, "e o clique nele não abre o terminal")
+	t.bloqueado = false
+	await process_frame
+	await process_frame
+	_verdade(t.ui().has("terminal"), "desbloqueado, o botão volta")
+	root.push_input(_mouse(Vector2(320, 342), true), true)
+	root.push_input(_mouse(Vector2(320, 342), false), true)
+	_igual(t.aberto, true, "e o clique nele abre o terminal")
+	t.vista = null
+	vista.free()
+	root.remove_child(t)
 	som.free()
 	t.free()
 

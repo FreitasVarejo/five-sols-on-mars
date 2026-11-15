@@ -39,6 +39,7 @@ func _init() -> void:
 	_missao_inteira()
 	_agenda_fixa()
 	_freeplay()
+	_problema_da_planta()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -1736,3 +1737,67 @@ func _freeplay() -> void:
 	_igual(u.fixa_concluida, false, "agenda forçada pela URL não conta como a missão fixa")
 	u.jogar_de_novo()
 	_igual(u.livre, false, "e o jogar de novo repete a missão")
+
+
+# --- o problema da estufa ----------------------------------------------------------------
+
+func _problema_da_planta() -> void:
+	# Missão fixa: o problema segue o sol (1 seca, 2 encharcada, 3 mofo, 4 seca, 5 mofo), qualquer semente.
+	_igual(Missao.FIXA_PROBLEMAS_PLANTA, ["seca", "encharcada", "mofo", "seca", "mofo"], "planta: a lista da missão fixa")
+	for semente in [-1, 0, 1, 42, 199]:
+		var f = Missao.new(semente)
+		for sol_n in range(1, 6):
+			f.montar_sol(sol_n, _st(6, 4, 12))
+			_igual(f.problema_da_planta(), Missao.FIXA_PROBLEMAS_PLANTA[sol_n - 1], "planta, fixa (semente %d): o problema do sol %d" % [semente, sol_n])
+	var f2 = Missao.new(1)
+	f2.montar_sol(2, _st(6, 4, 12))
+	_igual(f2.problema_da_planta(), "encharcada", "planta, fixa: o sol 2 é encharcada")
+	# O reinício do sol (modo de segurança) mantém o problema, na fixa e no freeplay; o `modos` não entra.
+	for livre in [false, true]:
+		var m = Missao.new(7, {"livre": livre})
+		var lista: Array = m.problemas_planta.duplicate()
+		m.montar_sol(1, _st(6, 1, 12))
+		var antes: String = m.problema_da_planta()
+		m.confirmar_plano()
+		m.avancar(m.turno_s)
+		_igual(m.fase, "seguranca", "planta (livre %s): o O2 1 leva ao modo de segurança" % livre)
+		_verdade(m.reiniciar_sol(), "planta (livre %s): reinicia o sol" % livre)
+		_igual(m.modos, 1, "planta (livre %s): o reinício contou um modo" % livre)
+		_igual(m.problema_da_planta(), antes, "planta (livre %s): o mesmo problema depois de reiniciar o sol" % livre)
+		_igual(m.problemas_planta, lista, "planta (livre %s): a lista da missão não mudou" % livre)
+	# Freeplay: cada sol tem um problema sorteado pela missão; os três aparecem, a semente fixa o sorteio.
+	var vistos := {}
+	var listas := {}
+	for semente in 200:
+		var m = Missao.new(semente, {"livre": true})
+		_igual(m.problemas_planta.size(), 5, "planta, freeplay: um problema por sol")
+		for sol_n in range(1, 6):
+			m.montar_sol(sol_n, _st(6, 4, 12))
+			_verdade(m.problema_da_planta() in Missao.PROBLEMAS_PLANTA, "planta, freeplay: o sol %d tem um problema da lista" % sol_n)
+			vistos[m.problema_da_planta()] = true
+		listas[m.problemas_planta] = true
+	_igual(vistos.size(), 3, "planta, freeplay: os três problemas são sorteados")
+	_verdade(listas.size() > 50, "planta, freeplay: a sequência varia entre missões")
+	var x = Missao.new(11, {"livre": true})
+	var y = Missao.new(11, {"livre": true})
+	_igual(x.problemas_planta, y.problemas_planta, "planta, freeplay: a semente fixa o sorteio")
+	# O sorteio da estufa não desloca o do resto: o `rng` da missão segue a conta de antes (agenda e atraso).
+	var ref := RandomNumberGenerator.new()
+	ref.seed = 5
+	ref.randi_range(0, Missao.AGENDAS_LIVRES.size() - 1)
+	ref.randi_range(Missao.ATRASO_MIN, Missao.ATRASO_MAX)
+	var z = Missao.new(5, {"livre": true})
+	_igual(z.rng.randi(), ref.randi(), "planta: o sorteio da estufa não puxa números do rng dos eventos")
+	# "Jogar de novo": a sequência anda a cada partida, em vez de repetir a mesma.
+	var j = Missao.new(3, {"freeplay_aberto": true})
+	var sequencias := {}
+	for i in 12:
+		j.fase = "relatorio"
+		_verdade(j.jogar_de_novo(), "planta: jogar de novo %d" % i)
+		sequencias[j.problemas_planta.duplicate()] = true
+	_verdade(sequencias.size() > 6, "planta: cada partida do freeplay tem a sua sequência (%d de 12)" % sequencias.size())
+	# Sem o freeplay aberto, o "jogar de novo" repete a fixa.
+	var k = Missao.new(3)
+	k.fase = "relatorio"
+	k.jogar_de_novo()
+	_igual(k.problemas_planta, Missao.FIXA_PROBLEMAS_PLANTA, "planta: sem freeplay, a mesma lista da fixa")

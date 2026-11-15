@@ -25,6 +25,14 @@ const SONS := {
 	"alarme": preload("res://assets/sons/alarme.ogg"),  # o medidor passou do limiar de abrigo (terminal.gd)
 	"viagem_ignicao": preload("res://assets/sons/viagem_ignicao.ogg"),  # o foguete parte, no começo da viagem (viagem.gd)
 	"viagem_pouso": preload("res://assets/sons/viagem_pouso.ogg"),  # o baque do pouso, junto do flash (viagem.gd)
+	# A estufa (minigames/cultivar_planta.gd): a luz verde, as três ferramentas, o retorno e o acerto final.
+	"estufa_luz": preload("res://assets/sons/estufa_luz.ogg"),
+	"estufa_regar": preload("res://assets/sons/estufa_regar.ogg"),
+	"estufa_ventilar": preload("res://assets/sons/estufa_ventilar.ogg"),
+	"estufa_cortar": preload("res://assets/sons/estufa_cortar.ogg"),
+	"estufa_melhorou": preload("res://assets/sons/estufa_melhorou.ogg"),
+	"estufa_piorou": preload("res://assets/sons/estufa_piorou.ogg"),
+	"estufa_ploc": preload("res://assets/sons/estufa_ploc.ogg"),
 }
 
 ## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).

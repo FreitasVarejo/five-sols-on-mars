@@ -37,6 +37,16 @@ a lâmpada verde da porta, para o Godot acendê-la ou apagá-la por cima do rend
 a folga da projeção), porque o Godot a pinta por cima do render. O terminal não é render: é camada de tela no Godot.
 Uma imagem de depuração com os retângulos fica em arte/blender/.render/regioes_debug.png.
 
+Vista de perto (`-- --perto estufa,glovebox`): a peça da planta e a da amostra abrem numa imagem da própria
+estação, vista de frente por uma câmera em perspectiva (640x360, só o estado normal). Mesma cena
+(construir) e mesmo pipeline (pixel_art), com o miolo que fica atrás do vidro escondido: a peça do
+Godot desenha o interior. O vidro da câmara sai com alpha 0 no PNG, como o da janela, e o Godot põe
+a peça ATRÁS do PNG, no maior retângulo inscrito nessa região (calculado pela máscara do vidro, sem
+o traço do contorno). O que fica na frente do vidro (aros e bocas das luvas) continua no render e
+encolhe o retângulo. Grava assets/comodo/perto_<estacao>.png e a chave "perto" de regioes.json (o
+resto do arquivo e os PNGs do panorama não mudam) e, em arte/blender/.render/, perto_<estacao>_debug.png
+(2x, com o retângulo da peça, a faixa do HUD, o botão de voltar e o de mudo).
+
 Paleta: Apollo, de AdamCYounis (https://lospec.com/palette-list/apollo).
 """
 
@@ -88,6 +98,8 @@ def args():
     p.add_argument("--saida", default="assets/comodo")
     p.add_argument("--sufixo", default="")
     p.add_argument("--amostras", type=int, default=64)
+    p.add_argument("--perto", default="",
+                   help="estações da vista de perto (estufa, glovebox); só elas são renderizadas")
     return p.parse_args(argv)
 
 
@@ -302,6 +314,8 @@ TELAS_APAGADAS = ("energia_tela", "oxigenio_tela", "radiacao_tela", "comunicacao
 AZUL_TERRA = "73bed3"                # azul é só do que vem da Terra (moldura da tela de comunicação)
 COR_AROS_JANELA = "151d28"           # traço do vidro e faces internas da moldura, em todo estado
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
+GLOVEBOX_C = (2.087, 1.466)          # (x, y) do painel da glovebox e o da estufa, no chão
+ESTUFA_C = (2.315, 0.66)
 
 
 def botao(nome, cor):
@@ -745,7 +759,7 @@ def construir():
     # cobrem as pontas) e na faixa y 120..250.
     vidro_gb = tela_apagada("vidro_glovebox", "468232")
 
-    g = Painel(2.087, 1.466)
+    g = Painel(*GLOVEBOX_C)
     g.caixa("glovebox_base", 0, 0, 0.40, 0.70, 0.40, 0.80, console, next(i))
     g.caixa("glovebox_moldura", 0, 0.05, 1.15, 0.78, 0.34, 0.68, caixa_c, next(i))
     g.caixa("glovebox_vidro", 0, 0.225, 1.17, 0.68, 0.01, 0.52, vidro_gb, next(i))
@@ -753,7 +767,7 @@ def construir():
         g.cil(f"glovebox_aro{k}", da, 0.24, 0.99, 0.115, 0.03, moldura, next(i))
     _glovebox(i, g)
 
-    e = Painel(2.315, 0.66)
+    e = Painel(*ESTUFA_C)
     e.caixa("estufa_corpo", 0, 0, 0.88, 0.66, 0.40, 1.76, caixa_c, next(i))
     pz = 1.18
     e.caixa("estufa_moldura", 0, 0.22, pz, 0.54, 0.04, 0.66, moldura, next(i))
@@ -1106,8 +1120,9 @@ def _ids(prefixos):
     return [v for n, v in INDICE.items() if n.startswith(prefixos)]
 
 
-def pixel_art(p, borda, estado):
-    """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo).
+def pixel_art(p, borda, estado, vidros=()):
+    """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo), e o dos objetos
+    em `vidros` (as câmaras da vista de perto) também.
 
     Passos: tons chapados por face (tons_por_face), quantização na Apollo com o verde, o azul e o
     rosa restritos aos seus objetos, filtro de maioria contra pixel solto (limpar_orfaos) e o
@@ -1154,6 +1169,10 @@ def pixel_art(p, borda, estado):
     alfa = np.full(rgb.shape[:2], 255, np.uint8)
     if estado != "abrigo":
         vidro = (p["indice"] == INDICE["janela"]) & ~borda
+        alfa[vidro] = 0
+        rgb[vidro] = 0
+    for nome in vidros:
+        vidro = (p["indice"] == INDICE[nome]) & ~borda
         alfa[vidro] = 0
         rgb[vidro] = 0
     return np.dstack([rgb, alfa])
@@ -1395,8 +1414,170 @@ def salvar_png_rgba(caminho, rgba):
     out.close()
 
 
+# ---------------------------------------------------------------- vista de perto
+
+# Cada estação: o painel no chão, o vidro da câmara (a face dele, em metros, na normal do painel, e o
+# centro dele), o miolo que fica atrás do vidro (escondido: a peça do Godot desenha o interior), a
+# escala (px por metro no plano do vidro), a distância da câmera ao vidro e onde, na imagem, cai o
+# centro do vidro. O vidro da glovebox é cortado embaixo pela imagem: os aros das luvas comem a parte
+# de baixo dele, e o retângulo da peça só existe acima deles.
+PERTO_DIST = 1.0                     # m da câmera ao vidro; perspectiva suave, sem deformar a peça
+PERTO_W, PERTO_H = 640, 360
+PERTO = {
+    "estufa": dict(
+        centro=ESTUFA_C, vidro="estufa_vidro", d_vidro=0.245, z_vidro=1.18,
+        esconder=("estufa_luz", "estufa_fundo", "estufa_bandeja", "estufa_solo",
+                  *(f"estufa_folha{k}" for k in range(7)),
+                  "estufa_broto_caule", "estufa_broto0", "estufa_broto1"),
+        px_por_m=530.0, ancora_px=(320, 195)),
+    "glovebox": dict(
+        centro=GLOVEBOX_C, vidro="glovebox_vidro", d_vidro=0.23, z_vidro=1.17,
+        esconder=("glovebox_fundo", "glovebox_chao", "glovebox_luz", "glovebox_manga0",
+                  "glovebox_manga1", "glovebox_mao0", "glovebox_mao1", "glovebox_polegar0",
+                  "glovebox_polegar1", "glovebox_suporte", "glovebox_tubo", "glovebox_liquido",
+                  "glovebox_tampa"),
+        px_por_m=760.0, ancora_px=(320, 238)),
+}
+# Onde o Godot desenha o resto da tela da vista de perto (640x360): a faixa do HUD do turno (y < 34), o
+# botão de voltar (canto de cima à direita) e o de mudo (canto de baixo à direita). A peça não os cobre.
+PERTO_HUD_Y = 34
+PERTO_VOLTAR = (562, 6, 72, 32)
+PERTO_MUDO = (596, 328, 38, 28)
+
+
+def posicionar_camera_perto(cfg):
+    """Põe a câmera de frente para o vidro, a PERTO_DIST dele, de modo que o centro do vidro caia em
+    `ancora_px` com `px_por_m` px por metro. Só translada (não gira nem inclina): o vidro, que é plano e
+    paralelo ao sensor, continua um retângulo alinhado aos eixos na imagem."""
+    painel = Painel(*cfg["centro"])
+    s_ = cfg["px_por_m"]
+    ax, ay = cfg["ancora_px"]
+    a_cam = -(ax - PERTO_W / 2) / s_
+    z_cam = cfg["z_vidro"] + (ay - PERTO_H / 2) / s_
+    cam = bpy.context.scene.camera
+    cam.location = painel.pos(a_cam, cfg["d_vidro"] + PERTO_DIST, z_cam)
+    ang = math.degrees(math.atan2(painel.f[0], painel.f[1]))   # de +y para +x, para a direita
+    cam.rotation_euler = (math.radians(90), 0, math.radians(-ang))
+    rad_px = 1.0 / (s_ * PERTO_DIST)
+    cam.data.angle_y = 2 * math.atan(rad_px * PERTO_H / 2)
+    return rad_px
+
+
+def maior_retangulo(mascara):
+    """Maior retângulo alinhado aos eixos todo dentro da máscara (histograma por linha): x, y, w, h."""
+    h, w = mascara.shape
+    alturas = np.zeros(w, np.int64)
+    melhor = (0, 0, 0, 0, 0)
+    for y in range(h):
+        alturas = np.where(mascara[y], alturas + 1, 0)
+        pilha = []
+        for x in range(w + 1):
+            atual = alturas[x] if x < w else 0
+            inicio = x
+            while pilha and pilha[-1][1] >= atual:
+                x0, alt = pilha.pop()
+                area = alt * (x - x0)
+                if area > melhor[0]:
+                    melhor = (area, x0, y - alt + 1, x - x0, alt)
+                inicio = x0
+            pilha.append((inicio, atual))
+    _, x, y, w_, h_ = melhor
+    return {"x": int(x), "y": int(y), "w": int(w_), "h": int(h_)}
+
+
+def desenhar_perto(rgba, r):
+    """Depuração em 2x: o vidro (azul), o retângulo da peça (magenta), a faixa do HUD, o botão de voltar e o de mudo."""
+    fundo = np.where(rgba[..., 3:4] > 0, rgba[..., :3], np.array([32, 96, 160], np.uint8))
+    img = np.repeat(np.repeat(fundo, 2, 0), 2, 1).astype(np.uint8).copy()
+    img[PERTO_HUD_Y * 2, ::6] = (255, 255, 255)
+
+    def moldura(x, y, w, h, cor):
+        x0, y0, x1, y1 = x * 2, y * 2, (x + w) * 2 - 1, (y + h) * 2 - 1
+        img[y0:y1 + 1, [x0, x0 + 1, x1 - 1, x1]] = cor
+        img[[y0, y0 + 1, y1 - 1, y1], x0:x1 + 1] = cor
+
+    moldura(r["x"], r["y"], r["w"], r["h"], (255, 0, 255))
+    moldura(*PERTO_VOLTAR, (255, 255, 0))
+    moldura(*PERTO_MUDO, (255, 255, 0))
+    return img
+
+
+def main_perto(a):
+    estacoes = [e for e in a.perto.split(",") if e]
+    for e in estacoes:
+        if e not in PERTO:
+            raise SystemExit(f"--perto: estação desconhecida '{e}' (use {', '.join(PERTO)})")
+    a.camera, a.largura, a.altura = "perspectiva", PERTO_W, PERTO_H
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    luzes = construir()
+    configurar(a)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    (CACHE / ".gdignore").touch()
+    saida = RAIZ / a.saida
+    aplicar_estado("normal", luzes)
+    regioes = {}
+    ok_geral = True
+    for nome in estacoes:
+        cfg = PERTO[nome]
+        for ob in cfg["esconder"]:
+            bpy.data.objects[ob].hide_render = True
+        posicionar_camera_perto(cfg)
+        bpy.context.view_layer.update()
+        exr = CACHE / f"perto_{nome}.exr"
+        bpy.context.scene.render.filepath = str(exr)
+        bpy.ops.render.render(write_still=True)
+        p = ler_exr(exr)
+        borda = contorno(p)
+        rgba = pixel_art(p, borda, "normal", vidros=(cfg["vidro"],))
+        for ob in cfg["esconder"]:
+            bpy.data.objects[ob].hide_render = False
+        caminho = saida / f"perto_{nome}.png"
+        salvar_png_rgba(caminho, rgba)
+
+        transp = rgba[..., 3] == 0
+        r = maior_retangulo(transp)
+        dentro = np.zeros(transp.shape, bool)
+        dentro[r["y"]:r["y"] + r["h"], r["x"]:r["x"] + r["w"]] = True
+        vx = [r["x"], r["x"] + r["w"]]
+        checagens = [
+            (f"nada opaco dentro do retângulo da peça ({int((dentro & ~transp).sum())} px opacos)",
+             not (dentro & ~transp).any()),
+            (f"o alpha 0 é só o vidro ({int((transp & (p['indice'] != INDICE[cfg['vidro']])).sum())} px de outro objeto)",
+             not (transp & (p["indice"] != INDICE[cfg["vidro"]])).any()),
+            (f"a janela não aparece na imagem ({int((p['indice'] == INDICE['janela']).sum())} px)",
+             not (p["indice"] == INDICE["janela"]).any()),
+            (f"retângulo abaixo da faixa do HUD: y {r['y']} >= {PERTO_HUD_Y}", r["y"] >= PERTO_HUD_Y),
+            (f"retângulo dentro da imagem: x {vx[0]}..{vx[1]}, y {r['y']}..{r['y'] + r['h']}",
+             vx[0] >= 0 and vx[1] <= PERTO_W and r["y"] + r["h"] <= PERTO_H),
+        ]
+        for rect_ui, nome_ui in ((PERTO_VOLTAR, "voltar"), (PERTO_MUDO, "mudo")):
+            ux, uy, uw, uh = rect_ui
+            livre = r["x"] + r["w"] <= ux or ux + uw <= r["x"] or r["y"] + r["h"] <= uy or uy + uh <= r["y"]
+            checagens.append((f"retângulo não cobre o botão {nome_ui} {rect_ui}", livre))
+        print(f"[comodo] perto {nome}: {caminho}")
+        print(f"[comodo]   retângulo da peça: {r['x']}, {r['y']}, {r['w']}x{r['h']}")
+        for msg, ok in checagens:
+            print(f"[comodo]   {'ok   ' if ok else 'FALHA'} {msg}")
+            ok_geral &= bool(ok)
+        regioes[nome] = r
+        salvar_png(CACHE / f"perto_{nome}_debug.png", desenhar_perto(rgba, r))
+        print(f"[comodo]   depuração: {CACHE / f'perto_{nome}_debug.png'}")
+
+    # só a chave "perto" muda: o resto do regioes.json (e os PNGs do panorama) ficam como estão
+    arq = saida / "regioes.json"
+    doc = json.loads(arq.read_text()) if arq.exists() else {}
+    doc.setdefault("perto", {}).update(regioes)
+    doc["perto"]["nota"] = ("x, y, w, h em px da imagem perto_<estacao>.png (640x360), no maior retângulo "
+                           "inscrito no vidro (alpha 0): é onde o Godot põe a peça, atrás do PNG.")
+    arq.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+    print(f"[comodo] regiões: {arq}")
+    print(f"[comodo] vista de perto: {'PASSA' if ok_geral else 'FALHA'}")
+
+
 def main():
     a = args()
+    if a.perto:
+        return main_perto(a)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     luzes = construir()
     rad_px = configurar(a)

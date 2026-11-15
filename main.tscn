@@ -19,6 +19,7 @@
 [ext_resource type="Texture2D" path="res://assets/comodo/persiana_indice.png" id="18_indice"]
 [ext_resource type="Script" path="res://scripts/som.gd" id="19_som"]
 [ext_resource type="Script" path="res://scripts/botao_mudo.gd" id="20_mudo"]
+[ext_resource type="Script" path="res://scripts/vista_de_perto.gd" id="21_perto"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_pan"]
 shader = ExtResource("6_shader")
@@ -172,6 +173,16 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("14_terminal")
+
+[node name="VistaDePerto" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("21_perto")
 
 [node name="BotaoMudo" type="Control" parent="."]
 layout_mode = 1

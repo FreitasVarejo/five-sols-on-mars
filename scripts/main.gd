@@ -14,6 +14,11 @@ extends Control
 ## O jogo em si mora em missao.gd (lógica pura). Aqui ficam a sala, a câmera e a ligação: a cada
 ## quadro a missão avança, a sala se redesenha com o estado dela (barras, medidor, estações,
 ## panorama) e o terminal (terminal.gd) e o HUD do turno desenham a parte de tela.
+##
+## A estufa e a glovebox levam à vista de perto (vista_de_perto.gd, camada filha desta, entre o terminal e o botão
+## de mudo): a Sala faz um zoom até a estação (`_aplicar_zoom`, a partir de `_perto.zoom()`) e a peça da tarefa
+## abre na imagem da estação. Com a vista à mostra (`_perto.aberta()`) o pan para, as setas somem, a sala não se
+## clica e o terminal fica bloqueado; o relógio do turno NÃO para (a vista não é uma `_sobreposicao`).
 
 const VELOCIDADE_BORDA := 600.0  # px/s, no limite da tela
 const VELOCIDADE_SETA := 400.0  # px/s, seta pressionada
@@ -35,6 +40,8 @@ const Inicio := preload("res://scripts/inicio.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
 const PaginaDiario := preload("res://scripts/pagina_diario.gd")
 const Viagem := preload("res://scripts/abertura/viagem.gd")
+const VistaDePerto := preload("res://scripts/vista_de_perto.gd")
+const ZOOM_SALA := 3.0  # quanto a Sala cresce até a estação, antes de a vista de perto aparecer
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -66,6 +73,7 @@ const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
 @onready var _contornos: Control = $HUD/Contornos
 @onready var _hud_turno: Control = $HUD/HudTurno
 @onready var _terminal: Control = $Terminal
+@onready var _perto: VistaDePerto = $VistaDePerto
 @onready var _som: Som = $Som
 @onready var _botao_mudo: Control = $BotaoMudo
 
@@ -89,6 +97,7 @@ var _pan_inteiro := 0
 # do mouse ou uma seta solta o pan.
 var _pan_alvo := 0.0
 var _pan_guiado := false
+var _foco := Rect2()  # a estação do zoom da vista de perto, em px do panorama
 var _cliques := 0
 var _ultimo_clique := ""
 var _hover := ""
@@ -129,6 +138,9 @@ func _ready() -> void:
 	_missao.duracao_encerrar = Missao.duracao_da_url(_parametros.get("acelerar"))
 	_carregar_regioes()
 	_hud_turno.missao = _missao
+	_perto.missao = _missao
+	_perto.som = _som
+	_terminal.vista = _perto
 	_terminal.iniciar(_missao, _donki)
 	_terminal.desenhou.connect(_sonda_se_mudou)
 	_terminal.pediu_abrigo.connect(_virar_para_abrigo)
@@ -246,7 +258,7 @@ func _input(event: InputEvent) -> void:
 
 ## Só chega aqui o que nenhum Control (as setas) consumiu.
 func _unhandled_input(event: InputEvent) -> void:
-	if _sobreposicao != null:
+	if _sobreposicao != null or _perto.aberta():
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var nome := _regiao_em(event.position)
@@ -281,7 +293,7 @@ func _process(delta: float) -> void:
 	if _missao.fixa_concluida and not _freeplay_gravado:
 		_freeplay_gravado = true
 		_gravar_freeplay_destravado()
-	var tapa: bool = _terminal.tapa_a_sala() or _sobreposicao != null
+	var tapa: bool = _terminal.tapa_a_sala() or _sobreposicao != null or _perto.aberta()
 	if tapa:
 		_esq_pressionada = false
 		_dir_pressionada = false
@@ -305,6 +317,7 @@ func _process(delta: float) -> void:
 	var novo := roundi(_pan)
 	_sala.position.x = -novo
 	_pan_inteiro = novo
+	_aplicar_zoom(_perto.zoom())
 
 	var hover := _regiao_em(_mouse_pos) if (_mouse_real and _mouse_dentro) else ""
 	if hover != _hover:
@@ -336,7 +349,10 @@ func _atualizar_sala() -> void:
 	if estado != _estado:
 		_definir_estado(estado)
 	_vista_janela.acompanhar(fase_ui, _missao.relogio(), _missao.turno_s, _missao.eh_poeira())
-	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto and _terminal.posicao() <= 0.0
+	# Na vista de perto o HUD do turno fica por cima dela (o relógio do turno e o alerta do medidor seguem à vista).
+	_hud_turno.visible = fase_ui == "turno" and (_perto.aberta() or (not _terminal.aberto and _terminal.posicao() <= 0.0))
+	_hud_turno.z_index = 1 if _perto.aberta() else 0
+	_terminal.bloqueado = _perto.aberta()
 	var estados := {}
 	var progresso := {}
 	var clicaveis := {}
@@ -352,10 +368,10 @@ func _atualizar_sala() -> void:
 
 ## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
 ## delas está escolhida, pendente (ou já rodando: o toque volta à peça), sem outra rodando e fora do abrigo; a porta do dormitório quando dá
-## para encerrar o sol (a lista acabou e o medidor não pede atenção).
+## para encerrar o sol (a lista acabou e o medidor não pede atenção). Nada, com a vista de perto à mostra.
 func _clicavel(nome: String) -> bool:
 	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _terminal.card_aberto \
-			or _sobreposicao != null:
+			or _sobreposicao != null or _perto.aberta():
 		return false
 	match nome:
 		"abrigo":
@@ -458,7 +474,7 @@ func _panorama_para_tela(q: Vector2) -> Vector2:
 
 ## Nome do botão sob o ponto p da tela ("" se nenhum). As setas tapam.
 func _regiao_em(p: Vector2) -> String:
-	if _terminal.tapa_a_sala() or _terminal.card_aberto or _sobreposicao != null:
+	if _terminal.tapa_a_sala() or _terminal.card_aberto or _sobreposicao != null or _perto.aberta():
 		return ""
 	for seta in [_seta_esq, _seta_dir]:
 		if seta.is_visible_in_tree() and seta.get_global_rect().has_point(p):
@@ -662,9 +678,9 @@ func _ao_clicar(nome: String) -> void:
 			else:
 				fez = _missao.abrigar()
 		"estufa":
-			fez = _terminal.abrir_na_estacao("planta")
+			fez = _abrir_perto("planta", nome)
 		"glovebox":
-			fez = _terminal.abrir_na_estacao("amostra")
+			fez = _abrir_perto("amostra", nome)
 		"porta":
 			# Na primeira vez abre o card da Terra e a ação espera a confirmação (o terminal toca o clique dela).
 			if _missao.pode_encerrar_sol() and _terminal.pedir_confirmacao("dormir", func() -> void: _missao.encerrar_sol()):
@@ -674,6 +690,33 @@ func _ao_clicar(nome: String) -> void:
 	if fez:
 		_som.clique(nome)
 	_sonda_teste()
+
+
+## Tocar na estação `botao` da tarefa `tarefa`: a vista de perto abre (a tarefa começa, se ainda não roda) e a
+## Sala faz o zoom até a estação. Devolve se abriu.
+func _abrir_perto(tarefa: String, botao: String) -> bool:
+	if not _perto.abrir(tarefa):
+		return false
+	_foco = _botoes[botao]
+	_terminal.bloqueado = true  # já neste quadro: o `_atualizar_sala` o mantém enquanto a vista estiver à mostra
+	_esq_pressionada = false
+	_dir_pressionada = false
+	_pan_guiado = false
+	return true
+
+
+## O zoom da Sala até `_foco`, de z = 0 (a sala como está, no pan de agora) a z = 1 (a estação no meio da tela,
+## ZOOM_SALA vezes maior). O ponto da estação vai do lugar dela na tela até o centro enquanto a escala cresce.
+func _aplicar_zoom(z: float) -> void:
+	if z <= 0.0:
+		_sala.scale = Vector2.ONE
+		_sala.position.y = 0.0
+		return
+	var c := _foco.get_center()
+	var c0 := Vector2(c.x - _pan_inteiro, c.y)
+	var escala := pow(ZOOM_SALA, z)
+	_sala.scale = Vector2(escala, escala)
+	_sala.position = c0.lerp(get_viewport_rect().size / 2.0, z) - c * escala
 
 
 func _definir_estado(estado: String) -> void:
@@ -799,6 +842,10 @@ func _ui_da_tela() -> Dictionary:
 		var sobre := _ui_da_sobreposicao()
 		sobre.merge(_botao_mudo.ui())
 		return sobre
+	if _perto.aberta():
+		var perto := _perto.ui()
+		perto.merge(_botao_mudo.ui())
+		return perto
 	var ui: Dictionary = _terminal.ui()
 	for nome: String in _botoes:
 		if _clicavel(nome):
@@ -827,15 +874,15 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
 		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando(),
-		_tela, _quadro_da_abertura(), TranslationServer.get_locale(), _terminal.card_id, JSON.stringify(_terminal.rolagem_fontes())]
+		_tela, _quadro_da_abertura(), TranslationServer.get_locale(), _terminal.card_id, JSON.stringify(_terminal.rolagem_fontes()), _perto.fase]
 	# Os retângulos da sobreposição andam com a rolagem da abertura: a sonda os relê a cada mudança.
 	if _sobreposicao != null:
 		chave += JSON.stringify(_ui_da_sobreposicao())
 	var agora := Time.get_ticks_msec() / 1000.0
-	if chave != _sonda_chave or _terminal.animando() or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
+	if chave != _sonda_chave or _terminal.animando() or _perto.animando() or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
 		_sonda_teste()
 
@@ -845,6 +892,11 @@ func _sonda_teste() -> void:
 	if not _sondar:
 		return
 	_sonda_t = Time.get_ticks_msec() / 1000.0
+	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(_estado_da_sonda()), true)
+
+
+## O estado que a sonda expõe em window.fsom (os testes headless o leem direto, sem o navegador).
+func _estado_da_sonda() -> Dictionary:
 	var res := _resolucao_do_shader()
 	var m := _missao
 	var prev := m.previsao()
@@ -887,14 +939,18 @@ func _sonda_teste() -> void:
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),
-		"minigame": _terminal.minigame(),  # o que a peça à vista oferece (alvos, bandeja, encaixe), em px da tela
+		# O que a peça à vista oferece (alvos, bandeja, encaixe, botões), em px da tela: a da vista de perto (planta,
+		# amostra) quando ela está aberta, senão a do visor do terminal (ChemCam, gerador).
+		"minigame": _perto.minigame() if _perto.fase == "aberta" else _terminal.minigame(),
+		"perto": _perto.perto(),  # {"tarefa": "planta"|"amostra"|"", "fase": "zoom"|"aberta"|"voltando"|""}
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
+		"problema_planta": m.problema_da_planta(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
 		"pode_dormir": m.pode_encerrar_sol(), "porta_clicavel": _clicavel("porta"),
 		"porta_acesa": _indicador_porta.aceso,
 	}
 	estado.merge(_sonda_graficos())
-	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)
+	return estado
 
 
 ## O que os gráficos expõem à sonda: a hora e a luz da sala, a mistura da vista de poeira e as setas.
