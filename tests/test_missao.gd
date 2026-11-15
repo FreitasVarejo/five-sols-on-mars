@@ -781,9 +781,9 @@ func _quebra_do_gerador() -> void:
 	_igual(q.st["gerador_quebrado"], true, "sol 2: o gerador quebrou")
 	_igual(q.st_inicio["gerador_quebrado"], true, "sol 2: o instantâneo do sol leva o gerador quebrado")
 	_igual(q.lista_do_turno(), ["gerador"], "sol 2: o conserto está na lista")
-	# A previsão supõe não consertado: 0 de O2.
+	# A previsão supõe o conserto no turno: o O2 pedido, como com o gerador inteiro.
 	q.mudar_q(1)
-	_igual(q.previsao()["o2_produzido"], 0, "plano com gerador quebrado: a previsão mostra 0 de O2")
+	_igual(q.previsao()["o2_produzido"], 1, "plano com gerador quebrado: a previsão supõe o conserto")
 	q.confirmar_plano()
 	_igual(q.tarefas, {"gerador": "pendente"}, "turno: o gerador é a tarefa pendente")
 	_igual(q.gerador_quebrado_agora(), true, "gerador quebrado e não consertado")

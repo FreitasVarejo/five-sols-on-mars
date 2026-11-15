@@ -278,7 +278,7 @@ func _clicavel(nome: String) -> bool:
 		return false
 	match nome:
 		"abrigo":
-			return true
+			return not _missao.abrigado
 		"estufa":
 			return _pode_iniciar("planta")
 		"glovebox":

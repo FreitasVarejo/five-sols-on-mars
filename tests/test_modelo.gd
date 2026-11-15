@@ -240,9 +240,10 @@ func _dose_e_estrelas() -> void:
 	_igual(Modelo.dose(true, 0.25), 6.0, "dose tempestade 0,25: 3 + round(3)")
 	_igual(Modelo.dose(true, -1.0), 3.0, "dose tempestade limita em 0")
 	_igual(Modelo.dose(true, 2.0), 15.0, "dose tempestade limita em 1")
-	# 70% de 14 = 9,8: precisa de 10.
+	# 60% de 10 = 6: precisa de 6.
+	_igual(Modelo.estrelas(0, 6), 3, "estrelas: 0 modos, ciência 6")
+	_igual(Modelo.estrelas(0, 5), 2, "estrelas: 0 modos, ciência 5")
 	_igual(Modelo.estrelas(0, 10), 3, "estrelas: 0 modos, ciência 10")
-	_igual(Modelo.estrelas(0, 9), 2, "estrelas: 0 modos, ciência 9")
 	_igual(Modelo.estrelas(0, 14), 3, "estrelas: 0 modos, ciência 14")
 	_igual(Modelo.estrelas(1, 14), 2, "estrelas: 1 modo")
 	_igual(Modelo.estrelas(2, 0), 2, "estrelas: 2 modos")
@@ -261,10 +262,23 @@ func _previsao_e_plano_cabe() -> void:
 	var v := Modelo.previsao(ini, false, 0, 0)
 	_igual(v["bateria_apos_plano"], 12.0, "previsão vazia: bateria")
 	_igual(v["perdida_no_teto"], 1.0, "previsão vazia: perdida")
-	# Gerador quebrado: mostra 0 de O2; a bateria do plano tira os 4 do gerador (9 - 4 = 5).
+	# Gerador quebrado: a previsão supõe o conserto no turno, então o O2 é o de um gerador inteiro;
+	# a bateria do plano tira os 4 do gerador (9 - 4 = 5).
 	var g := Modelo.previsao(_st(2, 4, 12, 1.0, true), false, 2, 0)
-	_igual(g["o2_produzido"], 0, "previsão com gerador quebrado: 0 de O2")
+	var g_ok := Modelo.previsao(_st(2, 4, 12, 1.0, false), false, 2, 0)
+	_igual(g["o2_produzido"], 2, "previsão com gerador quebrado: o O2 pedido, supondo o conserto")
 	_igual(g["bateria_apos_plano"], 5.0, "previsão com gerador quebrado: bateria do plano")
+	_igual(g["devolvida"], 0.0, "previsão com gerador quebrado: o gerador roda, nada volta à bateria")
+	_estado(g["st"], 5.0, 4.0, 11.0, 1.0, false, "previsão com gerador quebrado: estado, e o conserto limpa o defeito")
+	_igual(g["st"]["O"], g_ok["st"]["O"], "previsão com gerador quebrado: O2 igual ao do gerador inteiro")
+	# Sem pedir O2, o gerador quebrado não muda nada na previsão: 4 + 0 - 2 = 2.
+	var g0 := Modelo.previsao(_st(2, 4, 12, 1.0, true), false, 0, 0)
+	_igual(g0["o2_produzido"], 0, "previsão com gerador quebrado e q 0: 0 de O2")
+	_igual(g0["st"]["O"], 2.0, "previsão com gerador quebrado e q 0: O2 2")
+	# Já o fechar_sol sem conserto segue produzindo 0 e devolvendo a energia do gerador parado.
+	var sem := Modelo.fechar_sol(_st(2, 4, 12, 1.0, true), false, 2, 0, 0, 1.0, false)
+	_igual(sem["o2_produzido"], 0, "fechar_sol sem conserto: 0 de O2")
+	_igual(sem["devolvida"], 4.0, "fechar_sol sem conserto: a energia do gerador volta")
 	# plano_cabe: 13 para dividir.
 	_igual(Modelo.plano_cabe(ini, false, 6, 0), true, "cabe: q 6 (12 de 13)")
 	_igual(Modelo.plano_cabe(ini, false, 6, 1), false, "não cabe: q 6 e 1 tarefa (14 de 13)")

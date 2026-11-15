@@ -18,6 +18,8 @@ TANQUE_O2,O2 tank,Tanque de O2
 TANQUE_AGORA,Now: %d of %d,Agora: %d de %d
 AR_PARA_1,Air for 1 sol,Ar para 1 sol
 AR_PARA_N,Air for %d sols,Ar para %d sóis
+AR_PARA_1_SE_CONSERTAR,"Air for 1 sol, if fixed","Ar para 1 sol, se consertar"
+AR_PARA_N_SE_CONSERTAR,"Air for %d sols, if fixed","Ar para %d sóis, se consertar"
 TRIPULACAO_RESPIRA,The crew breathes %d per sol.,A tripulação respira %d por sol.
 UM_SOL,1 sol,1 sol
 ENERGIA_DO_SOL,Energy for sol %d,Energia do sol %d
@@ -40,10 +42,12 @@ SEM_TAREFAS,None,Nenhuma
 ESTADO_PENDENTE,Pending,Pendente
 ESTADO_RODANDO,Running,Rodando
 ESTADO_FEITA,Done,Feita
+ESTADO_CANCELADA,Cancelled: shelter,Cancelada: abrigo
 INICIAR,Start,Iniciar
 CONSERTAR,Fix,Consertar
 ENCERRAR_O_SOL,End the sol,Encerrar o sol
 ABRIGO,Shelter,Abrigo
+ABRIGO_ATE_FIM,The crew stays in the shelter until the end of the sol.,A tripulação fica no abrigo até o fim do sol.
 DIARIO_CALMO,A calm sol.,Um sol calmo.
 DIARIO_TEMPESTADE,The storm from the Sun arrived.,A tempestade do Sol chegou.
 DIARIO_POEIRA,Dust storm: the panel produced only %d%%.,Tempestade de poeira: o painel rendeu só %d%%.
@@ -88,7 +92,7 @@ N_DE_12,%d of 12,%d de 12
 MODOS_SEGURANCA,Safe modes,Modos de segurança
 DE_VERDADE,What really happened,O que aconteceu de verdade
 DE_VERDADE_DATA,May 2024,Maio de 2024
-DE_VERDADE_TEXTO,"DONKI warned of a week of storms heading for Mars. The strongest hit came as a surprise, minutes after an explosion on the Sun. Only the base's meter saw it right away.","O DONKI avisou de uma semana de tempestades a caminho de Marte. O golpe mais forte veio de surpresa, minutos depois de uma explosão no Sol. Só o medidor da base viu na hora."
+DE_VERDADE_TEXTO,"DONKI warned of a week of storms heading for Mars. The strongest hit came as a surprise, minutes after an explosion on the Sun. No one warned first: only the instruments already at Mars, like Curiosity's, measured the hit as it arrived.","O DONKI avisou de uma semana de tempestades a caminho de Marte. O golpe mais forte veio de surpresa, minutos depois de uma explosão no Sol. Ninguém avisou antes: só os aparelhos que já estavam em Marte, como o do Curiosity, mediram o golpe quando ele chegou."
 JOGAR_DE_NOVO,Play again,Jogar de novo
 ABA_CAMERAS,Cameras,Câmeras
 ABA_TAREFAS,Tasks,Tarefas
@@ -116,8 +120,9 @@ FONTE_LIMITE_FONTE,"NASA-STD-3001, vol. 1 Rev C (V1 4031).","NASA-STD-3001, vol.
 FONTE_RAD_FATO,"On 20/05/2024, Curiosity's dose for the day was about 17 times that of the days before, with a peak about 80 times.","Em 20/05/2024, a dose do dia no Curiosity foi cerca de 17 vezes a dos dias anteriores, com pico de cerca de 80 vezes."
 FONTE_RAD_FONTE,"Curiosity RAD, NASA RadLab.","Curiosity RAD, NASA RadLab."
 FONTE_ESCALA_FATO,"In the game, each sol stands for many days of real radiation.","No jogo, cada sol vale muitos dias de radiação de verdade."
+FONTE_ESCALA_FONTE,"Team estimate from Curiosity RAD data (SwRI, 2013; NASA, 2024) and NASA-STD-3001.","Conta do time com dados do RAD do Curiosity (SwRI, 2013; NASA, 2024) e o NASA-STD-3001."
 FONTE_PAINEL_FATO,"In 2018, Opportunity's panel fell from 645 to 22 Wh. The real dust storm lasted from 30/05/2018 until August or September; the game's 2-sol storm is shortened.","Em 2018, o painel do Opportunity caiu de 645 para 22 Wh. A tempestade de poeira real durou de 30/05/2018 até agosto ou setembro; a de 2 sóis do jogo é encurtada."
-FONTE_PAINEL_FONTE,"JPL, cited by The Planetary Society.","JPL, citado pela Planetary Society."
+FONTE_PAINEL_FONTE,"The Planetary Society, citing JPL; dates: NASA/JPL and Guzewich et al. (2019).","Planetary Society, citando o JPL; datas: NASA/JPL e Guzewich et al. (2019)."
 FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem da Terra a Marte leva de 3 a 22 min.
 FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.

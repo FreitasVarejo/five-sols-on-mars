@@ -16,8 +16,9 @@ extends Control
 ##
 ## O card da Terra abre por cima do plano (card_aberto) e, enquanto aberto, só "Fechar" se clica.
 ##
-## No turno, "Encerrar o sol" (encerrar_sol) aparece quando Missao.pode_encerrar_sol(): no fim da lista da
-## aba tarefas e, com o terminal abaixado, ao lado do botão TERMINAL. "Consertar" (consertar_gerador) e
+## No turno, "Encerrar o sol" (encerrar_sol) aparece quando Missao.pode_encerrar_sol(), com o terminal
+## aberto em qualquer aba ou abaixado, sempre no mesmo lugar: BOTAO_ENCERRAR, ao lado do botão
+## TERMINAL, na faixa da moldura abaixo da tela. "Consertar" (consertar_gerador) e
 ## "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do terminal os substituem na próxima parte.
 ##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
@@ -31,8 +32,9 @@ const DadosDonki := preload("res://scripts/dados_donki.gd")
 signal desenhou
 
 const BOTAO := Rect2(260, 328, 120, 28)
-# "Encerrar o sol" com o terminal abaixado: ao lado do botão TERMINAL, na faixa de baixo, longe das
-# setas do pan (meio das bordas), do medidor, das barras e dos chips do HUD.
+# "Encerrar o sol", aberto ou abaixado o terminal: ao lado do botão TERMINAL, na faixa de baixo (a
+# moldura, abaixo da tela do terminal, que não cobre aba nenhuma), longe das setas do pan (meio das
+# bordas), do medidor, das barras e dos chips do HUD.
 const BOTAO_ENCERRAR := Rect2(388, 328, 164, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
@@ -62,7 +64,7 @@ const X_ESQ := 14.0
 const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA",
 	"gerador": "TAREFA_GERADOR"}
 const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
-const SEM_FONTE := ["ESCALA"]  # fatos do jogo que não levam linha de fonte
+const SEM_FONTE := []  # fatos do jogo que não levam linha de fonte
 const PASSO_LINHA := 42.0      # altura de uma linha da lista de tarefas, com o espaço entre elas
 
 var missao: Missao
@@ -398,8 +400,8 @@ func _draw() -> void:
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
-	# Terminal abaixado: o "Encerrar o sol" fica ao lado do botão, enquanto valer.
-	if fase_ui == "turno" and not aberto and livre and not card and missao.pode_encerrar_sol():
+	# O "Encerrar o sol" fica ao lado do botão TERMINAL, em qualquer aba, enquanto valer.
+	if fase_ui == "turno" and livre and not card and missao.pode_encerrar_sol():
 		_botao("encerrar_sol", BOTAO_ENCERRAR, tr("ENCERRAR_O_SOL"), "sol", true, 12)
 	if card:
 		# O plano fica atrás, escurecido; só o "Fechar" se clica.
@@ -598,8 +600,14 @@ func _coluna_previsao(r: Rect2, p: Dictionary) -> void:
 		_nota(x, y + 36, w, tr("FALHA_OXIGENIO"), Desenho.VERMELHO, true, "alerta")
 	else:
 		var sois := maxi(0, floori(maxf(0.0, fim["O"]) / Modelo.N.CREW_O2 + 1e-9))
-		var ar := tr("AR_PARA_1") if sois == 1 else (tr("AR_PARA_N") % sois)
-		if sois == 0:
+		# Com o gerador quebrado a previsão supõe o conserto no turno, e a nota diz isso.
+		var quebrado: bool = st["gerador_quebrado"]
+		var ar: String
+		if quebrado:
+			ar = tr("AR_PARA_1_SE_CONSERTAR") if sois == 1 else (tr("AR_PARA_N_SE_CONSERTAR") % sois)
+		else:
+			ar = tr("AR_PARA_1") if sois == 1 else (tr("AR_PARA_N") % sois)
+		if sois == 0 or quebrado:
 			_nota(x, y + 36, w, ar, Desenho.AMARELO, true, "alerta")
 		else:
 			_nota(x, y + 36, w, ar, Desenho.TEXTO, true)
@@ -736,12 +744,17 @@ func _desenhar_fontes() -> void:
 	w = rr.size.x - 16
 	y = rr.position.y + 7
 	var pares := _pares_fontes()
-	# O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px.
+	# O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px, e o espaço entre os fatos
+	# (5 px) encolhe para 2 px quando só assim a lista cabe.
+	var livre := rr.end.y - 7 - y
 	var tam := 10
-	if _altura_pares(pares, w, 10) > rr.end.y - 7 - y:
+	var espaco := 2.0
+	if _altura_pares(pares, w, 10) > livre:
 		tam = 9
+		if _altura_pares(pares, w, 9) + 3.0 * pares.size() <= livre:
+			espaco = 5.0
 	for par in pares:
-		y += _par_fonte(x, y, w, par[0], par[1], tam) + (2.0 if tam == 10 else 5.0)
+		y += _par_fonte(x, y, w, par[0], par[1], tam) + espaco
 
 
 ## Um fato (`tam` px) e a fonte dele (9 px, suave). Se a fonte cabe na última linha do fato, vai ali
@@ -822,18 +835,18 @@ func _desenhar_tarefas() -> void:
 	var x := r.position.x + 10
 	var y := r.position.y + 10
 	var lista := missao.lista_do_turno()
-	if missao.medidor() > Missao.LIMIAR_ABRIGO:
+	# A linha do abrigo vale enquanto o medidor pede abrigo e, depois de abrigar, até o fim do sol.
+	var com_abrigo := missao.abrigado or missao.medidor() > Missao.LIMIAR_ABRIGO
+	if com_abrigo:
 		_linha_abrigo(Rect2(x, y, r.size.x - 20, 40))
 		y += PASSO_LINHA
 	for nome in lista:
 		_linha_tarefa(nome, Rect2(x, y, r.size.x - 20, 40))
 		y += PASSO_LINHA
-	if lista.is_empty() and missao.medidor() <= Missao.LIMIAR_ABRIGO:
+	if lista.is_empty() and not com_abrigo:
 		_t(tr("SEM_TAREFAS"), x, y + 6, 12, Desenho.TEXTO_SUAVE)
-		y += 30
-	# No fim da lista, "Encerrar o sol", enquanto valer.
-	if fase_ui == "turno" and missao.pode_encerrar_sol():
-		_botao("encerrar_sol", Rect2(x, y + 4, 240, 36), tr("ENCERRAR_O_SOL"), "sol", true, 13)
+	if missao.abrigado:
+		_t(tr("ABRIGO_ATE_FIM"), x, y + 4, 12, Desenho.TEXTO_SUAVE, r.size.x - 20)
 
 
 func _linha_base(r: Rect2) -> void:
@@ -863,9 +876,13 @@ func _linha_tarefa(nome: String, r: Rect2) -> void:
 			draw_rect(Rect2(rb.position, Vector2(rb.size.x * f, rb.size.y)), Desenho.TEXTO)
 			_t("%d%%" % roundi(f * 100.0), rb.end.x + 8, rb.position.y - 3, 12, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_LEFT, true)
 		_:
+			# Depois de abrigar a tripulação não faz mais tarefas no turno: a pendente fica cancelada.
+			var cancelada := missao.abrigado
 			Desenho.icone(self, "circulo", Rect2(xe, r.position.y + 12, 16, 16), Desenho.TEXTO_SUAVE, Desenho.FUNDO_TERMINAL)
-			_t(_estado_texto("pendente"), xe + 22, r.position.y + 13, 13, Desenho.TEXTO_SUAVE, 120)
+			_t(_estado_texto("cancelada" if cancelada else "pendente"), xe + 22, r.position.y + 13, 13, Desenho.TEXTO_SUAVE, 140)
 	var livre := missao.fase == "turno" and estado == "pendente" and not missao.abrigado and missao.tarefa_rodando == ""
+	if missao.abrigado and estado == "pendente":
+		return  # cancelada: sem botão
 	if nome == "chemcam":
 		# Placeholder: o ChemCam de verdade se faz pelas câmeras do terminal (P1).
 		_botao("iniciar_chemcam", Rect2(r.end.x - 130, r.position.y + 5, 122, 30), tr("INICIAR"), "", livre, 12)
@@ -1132,10 +1149,11 @@ func _desenhar_relatorio() -> void:
 			Desenho.icone(self, "poeira", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
 
 	# O que aconteceu de verdade.
-	y = 166.0
+	# O texto tem 3 linhas de 13 px em português e em inglês: o quadro tem 86 px de altura.
+	y = 162.0
 	_t(tr("DE_VERDADE"), x, y, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	var rv := Rect2(x, y + 22, 612, 62)
+	var rv := Rect2(x, y + 22, 612, 86)
 	_caixa(rv)
 	_t(tr("DE_VERDADE_DATA"), rv.position.x + 10, rv.position.y + 7, 11, Desenho.TEXTO_SUAVE, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 	_t(tr("DE_VERDADE_TEXTO"), rv.position.x + 10, rv.position.y + 24, 13, Desenho.TEXTO, rv.size.x - 20)
-	_botao("jogar_de_novo", Rect2(220, 264, 200, 50), tr("JOGAR_DE_NOVO"), "", true, 14)
+	_botao("jogar_de_novo", Rect2(220, 276, 200, 40), tr("JOGAR_DE_NOVO"), "", true, 14)

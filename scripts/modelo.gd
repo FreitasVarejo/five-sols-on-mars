@@ -43,10 +43,13 @@ const N := {
 	# No sim é 0.05. No P0 fica desligado; o P1 liga junto com "limpar o painel", que devolve P.
 	"ACUMULO": 0.0,         # quanto P cai por sol
 	"SOLS": 5,              # sóis da missão
-	# Máximo teórico de ciência: simTeorico do sim.js (coluna "tudo em ciência", sem poeira e
-	# sem tempestade solar) com ACUMULO 0. Se os números acima mudarem, recalcule rodando o sim.
-	"TEORICO": 14,
-	"ESTRELAS_PCT": 0.7,    # fração do TEORICO que a ciência precisa atingir para 3 estrelas
+	# [P] Máximo de ciência sem modo de segurança numa missão com tempestade solar (abrigo), 2 sóis
+	# de poeira e gerador quebrado num sol de 2 a 5, pela simulação de 14/11: o melhor caso dá 10
+	# (o teto de 14 é o da missão sem nenhum evento, que o jogo nunca sorteia). Com o limiar de
+	# 60% (6), a estratégia equilibrada ganha 3 estrelas em 12 dos 24 cenários e a conservadora
+	# nunca. Se os números acima mudarem, recalcule rodando o sim.
+	"TEORICO": 10,
+	"ESTRELAS_PCT": 0.6,    # fração do TEORICO que a ciência precisa atingir para 3 estrelas
 }
 
 const EPS := 1e-9
@@ -196,11 +199,13 @@ static func seguir_em_seguranca(st: Dictionary, poeira: bool, solar: bool) -> Di
 	return novo
 
 
-## O que o plano mostra antes de confirmar, supondo toda tarefa feita e sol sem tempestade.
-## "bateria_apos_plano" e "perdida_no_teto" são do momento da confirmação (a sobra do plano,
-## antes de qualquer devolução); o resto é o do fim do sol. Com gerador quebrado, mostra 0 de O2.
+## O que o plano mostra antes de confirmar, supondo toda tarefa feita, sol sem tempestade e, com
+## o gerador quebrado, que o conserto sai no turno (o que libera o O2 do mesmo sol). O aviso de
+## "gerador quebrado: 0 O2" é da UI, não desta conta. "bateria_apos_plano" e "perdida_no_teto"
+## são do momento da confirmação (a sobra do plano, antes de qualquer devolução; não dependem do
+## conserto); o resto é o do fim do sol.
 static func previsao(st: Dictionary, poeira: bool, q: int, n_ciencia: int) -> Dictionary:
-	var r := fechar_sol(st, poeira, q, n_ciencia, n_ciencia, N.DOSE_NORMAL, false)
+	var r := fechar_sol(st, poeira, q, n_ciencia, n_ciencia, N.DOSE_NORMAL, true)
 	var sobra: float = r["para_dividir"] - q * N.GEN_CUSTO - n_ciencia * N.CIENCIA_CUSTO
 	r["bateria_apos_plano"] = _rnd(minf(N.TETO, sobra))
 	r["perdida_no_teto"] = _rnd(maxf(0.0, sobra - N.TETO))
