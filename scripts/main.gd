@@ -381,8 +381,17 @@ func _desenhar_realce() -> void:
 	if _hover == "":
 		return
 	var r: Rect2 = _botoes[_hover]
-	_realce.draw_rect(r, Color(1, 1, 1, 0.22))
-	_realce.draw_rect(r, Color(1, 1, 1, 0.6), false, 1.0)
+	_realce.draw_rect(r, Color(1, 1, 1, 0.1))
+	# Quatro cantoneiras em L, verde (é o que se clica): braço de 8 px, traço de 2 px.
+	var braco := 8.0
+	var traco := 2.0
+	for canto in [r.position, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.end]:
+		var sx := 1.0 if canto.x == r.position.x else -1.0
+		var sy := 1.0 if canto.y == r.position.y else -1.0
+		var horizontal := Rect2(canto.x if sx > 0 else canto.x - braco, canto.y if sy > 0 else canto.y - traco, braco, traco)
+		var vertical := Rect2(canto.x if sx > 0 else canto.x - traco, canto.y if sy > 0 else canto.y - braco, traco, braco)
+		_realce.draw_rect(horizontal, Desenho.VERDE)
+		_realce.draw_rect(vertical, Desenho.VERDE)
 
 
 ## No HUD, depois do shader: o contorno do que é clicável (magenta) e o das telas (ciano), pela
