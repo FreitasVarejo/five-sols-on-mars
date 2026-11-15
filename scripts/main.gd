@@ -24,6 +24,7 @@ const Desenho := preload("res://scripts/desenho.gd")
 const TelaBarra := preload("res://scripts/tela_barra.gd")
 const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
 const Estacoes := preload("res://scripts/estacoes.gd")
+const TelaComunicacao := preload("res://scripts/tela_comunicacao.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
@@ -42,8 +43,6 @@ const TELAS := {
 }
 # Estação de cada tarefa de ciência: tarefa -> botão da sala.
 const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
-# Tela de comunicação com a Terra: por enquanto só apagada, na cor única das telas em branco.
-const COR_TELA_APAGADA := Color("#202e37")
 
 @onready var _sala: Control = $Sala
 @onready var _vista_janela: Janela = $Sala/Vista
@@ -168,11 +167,10 @@ func _carregar_regioes() -> void:
 	_tela_radiacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_telas.add_child(_tela_radiacao)
 
-	var comunicacao := ColorRect.new()
+	var comunicacao: Control = TelaComunicacao.new()
 	var rc: Rect2 = _regioes_telas["comunicacao"]
 	comunicacao.position = rc.position
 	comunicacao.size = rc.size
-	comunicacao.color = COR_TELA_APAGADA
 	comunicacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_telas.add_child(comunicacao)
 
