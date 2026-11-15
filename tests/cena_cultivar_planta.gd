@@ -1,7 +1,8 @@
 extends Control
 ## Cena de teste do minigame "Cultivar a planta": hospeda a peça sozinha.
-## Sem argumento, é jogável à mão (área cheia, semente 0; qualquer tecla sorteia outra).
-## Com `--capturar=<pasta>` depois de `--`, percorre os estados, salva os PNGs e sai:
+## Sem argumento, é jogável à mão (área cheia, problema da semente 0; qualquer tecla sorteia outro).
+## Com `--capturar=<pasta>` depois de `--`, percorre os estados, salva os PNGs e sai: a câmara sob a luz rosa, cada
+## problema sob a luz verde, um "pior" de cada, o crescimento, o fim e as áreas 368×207 e 320×180:
 ##   godot --path . res://tests/cena_cultivar_planta.tscn -- --capturar=<pasta>
 
 const Planta := preload("res://scripts/minigames/cultivar_planta.gd")
@@ -59,27 +60,62 @@ func _salvar(pasta: String, nome: String) -> void:
 	print("%s: %s (%dx%d)" % [nome, "ok" if erro == OK else "erro %d" % erro, img.get_width(), img.get_height()])
 
 
-func _levar(c: int, alvo: int) -> void:
-	while _g.nivel(c) != alvo and not _g.ocupada():
-		_g.apertar(c, 1 if alvo > _g.nivel(c) else -1)
-		_passo(0.2)
+## Recomeça a peça com o problema `nome`, na área `area`.
+func _abrir(nome: String, area: Rect2 = Rect2(0, 0, 640, 360)) -> void:
+	_g.definir_problema(nome)
+	_g.configurar(area, 10.0, false)
+
+
+## A ferramenta do erro de cada problema (a que piora) e a do acerto.
+const ERRO := {"seca": "ventilador", "encharcada": "regador", "mofo": "regador"}
+const CERTO := {"seca": ["regador"], "encharcada": ["ventilador"], "mofo": ["tesoura", "ventilador"]}
 
 
 func _capturar(pasta: String) -> void:
 	DirAccess.make_dir_recursive_absolute(pasta)
 	_g.set_process(false)  # o tempo anda à mão
-	_g.semente(1)
-	_g.configurar(Rect2(0, 0, 640, 360), 10.0, false)
+	var area_real := Rect2(130, 73, 368, 207)
+	# A câmara sob a luz rosa: o sintoma fica escondido.
+	_abrir("mofo")
 	_passo(0.5)
-	await _salvar(pasta, "planta_inicial.png")
-	_levar(Planta.LUZ, Planta.FAIXA_DE)
-	await _salvar(pasta, "planta_luz_na_faixa.png")
-	_levar(Planta.AGUA, Planta.FAIXA_DE)
+	await _salvar(pasta, "planta_rosa.png")
+	# Cada problema sob a luz verde, e o "pior" de cada (a sacudida e depois o sintoma que cresce).
+	for nome: String in Planta.PROBLEMAS:
+		_abrir(nome)
+		_g.acender_luz()
+		_passo(0.6)
+		await _salvar(pasta, "planta_%s.png" % nome)
+		_g.usar(ERRO[nome])
+		_passo(0.15)
+		await _salvar(pasta, "planta_%s_pior_sacode.png" % nome)
+		_passo(0.5)
+		await _salvar(pasta, "planta_%s_pior.png" % nome)
+	# Uma ferramenta em ação (a tesoura no mofo) e o crescimento, passo a passo, até o fim.
+	_abrir("mofo")
+	_g.acender_luz()
 	_passo(0.5)
+	_g.usar("tesoura")
+	_passo(0.22)
+	await _salvar(pasta, "planta_mofo_tesoura.png")
+	_passo(0.4)
+	_g.usar("ventilador")
+	_passo(0.1)
+	await _salvar(pasta, "planta_acerto.png")
+	_passo(0.25 + 0.5)
 	await _salvar(pasta, "planta_crescendo.png")
-	_passo(2.0)
-	await _salvar(pasta, "planta_crescida.png")
-	_g.semente(2)
-	_g.configurar(Rect2(130, 73, 368, 207), 10.0, false)
-	await _salvar(pasta, "planta_area_pequena.png")
+	_passo(1.5)
+	await _salvar(pasta, "planta_fim.png")
+	# A área real da estação (368×207) e a menor dos testes (320×180).
+	_abrir("encharcada", area_real)
+	await _salvar(pasta, "planta_368x207_rosa.png")
+	_g.acender_luz()
+	_passo(0.6)
+	await _salvar(pasta, "planta_368x207_encharcada.png")
+	_g.usar("ventilador")
+	_passo(0.25 + 2.0)
+	await _salvar(pasta, "planta_368x207_fim.png")
+	_abrir("seca", Rect2(0, 0, 320, 180))
+	_g.acender_luz()
+	_passo(0.6)
+	await _salvar(pasta, "planta_320x180_seca.png")
 	get_tree().quit()

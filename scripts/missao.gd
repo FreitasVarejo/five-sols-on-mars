@@ -37,6 +37,8 @@ const FIXA_SOL_SOLAR := 2
 const FIXA_SOL_POEIRA := 3     # a poeira cobre os sóis 3 e 4 (DURACAO_POEIRA)
 const FIXA_SOL_QUEBRA := 5
 const FIXA_ATRASO_MIN := 16    # o "há N min" do card da Terra na missão fixa
+const PROBLEMAS_PLANTA := ["seca", "encharcada", "mofo"]  # os problemas da estufa (cultivar_planta.gd)
+const FIXA_PROBLEMAS_PLANTA := ["seca", "encharcada", "mofo", "seca", "mofo"]  # o problema da estufa em cada sol da missão fixa
 const FIXA_PICO_S := 25.0      # pico da tempestade solar, em segundos de um turno de TURNO_S
 # O freeplay versão zero: as seis agendas de 5 sóis com um evento por sol, [solar, poeira (início), quebra].
 const AGENDAS_LIVRES := [
@@ -65,6 +67,7 @@ const POR_PECA := ["chemcam", "gerador", "planta", "amostra"]
 const EPS := 1e-9
 
 var rng := RandomNumberGenerator.new()
+var _rng_planta := RandomNumberGenerator.new()  # só o sorteio da estufa: à parte, para não deslocar o `rng` dos eventos
 var turno_s := TURNO_S
 var tarefa_s := TAREFA_S
 var forcar_sol_solar := 0   # 2, 3 ou 4 força o sol da tempestade; 0 deixa a agenda
@@ -78,6 +81,7 @@ var sol_solar := 3
 var sol_poeira := 2         # sol em que a tempestade de poeira começa (dura DURACAO_POEIRA)
 var sol_quebra := 5         # sol em que o gerador quebra (uma vez por missão, nunca no sol_solar)
 var atraso_min := 3
+var problemas_planta: Array = FIXA_PROBLEMAS_PLANTA.duplicate()  # o problema da estufa em cada sol desta missão
 var sol := 1
 var fase := "plano"
 var versao := 0
@@ -127,6 +131,7 @@ func _init(semente: int = -1, opcoes: Dictionary = {}) -> void:
 		rng.seed = semente
 	else:
 		rng.randomize()
+	_rng_planta.seed = rng.seed ^ 0x504C414E  # derivada da semente da missão
 	turno_s = float(opcoes.get("turno_s", TURNO_S))
 	tarefa_s = float(opcoes.get("tarefa_s", TAREFA_S))
 	forcar_sol_solar = int(opcoes.get("sol_solar", 0))
@@ -146,6 +151,13 @@ func nova_missao() -> void:
 	if livre:
 		agenda = AGENDAS_LIVRES[rng.randi_range(0, AGENDAS_LIVRES.size() - 1)]
 		atraso_min = rng.randi_range(ATRASO_MIN, ATRASO_MAX)
+	# A estufa: na fixa o problema segue o sol; no freeplay cada sol tem o seu, sorteado aqui e fixo na missão
+	# (o reinício do sol não sorteia de novo). O gerador é à parte: a cada missão nova ele anda, e a planta não
+	# repete a sequência. O `modos` não entra.
+	problemas_planta = FIXA_PROBLEMAS_PLANTA.duplicate()
+	if livre:
+		for i in problemas_planta.size():
+			problemas_planta[i] = PROBLEMAS_PLANTA[_rng_planta.randi_range(0, PROBLEMAS_PLANTA.size() - 1)]
 	sol_solar = forcar_sol_solar if forcar_sol_solar in SOLS_SOLAR else agenda[0]
 	sol_poeira = forcar_sol_poeira if forcar_sol_poeira in SOLS_EVENTO else agenda[1]
 	# A quebra nunca cai no sol da tempestade solar, nem quando a URL força esse sol.
@@ -167,6 +179,11 @@ func montar_sol(sol_n: int, estado: Dictionary) -> void:
 
 
 # --- consultas ---------------------------------------------------------------
+
+## O problema da estufa no sol atual ("seca", "encharcada" ou "mofo"): fixo na missão, igual depois de reiniciar o sol.
+func problema_da_planta() -> String:
+	return problemas_planta[posmod(sol - 1, problemas_planta.size())]
+
 
 func eh_sol_solar() -> bool:
 	return sol == sol_solar
