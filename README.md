@@ -22,16 +22,6 @@ The game runs in the browser with no download, no account and no tracking, in En
 
 TODO(owner): public video link, no login required.
 
-| Time | On screen | Caption |
-|---|---|---|
-| 0:00–0:03 | The room at rest, the window onto Mount Sharp, the title on top (added in the edit) | Five Sols on Mars · TODO(owner): team name · NASA Space Apps 2026 · Junior Astronaut Mission Trainer |
-| 0:03–0:07 | Pan across the room: radiation meter, shelter button, Earth screen, energy and oxygen gauges | You command a Mars base in Gale crater. Ages 7 to 12. |
-| 0:07–0:11 | The plan of sol 1: oxygen goes up, three science tasks are ticked, the bars show "before → after" and "Air for 2 sols" | Every choice has a cost |
-| 0:11–0:17 | The card from Earth with the warning and the date of the data; cut to the shift of sol 2: the meter climbs, the alert lights, the shelter button is pressed, the card says what sheltering costs, the shutter closes | Real space weather: NASA DONKI · Curiosity RAD (NASA RadLab), May 2024 |
-| 0:17–0:21 | The plan of sol 3 under "Dust storm: the solar panel produces 10%", the energy bar falling; cut to the dust in the window | Opportunity, 2018: 645 → 22 Wh |
-| 0:21–0:25 | The safe mode screen of a dust sol with the real case; cut to the report with the stars and "What really happened" | No game over. Safe mode, then a debrief. |
-| 0:25–0:29 | The Sources tab, scrolling down to the credits; cut to the report with "Free play", the click, and the address of the game (added in the edit) | Sources tab: where each number comes from · Browser, no account, no tracking · English and Portuguese |
-
 ## Final project link
 
 https://freitasvarejo.github.io/five-sols-on-mars/
@@ -118,6 +108,7 @@ The game makes no requests to third parties: no analytics, no cookies, no login.
 - **Data:** a Python script (standard library only) downloads DONKI at build time and writes the JSON the game reads.
 - **Rules:** one model script holds the rules, with unit tests. The strategies above were measured by playing the published build in the browser with Playwright.
 - **Hosting:** GitHub Pages.
+- **Team:** two people. Our teammate under 16 brought three ideas from their own version of the game: the blueprint look of the Panel, the daily log with clues, and the trip from Earth to Mars before the mission.
 - **Languages:** GDScript, Python, Godot shading language, Bash.
 
 ### What comes next
@@ -159,7 +150,7 @@ The game uses no NASA image and no NASA insignia.
 
 **Partner agencies**
 
-- George et al., "Space radiation measurements during the Artemis I lunar mission", Nature 634, 48–52 (2024): https://www.nature.com/articles/s41586-024-07927-7. A paper by NASA, DLR and ESA researchers. We use its fourfold difference in dose rate between shielding locations inside Orion. TODO(owner): check, while logged in to the site, whether ESA and DLR are on the 2026 partner agency list (the paper has ESA and DLR authors, checked on PMC11446838 on 15 Nov). If the greenhouse task does not exist in the build, no CSA material was used and none is cited.
+- George et al., "Space radiation measurements during the Artemis I lunar mission", Nature 634, 48–52 (2024): https://www.nature.com/articles/s41586-024-07927-7. A paper by NASA, DLR and ESA researchers. We use its fourfold difference in dose rate between shielding locations inside Orion. TODO(owner): check, while logged in to the site, whether ESA and DLR are on the 2026 partner agency list (the paper has ESA and DLR authors, checked on PMC11446838 on 15 Nov). The greenhouse task is based on NASA's Veggie, so no CSA material is cited.
 
 **Code, art and sound by others**
 
