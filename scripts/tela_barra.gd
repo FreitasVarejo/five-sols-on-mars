@@ -1,7 +1,7 @@
 extends Control
 ## Tela de barra do cômodo (energia, oxigênio): ícone, nome, número e barra em células.
 ## Fica dentro da Sala, antes do shader, para curvar com a parede.
-## Cor neutra (a do texto): barra de recurso nunca é verde, amarela nem azul (spec, "Terminal").
+## Cor do recurso (Desenho.cor_recurso(icone)) no ícone e nas células; nome e número ficam em TEXTO.
 ## Três formatos pelo tamanho da região: grande (as telas antigas da parede), ampla (as telas
 ## baixas e largas da rampa: ícone e nome à esquerda, número à direita, barra embaixo) e pequena.
 
@@ -15,7 +15,9 @@ var nome := ""
 var icone := "energia"
 var valor := 0
 var maximo := 1
-var cor := Desenho.TEXTO
+var cor: Color:
+	get:
+		return Desenho.cor_recurso(icone)
 
 
 func atualizar(novo_valor: int) -> void:
@@ -44,7 +46,7 @@ func _draw() -> void:
 
 	y += lado_icone + (6.0 if grande else 4.0)
 	draw_string(fonte, Vector2(margem, y + tam_num * 0.85), "%d/%d" % [valor, maximo],
-		HORIZONTAL_ALIGNMENT_LEFT, size.x - margem * 2.0, tam_num, cor)
+		HORIZONTAL_ALIGNMENT_LEFT, size.x - margem * 2.0, tam_num, TEXTO)
 
 	var alt_barra := 20.0 if grande else 10.0
 	Desenho.celulas(self, Rect2(margem, size.y - margem - alt_barra, size.x - margem * 2.0, alt_barra), valor, maximo, cor)
@@ -64,7 +66,7 @@ func _desenhar_ampla() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, size.x * 0.5, tam_nome, TEXTO)
 	# número à direita, na altura da linha do ícone
 	draw_string(fonte, Vector2(margem, topo + tam_num * 0.8), "%d/%d" % [valor, maximo],
-		HORIZONTAL_ALIGNMENT_RIGHT, size.x - margem * 2.0, tam_num, cor)
+		HORIZONTAL_ALIGNMENT_RIGHT, size.x - margem * 2.0, tam_num, TEXTO)
 
 	var alt_barra := 16.0
 	Desenho.celulas(self, Rect2(margem, size.y - margem - alt_barra, size.x - margem * 2.0, alt_barra), valor, maximo, cor)

@@ -31,11 +31,11 @@ func _draw() -> void:
 	var larg := size.x - m * 2.0
 
 	# Margem: ícone, "MARGEM", n/12 e a barra de células.
-	Desenho.icone(self, "radiacao", Rect2(m, 5, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "radiacao", Rect2(m, 5, 12, 12), Desenho.RADIACAO, Desenho.FUNDO_TELA)
 	Desenho.texto(self, tr("MARGEM").to_upper(), Vector2(m + 16, 5), 10, Desenho.TEXTO)
 	Desenho.texto(self, "%d/%d" % [roundi(margem), maximo], Vector2(m, 2), 14, Desenho.TEXTO, larg,
 		HORIZONTAL_ALIGNMENT_RIGHT, true)
-	Desenho.celulas(self, Rect2(m, 20, larg, 7), margem, maximo)
+	Desenho.celulas(self, Rect2(m, 20, larg, 7), margem, maximo, Desenho.RADIACAO)
 	draw_line(Vector2(m, 31), Vector2(size.x - m, 31), Desenho.BORDA, 1.0)
 
 	# Medidor: rótulo, trilho com as duas marcas, ponteiro.

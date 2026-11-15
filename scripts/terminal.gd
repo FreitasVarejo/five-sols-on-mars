@@ -343,13 +343,14 @@ func _barra(x: float, y: float, w: float, icone: String, nome: String, valor: fl
 		falha: bool = false, fundo: Color = Desenho.FUNDO_TERMINAL) -> void:
 	if falha:
 		draw_rect(Rect2(x - 4, y - 4, w + 8, 33), Desenho.VERMELHO, false, 2.0)
-	Desenho.icone(self, icone, Rect2(x, y + 1, 12, 12), Desenho.TEXTO, fundo)
+	var cor_rec := Desenho.cor_recurso(icone)
+	Desenho.icone(self, icone, Rect2(x, y + 1, 12, 12), cor_rec, fundo)
 	_t(nome, x + 16, y, 11, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 	var rot := "%d/%d" % [roundi(valor), maximo]
 	_t(rot, x, y - 1, 12, Desenho.TEXTO, w - (16.0 if falha else 0.0), HORIZONTAL_ALIGNMENT_RIGHT, true)
 	if falha:
 		Desenho.icone(self, "alerta", Rect2(x + w - 13, y, 13, 13), Desenho.VERMELHO, fundo)
-	Desenho.celulas(self, Rect2(x, y + 17, w, 7), valor, maximo)
+	Desenho.celulas(self, Rect2(x, y + 17, w, 7), valor, maximo, cor_rec)
 
 
 ## "a → b" alinhado à direita em [x, x+w], com a seta desenhada (a fonte padrão não tem "→").
@@ -486,13 +487,13 @@ func _custo_cada(x_dir: float, y: float, valor: float) -> void:
 	var l_cada := Desenho.largura_texto(tr("CADA"), 11)
 	var x := x_dir - (l_num + 4.0 + 12.0 + 4.0 + l_cada)
 	_t(num, x, y - 1, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.icone(self, "energia", Rect2(x + l_num + 4.0, y + 2, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "energia", Rect2(x + l_num + 4.0, y + 2, 12, 12), Desenho.ENERGIA, Desenho.FUNDO_TELA)
 	_t(tr("CADA"), x + l_num + 20.0, y + 1, 11, Desenho.TEXTO_SUAVE)
 
 
 ## Cabeça de uma linha: ícone e nome em negrito.
 func _cabeca_linha(x: float, y: float, icone: String, nome: String) -> void:
-	Desenho.icone(self, icone, Rect2(x, y + 1, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, icone, Rect2(x, y + 1, 14, 14), Desenho.cor_recurso(icone), Desenho.FUNDO_TELA)
 	_t(nome, x + 20, y, 12, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 
 
@@ -508,7 +509,7 @@ func _coluna_energia(r: Rect2) -> void:
 	var num := _numero(-Modelo.N.AQUEC)
 	var l_num := Desenho.largura_texto(num, 13, true)
 	_t(num, x + w - l_num - 16, y - 1, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.icone(self, "energia", Rect2(x + w - 12, y + 2, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "energia", Rect2(x + w - 12, y + 2, 12, 12), Desenho.ENERGIA, Desenho.FUNDO_TELA)
 	y += 26
 	if missao.eh_poeira():
 		Desenho.icone(self, "poeira", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
@@ -635,11 +636,12 @@ func _coluna_previsao(r: Rect2, p: Dictionary) -> void:
 func _bloco_previsao(x: float, y: float, w: float, icone: String, nome: String, antes: float, depois: float,
 		falha: bool) -> void:
 	var cor := Desenho.VERMELHO if falha else Desenho.TEXTO
-	Desenho.icone(self, icone, Rect2(x, y + 1, 14, 14), cor, Desenho.FUNDO_TELA)
+	var cor_rec := Desenho.VERMELHO if falha else Desenho.cor_recurso(icone)
+	Desenho.icone(self, icone, Rect2(x, y + 1, 14, 14), cor_rec, Desenho.FUNDO_TELA)
 	_t(nome, x + 20, y, 12, cor, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 	var d := maxf(0.0, depois)
 	_de_para(x, y, w, _numero(maxf(0.0, antes)), _numero(d), cor, 12)
-	Desenho.celulas_de_para(self, Rect2(x, y + 21, w, 8), antes, d, 12, cor)
+	Desenho.celulas_de_para(self, Rect2(x, y + 21, w, 8), antes, d, 12, cor_rec)
 
 
 ## Uma linha de nota de 11 px, com ícone opcional (alerta).
@@ -712,7 +714,7 @@ func _desenhar_fontes() -> void:
 	var y := rl.position.y + 8
 
 	# Energia do sol: bateria + painel − aquecimento = para dividir.
-	Desenho.icone(self, "energia", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "energia", Rect2(x, y + 1, 12, 12), Desenho.ENERGIA, Desenho.FUNDO_TELA)
 	y += _t(tr("ENERGIA_DO_SOL") % missao.sol, x + 16, y, 12, Desenho.TEXTO, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true) + 4
 	# Uma casa decimal quando a conta não é inteira (o painel na poeira rende 0,8): a conta tem de fechar.
 	var linhas := [
@@ -731,7 +733,7 @@ func _desenhar_fontes() -> void:
 	y += h_dividir + 10
 
 	# Tanque de O2.
-	Desenho.icone(self, "oxigenio", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "oxigenio", Rect2(x, y + 1, 12, 12), Desenho.OXIGENIO, Desenho.FUNDO_TELA)
 	y += _t(tr("TANQUE_O2"), x + 16, y, 12, Desenho.TEXTO, w - 16, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
 	var h_nota := Desenho.altura_texto(tr("FONTE_UNIDADES_FATO"), 10, w)
 	_tanque(Rect2(x, y, w, rl.end.y - 8 - y - h_nota - 8))
@@ -811,7 +813,7 @@ func _tanque(r: Rect2) -> void:
 	var cheias := clampi(roundi(agora), 0, 12)
 	for i in 12:
 		var rf := Rect2(g.position.x + 2, g.end.y - (i + 1) * faixa + 1, g.size.x - 4, faixa - 1)
-		draw_rect(rf, Desenho.TEXTO if i < cheias else Desenho.CELULA_VAZIA)
+		draw_rect(rf, Desenho.OXIGENIO if i < cheias else Desenho.CELULA_VAZIA)
 	draw_rect(g, Desenho.TEXTO_SUAVE, false, 1.0)
 	var h_sol := Modelo.N.CREW_O2 * faixa
 	var xc := g.end.x + 3
@@ -942,10 +944,10 @@ func _desenhar_diario() -> void:
 	for k in ["E", "O", "M"]:
 		var a: float = reg["antes"][k]
 		var d: float = reg["depois"][k]
-		Desenho.icone(self, nomes[k][0], Rect2(bx, by + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+		Desenho.icone(self, nomes[k][0], Rect2(bx, by + 1, 12, 12), Desenho.cor_recurso(k), Desenho.FUNDO_TELA)
 		_t(nomes[k][1], bx + 16, by, 11, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 		_de_para(bx, by - 1, bw, _numero(a), "%s/12" % _numero(d), Desenho.TEXTO)
-		Desenho.celulas(self, Rect2(bx, by + 17, bw, 6), maxf(0.0, d), 12)
+		Desenho.celulas(self, Rect2(bx, by + 17, bw, 6), maxf(0.0, d), 12, Desenho.cor_recurso(k))
 		by += 44
 	if fase_ui == "fim_do_sol":
 		_botao("enviar", Rect2(rb.position.x, Y_FIM - 50, rb.size.x, 50), tr("ENVIAR_A_TERRA"), "terra", true, 14)
@@ -1118,11 +1120,11 @@ func _desenhar_relatorio() -> void:
 	_t(tr("N_PONTOS") % missao.ciencia_total(), rects[0].position.x + 42, y + 22, 18, Desenho.TEXTO, bw - 50,
 		HORIZONTAL_ALIGNMENT_LEFT, true)
 	_caixa(rects[1])
-	Desenho.icone(self, "radiacao", Rect2(rects[1].position.x + 10, y + 14, 22, 22), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	Desenho.icone(self, "radiacao", Rect2(rects[1].position.x + 10, y + 14, 22, 22), Desenho.RADIACAO, Desenho.FUNDO_TELA)
 	_t(tr("MARGEM_FINAL"), rects[1].position.x + 42, y + 8, 11, Desenho.TEXTO_SUAVE)
 	_t(tr("N_DE_12") % roundi(missao.st["M"]), rects[1].position.x + 42, y + 22, 18, Desenho.TEXTO, 90,
 		HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.celulas(self, Rect2(rects[1].position.x + 118, y + 28, 68, 8), missao.st["M"], 12)
+	Desenho.celulas(self, Rect2(rects[1].position.x + 118, y + 28, 68, 8), missao.st["M"], 12, Desenho.RADIACAO)
 	_caixa(rects[2])
 	Desenho.icone(self, "alerta", Rect2(rects[2].position.x + 10, y + 14, 22, 22), Desenho.TEXTO, Desenho.FUNDO_TELA)
 	_t(tr("MODOS_SEGURANCA"), rects[2].position.x + 42, y + 8, 11, Desenho.TEXTO_SUAVE, bw - 50)

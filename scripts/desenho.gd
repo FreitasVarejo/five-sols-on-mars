@@ -3,7 +3,8 @@ extends RefCounted
 ## Tudo estático: quem desenha passa o CanvasItem (dentro do seu _draw).
 ##
 ## Cores [R] (spec, "Terminal"): verde só no que se clica; vermelho e amarelo só em alerta; azul só
-## no que vem da Terra. O resto é neutro. Barras e ícones de recurso são neutros (TEXTO).
+## no que vem da Terra. O resto é neutro. Cada recurso tem a sua cor (ENERGIA, OXIGENIO, RADIACAO),
+## usada no ícone e nas células; nome e número ficam em TEXTO, e o alerta (vermelho/amarelo) vai por cima.
 
 const TEXTO := Color("#e8f0f2")
 const TEXTO_SUAVE := Color("#a9b8bf")
@@ -20,8 +21,28 @@ const VERDE_CLARO := Color("#a8ee86")
 const AMARELO := Color("#f2b631")
 const VERMELHO := Color("#e8504a")
 const AZUL := Color("#73bed3")
+# Cores dos recursos. Verde, amarelo, vermelho e azul são reservados pela spec ([R]: verde = clicável,
+# vermelho/amarelo = alerta, azul = Terra). Nenhum matiz fica longe das quatro com daltonismo
+# (deuteranopia/protanopia); estas três ficam distintas entre si, e o violeta e o rosa ficam longe das
+# reservadas. O ciano fica perto do azul (dono, 14/11): ciano só no ícone e nas células do oxigênio,
+# azul só no que vem da Terra.
+const ENERGIA := Color("#8d92f9")  # violeta
+const OXIGENIO := Color("#5fdcea")  # ciano
+const RADIACAO := Color("#ff7eb6")  # rosa
 
 static var _negrito: FontVariation
+
+
+## Cor do recurso `nome` ("energia", "oxigenio", "radiacao", ou as chaves "E", "O", "M"); qualquer outro é TEXTO.
+static func cor_recurso(nome: String) -> Color:
+	match nome:
+		"energia", "E":
+			return ENERGIA
+		"oxigenio", "O":
+			return OXIGENIO
+		"radiacao", "M":
+			return RADIACAO
+	return TEXTO
 
 
 static func fonte() -> Font:
@@ -113,9 +134,19 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 				p + Vector2(s * 0.34, s), p + Vector2(s * 0.88, s * 0.38), p + Vector2(s * 0.54, s * 0.38),
 			]), cor)
 		"oxigenio":
-			ci.draw_circle(c + Vector2(0, s * 0.12), s * 0.38, cor)
-			ci.draw_colored_polygon(PackedVector2Array([
-				c + Vector2(0, -s * 0.5), c + Vector2(-s * 0.33, 0), c + Vector2(s * 0.33, 0)]), cor)
+			# "O₂": o O é um anel grande à esquerda, o 2 é pequeno e fica embaixo, à direita (subscrito).
+			var ro := s * 0.35
+			var co := p + Vector2(s * 0.37, s * 0.40)
+			ci.draw_circle(co, ro, cor)
+			ci.draw_circle(co, ro - maxf(1.5, s * 0.14), fundo)
+			var wd := maxf(1.0, roundf(s / 14.0))
+			var x0 := p.x + s * 0.74
+			var x1 := p.x + s * 0.98
+			var y0 := p.y + s * 0.58
+			var y1 := p.y + s * 0.98
+			ci.draw_polyline(PackedVector2Array([
+				Vector2(x0, y0 + wd / 2.0), Vector2(x1, y0 + wd / 2.0), Vector2(x1, (y0 + y1) / 2.0),
+				Vector2(x0, (y0 + y1) / 2.0), Vector2(x0, y1 - wd / 2.0), Vector2(x1, y1 - wd / 2.0)]), cor, wd)
 		"radiacao":
 			# Trifólio: três setores de 60 graus em volta de um miolo.
 			for k in 3:
