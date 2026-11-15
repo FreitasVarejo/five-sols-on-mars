@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 17:56. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 22:43. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Glossário
 
@@ -14,7 +14,7 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 - **Fase de plano** — a parte calma de cada sol, sem relógio, dentro do terminal: a criança lê o aviso do clima espacial e os pedidos da Terra e distribui energia. Junto com o fim do sol, é onde mora o texto do jogo, porque a leitura nessa idade é lenta.
    → jogos-educativos-7-a-12-anos (pesquisa no vault do dono)
 
-- **Fase de turno** — a parte curta de cada sol, em tempo real (de 60 a 90 s): o cômodo vive, os eventos acontecem e os minigames consertam. Só clique, sem texto para ler. Acaba quando o Sol se põe, ou antes, quando a criança aperta "Encerrar o sol" depois de terminar as tarefas.
+- **Fase de turno** — a parte curta de cada sol, em tempo real (de 60 a 90 s): o cômodo vive, os eventos acontecem e os minigames consertam. Só clique, sem texto para ler. Acaba quando o Sol se põe, ou antes, quando a criança vai dormir pela porta do dormitório depois de terminar as tarefas.
 
 - **Fim do sol** — a parte calma depois do turno: a criança lê o diário do sol e aperta "Enviar à Terra"; vem a noite, e o pacote da Terra da manhã abre o plano seguinte. Não é "fim do turno", que é só o pôr do Sol que o dispara.
 
@@ -40,7 +40,7 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 
 - **Tarefa de manutenção** — minigame que a própria base pede no turno, como consequência do que aconteceu (painel sujo, gerador com falha). Protege um recurso. Não se escolhe: se faz ou se paga.
 
-- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. No jogo é um toque na porta, não minigame. Custa tempo de ciência, não energia: a ciência feita antes de abrigar conta, e depois o turno não rende mais. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
+- **Abrigo** — a tripulação para de trabalhar e põe massa entre ela e as partículas, arrumando a carga nas paredes, como na Orion da Artemis II. No jogo é um toque no botão do abrigo, ao lado da porta do dormitório, não minigame. Custa tempo de ciência, não energia: a ciência feita antes de abrigar conta, e depois o turno não rende mais. Não confundir com "escudo", que foi a primeira versão e não tem respaldo no que a NASA faz.
    → painel-da-tripulacao-e-alertas (pesquisa no vault do dono)
 
 - **Modo de segurança** — o que acontece quando falta energia para o aquecimento, o oxigênio acaba ou a margem de radiação zera: a base corta o que não é essencial e a tripulação se protege, como no safe mode real dos rovers. Uma tela explica a causa com um número ou caso real. Se algum plano salva o sol, o simulador o reinicia; se não, a base segue em modo de segurança e o sol passa sem ciência. Cada modo de segurança conta contra a nota do relatório. Não é game over.

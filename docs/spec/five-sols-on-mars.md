@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 17:56. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 22:59. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Five Sols on Mars
 
@@ -74,7 +74,7 @@ A troca com custo, decidida pelo dono em 14/11:
 - **[P]** O turno dura de 60 a 90 s, com 1 s = 1 min de tempo real.
 - **[P]** O que encerra o turno:
   - o relógio, que começa em "Confirmar plano". O Sol andando no céu é esse relógio desenhado: na faixa do Sol, na janela (dia, pôr do Sol, escuro) e na luz da sala, que fica azulada nos últimos ~10 s sem piscar, como o pôr do Sol em Gale (Curiosity, sol 956). Quando o Sol se põe, o turno acaba sozinho;
-  - ou a criança, pelo botão "Encerrar o sol", que só aparece quando todas as tarefas da lista acabaram;
+  - ou a criança, indo dormir pela porta do dormitório (ver "Onde a criança está"), que só acende quando todas as tarefas da lista acabaram;
   - o modo de segurança no meio do turno também encerra o turno ali.
 - **[P]** O pico de um evento é sorteado só até ~70% do turno, para nunca coincidir com o pôr do Sol.
 - **[P]** No sol 1, o Sol fica parado enquanto o card do tutorial espera o passo da criança.
@@ -85,7 +85,7 @@ A troca com custo, decidida pelo dono em 14/11:
   - o pacote da Terra da manhã abre o plano do sol seguinte.
 
   Base: o rover manda os dados à Terra num contato à tarde e recebe o plano de manhã; no MDRS, a tripulação manda um relatório por sol (comunicacao-com-atraso-terra-marte (pesquisa no vault do dono), terminais-de-tripulacao (pesquisa no vault do dono)).
-- **[P]** A história anda por três botões, sempre o mesmo gesto: "Confirmar plano", "Encerrar o sol" (opcional) e "Enviar à Terra".
+- **[P]** A história anda por três gestos: "Confirmar plano", ir dormir pela porta (opcional) e "Enviar à Terra" (dono, 14/11).
 - **[R]** Um evento por vez. A crise permanente cansa, e a Innersloth a tirou do Among Us (referencias-de-jogos-de-gestao (pesquisa no vault do dono)).
 - **[R]** Critério da calibração (14/11): nenhuma estratégia pode ser melhor ou igual às outras duas em ciência e em modos de segurança em todos os cenários. Uma estratégia cautelosa demais pode sair perdendo: cautela que custa caro também é lição, e não viola "nenhuma escolha segura sem custo".
 
@@ -106,19 +106,24 @@ Mapa da sala no turno (dono, 14/11), que substitui o HUD fixo do wireframe. A te
   - as telas de energia e oxigênio, lado a lado na rampa do console, abaixo da janela.
 - **[P]** A vista da janela é um render à parte, com a mesma câmera da sala, posto atrás dela antes do shader: o vidro sai transparente no PNG da sala. Evento novo do lado de fora é só mais uma imagem de vista, sem refazer a sala.
 - **[P]** Na esquerda:
-  - a porta e o botão do abrigo;
+  - na ponta, a porta do dormitório: tocá-la encerra o sol (ir dormir). Ela só se clica quando o turno pode acabar, e então a lâmpada verde dela acende e uma lua aparece por cima (dono, 14/11);
+  - o botão do abrigo, ao lado da porta;
   - a tela do medidor e da margem de radiação;
   - a tela de comunicação com a Terra, no lugar do antigo botão azul (ver "Comunicação com a Terra").
 - **[P]** Na direita, a parede da ciência de dentro, em destaque: a estufa (cultivar planta) e a glovebox (selar a amostra).
 - **[R]** As barras na sala seguem as regras das barras (ícone, texto e número) e curvam junto com a parede: são desenhadas antes do shader.
-- **[P]** No canto superior esquerdo da tela, fixo em qualquer ângulo: as notificações do sol atual, do evento em curso e dos alertas. São só ícones, porque o turno não tem texto para ler, e cumprem o equivalente visual do alarme.
+- **[P]** No canto superior esquerdo da tela, fixo em qualquer ângulo: as notificações do sol atual, do evento em curso, dos alertas e a lua de "pode dormir", porque a porta do dormitório fica na ponta e só aparece virando (dono, 14/11). São só ícones, porque o turno não tem texto para ler, e cumprem o equivalente visual do alarme.
 - **[P]** As posições exatas de cada botão e de cada tela vêm de `assets/comodo/regioes.json`, gerado pelo `arte/blender/comodo.py` a partir da câmera do render.
+- **[P]** O que puder morar na sala sai do terminal, para espalhar a carga de atenção pela vista; o terminal fica com o que precisa de texto (dono, 14/11).
 
 ## Terminal
 
 O computador da base, que reúne o que a criança consulta e faz pela tela. Base: terminais-de-tripulacao (pesquisa no vault do dono).
 
-- **[P]** Um botão único, fixo embaixo da tela, faz o terminal subir na hora, como camada de tela por cima do panorama, sem a curva do shader. O mesmo botão o abaixa. Atrás dele fica o que a criança estava olhando, que muda com o pan.
+- **[P]** Um botão único, fixo embaixo da tela, faz o terminal subir, como camada de tela por cima do panorama, sem a curva do shader. O mesmo botão o abaixa. Atrás dele fica o que a criança estava olhando, que muda com o pan.
+  - **[P]** O terminal sobe e desce numa animação curta, com som de subir e de descer, também quando sobe ou desce sozinho na troca de fase; no fim do turno, a subida vem depois do escurecimento (dono, 14/11). A duração se escolhe testando com `?terminal=<s>`. Enquanto anima, nos dois sentidos, a sala não recebe clique.
+  - **[P]** Aberto, o terminal trava o pan, e a sala que estava na tela aparece pelas frestas da moldura (as bordas, os vãos entre as teclas e a faixa de baixo), sem clique. A tela do terminal não encolhe (dono, 14/11).
+  - **[P]** Os botões fazem um clique com som, um por peso da ação: navegar (abas, voltar, fechar o card, O2 − e +, marcar tarefa), confirmar (confirmar, enviar, iniciar, consertar, reiniciar, seguir, jogar de novo, estufa, glovebox e a porta do dormitório) e abrigo. O botão do terminal e as setas não fazem clique (dono, 14/11).
 - **[P]** Abas:
   - **câmeras**, escolhidas num mapa de Gale, com sobreposição de alvo e telemetria, como as vistas da estação robótica da ISS;
   - **tarefas**, a lista do turno;
@@ -128,7 +133,6 @@ O computador da base, que reúne o que a criança consulta e faz pela tela. Base
 - **[P]** As abas são teclas grandes na moldura, como as bezel keys das telas da Orion.
 - **[R]** Cores: verde só no que se clica, como na Orion; vermelho e amarelo só em alerta (NASA-STD-3001 [V2 10118] e [V2 10119]); azul só no que vem da Terra.
 - **[R]** O terminal não guarda as ordens da Terra que ainda valem: elas ficam na tela de comunicação. Quando vencem, vão para o diário.
-- **[P]** O tamanho do terminal e se o pan funciona com ele aberto ficam com o primo.
 
 ## Tarefas (minigames)
 
@@ -144,7 +148,7 @@ O computador da base, que reúne o que a criança consulta e faz pela tela. Base
 
 - **[P]** As interações e a dificuldade de cada tarefa.
 - **[P]** Onde cada tarefa se faz: painel, gerador (MOXIE) e ChemCam pelas câmeras do terminal; amostra na glovebox e planta na estufa, na parede direita.
-- **[R]** Abrigar é um toque na porta da esquerda, não minigame (dono, 14/11). O porquê: arrastar a carga punia a habilidade motora e fazia a dose depender do reflexo. A base real é o procedimento da Artemis II, com a carga nas paredes.
+- **[R]** Abrigar é um toque no botão do abrigo, ao lado da porta, não minigame (dono, 14/11; o lugar passou da porta ao botão quando a porta virou o dormitório). O porquê: arrastar a carga punia a habilidade motora e fazia a dose depender do reflexo. A base real é o procedimento da Artemis II, com a carga nas paredes.
 - **[R]** O abrigo custa tempo: a ciência feita antes de abrigar conta, e depois a tripulação não faz mais tarefas no turno (dono, 14/11). Abrigar cedo demais perde ciência à toa, e tarde demais recebe dose.
 - **[R]** Tarefa de ciência não feita até o fim do turno: o plano só reserva a energia, e a tarefa a gasta quando roda, como o instrumento real só gasta quando liga. A reserva da tarefa não feita volta à bateria, respeitando o teto (o excedente se perde).
   - O porquê: perder a energia puniria a habilidade motora em vez da escolha, e faria o abrigo custar energia, não só tempo.
@@ -196,6 +200,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
 ## Falha e relatório
 
 - **[R]** Não há game over. Quando falta energia para o aquecimento, o oxigênio acaba ou a margem de radiação zera, entra o **modo de segurança**, como o safe mode real: a base corta o não essencial, a tripulação se protege e a ciência para.
+- **[P]** A entrada no modo de segurança toca o som de desligar, uma vez; quando o relógio acaba, no começo do escurecimento (dono, 14/11).
 - **[R]** Uma tela explica a causa em 1 a 2 frases, com número ou caso real:
   - energia: o Opportunity em 2018;
   - radiação: o evento de referência de outubro de 1989, para o qual a NASA projeta o abrigo. Maio de 2024, o maior pico medido em Marte, ficou abaixo do limite, então não serve de caso de falha: a tela diz que no jogo a dose foi ampliada;
@@ -206,6 +211,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
   - o teste de "algum plano salva" é rodar o plano de emergência: tudo ao gerador, consertar o que estiver quebrado e abrigo no sol da tempestade solar. Sem o conserto no teste, o gerador quebrado daria zero e mandaria para "seguir em modo de segurança" um sol que tinha salvação;
   - o porquê: sem a segunda saída, a criança recomeça um sol impossível sem fim, e o desafio pede aprender com a falha sem punição.
 - **[R]** Nada de tela piscando: no máximo 3 flashes por segundo, transição suave e som sempre com equivalente visual.
+- **[P]** Todo som passa por um barramento só, com um volume geral, e um botão de mudo fica no canto direito da faixa de baixo, ao lado do botão do terminal, fixo em todas as fases e guardado no navegador para a próxima vez (dono, 14/11). O canto superior direito foi descartado porque o terminal aberto o ocupa.
 - **[R]** No fim da missão vem o relatório, o debriefing:
   - ciência, margem final e quantos modos de segurança;
   - uma nota em estrelas, em que cada modo de segurança conta contra;
@@ -245,7 +251,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
   - o terminal com o botão único e a fase de plano dentro dele, com as três barras;
   - o fim do turno pelo relógio, um diário mínimo com "Enviar à Terra", modo de segurança e relatório;
   - a tempestade solar com o dado embutido, com o aviso da Terra num card azul simples;
-  - o abrigo, com um toque na porta;
+  - o abrigo, com um toque no botão;
   - uma tarefa de ciência mínima: o ChemCam com um clique;
   - a tempestade de poeira só como efeito na barra de energia;
   - consertar o gerador, com a quebra sorteada;
@@ -253,6 +259,7 @@ Base: comunicacao-com-atraso-terra-marte (pesquisa no vault do dono).
   - O porquê (dono, 14/11): sem ciência e sem poeira, "tudo em ciência" ganhava das outras estratégias em tudo, o que fere "nenhuma escolha segura sem custo".
 - **P1, o que dá o desenho (sábado à noite e domingo de manhã):**
   - primeiro, o plano enxuto, o card por cima do plano e as 4 abas do terminal, com a de fontes já preenchida (o plano enxuto depende dela);
+  - o terminal animado com som, os cliques, o desligar, o mudo e a porta do dormitório (dono, 14/11);
   - o conteúdo das abas de câmeras e de tarefas;
   - limpar o painel e a poeira escurecendo a janela;
   - o ChemCam completo, com mira;
