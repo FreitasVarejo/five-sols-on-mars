@@ -1228,19 +1228,20 @@ func _desenhar_seguranca() -> void:
 	_t(tr("MODO_SEGURANCA"), x + 28, y, 18, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
 	Desenho.icone(self, "sol", Rect2(r.end.x - 90, y + 3, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TERMINAL)
 	_t(tr("SOL_N") % missao.sol, r.end.x - 70, y + 2, 14, Desenho.TEXTO, 56, HORIZONTAL_ALIGNMENT_LEFT, true)
-	y += 36
+	y += 32
 	var b := missao.barras_falha
 	var causa := missao.causa
 	var larg_barra := (w - 40.0) / 3.0
 	_barra(x + 4, y + 4, larg_barra - 8, "energia", tr("ENERGIA"), b["E"], 12, causa == "energia")
 	_barra(x + larg_barra + 24, y + 4, larg_barra - 8, "oxigenio", tr("OXIGENIO"), b["O"], 12, causa == "oxigenio")
 	_barra(x + 2 * larg_barra + 44, y + 4, larg_barra - 8, "radiacao", tr("MARGEM"), b["M"], 12, causa == "radiacao")
-	y += 42
+	y += 38
 
-	# A causa em 1 a 2 frases.
+	# A causa: a barra que zerou e, se houver, o contexto (até 3 linhas no pior caso, medido).
 	var frase := tr("CAUSA_" + causa.to_upper())
-	if missao.causa_sem_abrigo:
-		frase += " " + tr("CAUSA_SEM_ABRIGO")
+	var contexto := missao.causa_contexto()
+	if contexto != "":
+		frase += " " + tr("CAUSA_" + contexto.to_upper())
 	y += _t(frase, x, y, 14, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 4
 	if not missao.tem_conserto:
 		y += _t(tr("SEM_CONSERTO"), x, y, 13, Desenho.TEXTO, w) + 4
@@ -1250,13 +1251,15 @@ func _desenhar_seguranca() -> void:
 	var h_caso := 62.0
 	var rc := Rect2(x, y, w, h_caso)
 	_caixa(rc, Desenho.FUNDO_TELA)
-	_t(tr("CASO_REAL_" + causa.to_upper()), rc.position.x + 10, rc.position.y + 6, 11, Desenho.TEXTO_SUAVE, w - 20,
+	var caso := missao.caso_real().to_upper()
+	_t(tr("CASO_REAL_" + caso), rc.position.x + 10, rc.position.y + 6, 11, Desenho.TEXTO_SUAVE, w - 20,
 		HORIZONTAL_ALIGNMENT_LEFT, true)
-	_t(tr("CASO_TEXTO_" + causa.to_upper()), rc.position.x + 10, rc.position.y + 22, 12, Desenho.TEXTO, w - 20)
-	y += h_caso + 8
+	_t(tr("CASO_TEXTO_" + caso), rc.position.x + 10, rc.position.y + 22, 12, Desenho.TEXTO, w - 20)
 
-	Desenho.icone(self, "alerta", Rect2(x, y + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TERMINAL)
-	_t(tr("MODOS_NA_MISSAO") % missao.modos, x + 18, y, 12, Desenho.TEXTO, w - 18)
+	# Os modos da missão ficam embaixo do botão, para o quadro do caso real ter o espaço do pior caso.
+	var y_modos := r.end.y - 18
+	Desenho.icone(self, "alerta", Rect2(x, y_modos + 1, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TERMINAL)
+	_t(tr("MODOS_NA_MISSAO") % missao.modos, x + 18, y_modos, 12, Desenho.TEXTO, w - 18)
 
 	# Um botão só: reinicia (há conserto) ou segue (não há).
 	var rb := Rect2(x, r.end.y - 66, 260, 46)

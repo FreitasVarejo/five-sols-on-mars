@@ -332,6 +332,34 @@ func estrelas() -> int:
 	return Modelo.estrelas(modos, ciencia_total())
 
 
+## A causa pelo contexto do sol que falhou, além da barra que zerou (spec, "Falha e relatório"):
+## "sem_abrigo" (a radiação veio do abrigo tardio), "gerador" (oxigênio com o gerador quebrado no começo
+## do sol e sem conserto, quando consertar salvava: falha no turno, com `tem_conserto`) ou "poeira"
+## (oxigênio ou energia num sol de poeira). "" quando não há contexto. Na tela antecipada (nenhum plano
+## salva, nem com o conserto), "aperte Consertar" não vale, e o gerador não entra.
+func causa_contexto() -> String:
+	if causa_sem_abrigo:
+		return "sem_abrigo"
+	if causa == "oxigenio" and tem_conserto and st_inicio.get("gerador_quebrado", false) and tarefas.get("gerador", "") != "feita":
+		return "gerador"
+	if eh_poeira() and (causa == "oxigenio" or causa == "energia"):
+		return "poeira"
+	return ""
+
+
+## A chave (minúscula) do caso real da tela do modo de segurança: acompanha o contexto (poeira: o da
+## energia; gerador: o do oxigênio; sem abrigo: o da radiação); sem contexto, o da barra que zerou.
+func caso_real() -> String:
+	match causa_contexto():
+		"poeira":
+			return "energia"
+		"gerador":
+			return "oxigenio"
+		"sem_abrigo":
+			return "radiacao"
+	return causa
+
+
 # --- plano -------------------------------------------------------------------
 
 ## Muda o O2 do plano em `delta`. Só vale se o plano novo cabe.
@@ -504,7 +532,7 @@ func _fechar_turno() -> void:
 		"q": plano_q, "escolhidas": plano_tarefas.duplicate(), "feitas": feitas, "nao_feitas": nao_feitas,
 		"ciencia": feitas.size(), "devolvida": r["devolvida"], "perdida_no_teto": r["perdida_no_teto"],
 		"o2_produzido": r["o2_produzido"], "dose": dose, "f_exposto": f, "abrigou": t_abrigado > 0.0,
-		"seguranca": false, "causa": "",
+		"seguranca": false, "causa": "", "causa_contexto": "",
 	})
 	fase = "fim_do_sol"
 	versao += 1
@@ -551,7 +579,7 @@ func seguir_em_seguranca() -> bool:
 		"q": 0, "escolhidas": [], "feitas": [], "nao_feitas": [],
 		"ciencia": 0, "devolvida": 0.0, "perdida_no_teto": 0.0, "o2_produzido": 0,
 		"dose": 0.0, "f_exposto": 0.0, "abrigou": false,
-		"seguranca": true, "causa": causa,
+		"seguranca": true, "causa": causa, "causa_contexto": causa_contexto(),
 	})
 	fase = "fim_do_sol"
 	versao += 1
@@ -604,8 +632,9 @@ func jogar_de_novo() -> bool:
 
 # --- interno -----------------------------------------------------------------
 
-## Começa o plano do sol `sol` com o estado `st`. Sem energia para o aquecimento da noite, o sol
-## já começa em modo de segurança (no P0 isso não acontece em jogo; os testes montam o estado).
+## Começa o plano do sol `sol` com o estado `st`. Sem energia para o aquecimento da noite, ou quando
+## nenhum plano salva o sol (a causa veio dos sóis anteriores), o sol já começa em modo de segurança:
+## a criança não joga um sol perdido (spec, "Falha e relatório"). Acontece depois da noite.
 func _comecar_sol() -> void:
 	st_inicio = st.duplicate()
 	st_fim = {}
@@ -629,6 +658,11 @@ func _comecar_sol() -> void:
 	versao += 1
 	if Modelo.manha(st, eh_poeira())["falta_aquecimento"]:
 		_entrar_seguranca(["energia"], {"E": 0.0, "O": st["O"], "M": st["M"]})
+		return
+	# Nenhum plano salva: as falhas e as barras são as do plano de emergência.
+	var e := Modelo.emergencia(st, eh_poeira(), eh_sol_solar())
+	if not e["falhas"].is_empty():
+		_entrar_seguranca(e["falhas"], e["st"])
 
 
 func _barras(s: Dictionary) -> Dictionary:

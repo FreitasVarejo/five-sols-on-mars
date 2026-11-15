@@ -11,6 +11,7 @@ const Modelo := preload("res://scripts/modelo.gd")
 
 var falhas := 0
 var total := 0
+var antecipados: Array = []  # sóis em que _jogar_missao viu o modo de segurança antes do plano (t = 0)
 
 
 func _init() -> void:
@@ -26,6 +27,8 @@ func _init() -> void:
 	_seguranca_no_fim_do_turno()
 	_seguranca_sem_conserto()
 	_aquecimento_e_gerador()
+	_causa_pelo_contexto()
+	_tela_antes_do_plano()
 	_poeira()
 	_quebra_do_gerador()
 	_encerrar_sol()
@@ -505,6 +508,8 @@ func _seguranca_no_meio_do_turno() -> void:
 	_igual(m.causa, "radiacao", "causa: radiação")
 	_igual(m.modos, 1, "uma entrada soma 1 em modos")
 	_igual(m.causa_sem_abrigo, true, "não abrigou a tempo")
+	_igual(m.causa_contexto(), "sem_abrigo", "contexto: abrigo tardio")
+	_igual(m.caso_real(), "radiacao", "caso real do abrigo tardio: a radiação")
 	_igual(m.barras_falha, {"E": 6.0, "O": 4.0, "M": 0.0}, "barras da falha: margem em 0")
 	_igual(m.tem_conserto, true, "margem 4: o abrigo salva (4 - 3 = 1), tem conserto")
 	_igual(m.seguir_em_seguranca(), false, "com conserto não se segue")
@@ -591,9 +596,10 @@ func _seguranca_no_fim_do_turno() -> void:
 
 
 func _seguranca_sem_conserto() -> void:
-	# Margem 2 no sol da tempestade exposta: a margem ao vivo zera no meio; não há plano que salve
-	# (nem o abrigo, de dose 3).
+	# Margem 2 no sol da tempestade: não há plano que salve (nem o abrigo, de dose 3), então o sol
+	# já começa em segurança, antes do plano (o turno nem chega a existir).
 	var m = _solar(41, _st(6, 4, 2))
+	_igual(m.t, 0.0, "margem 2: a segurança vem antes do turno")
 	m.confirmar_plano()
 	_ate_sair_do_turno(m, 0.05)
 	_igual(m.fase, "seguranca", "margem 2 exposta: segurança")
@@ -612,16 +618,21 @@ func _seguranca_sem_conserto() -> void:
 	_igual(m.ciencia_por_sol, [0], "ciência por sol: 0")
 	_verdade(m.enviar_a_terra(), "enviar à Terra depois do modo de segurança")
 	_igual(m.st["M"], 0.0, "o estado seguiu em frente")
-	# Margem 0 no começo de um sol comum: a margem ao vivo não dispara (não houve exposição),
-	# o sol falha no fim, e sem conserto a saída é seguir.
+	# Margem 0 no começo de um sol comum: nenhum plano salva (a dose do sol, 1, já a zera), então o sol
+	# começa em modo de segurança, sem conserto, antes do plano e do turno.
 	var z = Missao.new(1, {"sol_solar": 3})
 	z.montar_sol(1, _st(6, 4, 0))
-	z.confirmar_plano()
-	_ate(z, 10.0)
-	_igual(z.fase, "turno", "margem 0 sem exposição: o turno corre")
-	z.avancar(z.turno_s)
-	_igual(z.fase, "seguranca", "margem 0: falha de radiação no fim")
+	_igual(z.fase, "seguranca", "margem 0: a tela vem antes do plano")
+	_igual(z.causa, "radiacao", "margem 0: causa radiação")
 	_igual(z.tem_conserto, false, "margem 0: sem conserto")
+	_igual(z.confirmar_plano(), false, "margem 0: não há plano a confirmar")
+	# A margem ao vivo não dispara sem exposição: o turno corre até o fim quando só ela está no limite.
+	var y = Missao.new(1, {"sol_solar": 3})
+	y.montar_sol(1, _st(6, 4, 1.5))
+	_igual(y.fase, "plano", "margem 1,5: um plano salva o sol (dose 1)")
+	y.confirmar_plano()
+	_ate(y, 10.0)
+	_igual(y.fase, "turno", "sem exposição: o turno corre")
 
 
 func _aquecimento_e_gerador() -> void:
@@ -660,6 +671,132 @@ func _aquecimento_e_gerador() -> void:
 	_igual(n.st_fim["gerador_quebrado"], false, "gerador não quebra no sol 1")
 	_igual(n.registros[0]["gerador_quebrado"], false, "registro: o gerador estava inteiro")
 	_igual(n.registros[0]["consertou"], false, "registro: nada a consertar")
+
+
+func _causa_pelo_contexto() -> void:
+	# Oxigênio num sol comum, sem gerador quebrado: sem contexto; o caso real é o da barra.
+	var v = Missao.new(1, {"sol_solar": 3})
+	v.montar_sol(1, _st(6, 1, 12))
+	v.confirmar_plano()
+	v.avancar(v.turno_s)
+	_igual(v.causa, "oxigenio", "vazio: a causa é o oxigênio")
+	_igual(v.causa_contexto(), "", "vazio: sem contexto")
+	_igual(v.caso_real(), "oxigenio", "vazio: o caso real é o da barra")
+	_verdade(v.reiniciar_sol(), "vazio: há conserto")
+	# Gerador quebrado no começo do sol e não consertado, e o oxigênio acaba: contexto do gerador.
+	var g = Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	g.montar_sol(2, _st(6, 0, 12, 1.0, true))
+	g.confirmar_plano()
+	g.avancar(g.turno_s)
+	_igual(g.causa, "oxigenio", "gerador: a causa é o oxigênio")
+	_igual(g.causa_contexto(), "gerador", "gerador: contexto do gerador")
+	_igual(g.caso_real(), "oxigenio", "gerador: o caso real é o do oxigênio")
+	_verdade(g.reiniciar_sol(), "gerador: o conserto salva, o simulador reinicia")
+	# Consertado no turno e o oxigênio ainda acaba (q 0): o gerador não é a causa.
+	g.confirmar_plano()
+	g.iniciar_tarefa("gerador")
+	g.avancar(g.tarefa_s)
+	_igual(g.tarefas["gerador"], "feita", "gerador: o conserto terminou")
+	g.avancar(g.turno_s)
+	_igual(g.fase, "seguranca", "gerador consertado e q 0: o oxigênio acaba")
+	_igual(g.causa_contexto(), "", "gerador consertado: sem contexto")
+	# Poeira e oxigênio: contexto da poeira, e o caso real é o da energia (o Opportunity).
+	var p = Missao.new(1)
+	p.montar_sol(3, _st(6, 1, 12))
+	_igual(p.eh_poeira(), true, "poeira: o sol 3 da missão fixa")
+	p.confirmar_plano()
+	p.avancar(p.turno_s)
+	_igual(p.causa, "oxigenio", "poeira: a causa é o oxigênio")
+	_igual(p.causa_contexto(), "poeira", "poeira e oxigênio: contexto da poeira")
+	_igual(p.caso_real(), "energia", "poeira: o caso real é o da energia")
+	# Poeira e energia (bateria vazia no aquecimento): também poeira.
+	var e = Missao.new(1)
+	e.montar_sol(4, _st(0, 4, 12, 0.0))
+	_igual(e.causa, "energia", "poeira: a causa é a energia")
+	_igual(e.causa_contexto(), "poeira", "poeira e energia: contexto da poeira")
+	# Poeira e radiação: a poeira não explica a radiação, sem contexto.
+	var r = Missao.new(1)
+	r.montar_sol(3, _st(6, 4, 0))
+	_igual(r.causa, "radiacao", "poeira: a causa é a radiação")
+	_igual(r.causa_contexto(), "", "poeira e radiação: sem contexto")
+	_igual(r.caso_real(), "radiacao", "poeira e radiação: o caso real é o da barra")
+	# O gerador vem antes da poeira na prioridade.
+	var d = Missao.new(1, {"sol_poeira": 4, "sol_quebra": 4})
+	d.montar_sol(4, _st(6, 0, 12, 1.0, true))
+	_igual(d.eh_poeira(), true, "gerador e poeira: o sol 4 tem poeira")
+	d.confirmar_plano()
+	d.avancar(d.turno_s)
+	_igual(d.causa_contexto(), "gerador", "gerador e poeira: vale o gerador")
+	# O abrigo tardio vem antes de tudo; fora do modo de segurança não há contexto.
+	var f = Missao.new(1)
+	_igual(f.causa_contexto(), "", "sem falha: sem contexto")
+	# O registro de "seguir em modo de segurança" guarda o contexto; o do sol normal, vazio.
+	var s = Missao.new(1)
+	s.montar_sol(3, _st(0, 4, 12, 0.0))
+	_verdade(s.seguir_em_seguranca(), "poeira e energia: segue em modo de segurança")
+	_igual(s.registros[0]["causa_contexto"], "poeira", "registro: o contexto da poeira")
+	var n = Missao.new(1, {"sol_solar": 3})
+	n.confirmar_plano()
+	n.avancar(n.turno_s)
+	_igual(n.registros[0]["causa_contexto"], "", "registro do sol normal: sem contexto")
+
+
+func _tela_antes_do_plano() -> void:
+	# Nenhum plano salva o sol de poeira (O2 0, bateria 2): a tela do modo de segurança é a primeira
+	# coisa do sol, antes do plano e do turno.
+	var m = Missao.new(1)
+	m.montar_sol(4, _st(2, 0, 12))
+	_igual(m.eh_poeira(), true, "antecipação: o sol 4 é de poeira")
+	_igual(m.fase, "seguranca", "antecipação: o sol já começa em segurança")
+	_igual(m.t, 0.0, "antecipação: sem turno jogado")
+	_igual(m.causa, "oxigenio", "antecipação: a causa é o oxigênio")
+	_igual(m.causa_contexto(), "poeira", "antecipação: contexto da poeira")
+	_igual(m.causa_sem_abrigo, false, "antecipação: não há abrigo tardio")
+	_igual(m.tem_conserto, false, "antecipação: sem conserto")
+	_igual(m.modos, 1, "antecipação: conta 1 modo")
+	_igual(m.barras_falha["O"], 0.0, "antecipação: barras do plano de emergência, O2 no piso")
+	_igual(m.barras_falha["E"], Modelo.emergencia(_st(2, 0, 12), true, false)["st"]["E"], "antecipação: a bateria é a da emergência")
+	_igual(m.reiniciar_sol(), false, "antecipação: não reinicia")
+	_igual(m.confirmar_plano(), false, "antecipação: não há plano")
+	_igual(m.registros.size(), 0, "antecipação: ainda sem registro")
+	_verdade(m.seguir_em_seguranca(), "antecipação: segue em modo de segurança")
+	_igual(m.fase, "fim_do_sol", "antecipação: o sol passa")
+	_igual(m.modos, 1, "antecipação: seguir não soma outro modo")
+	_igual(m.ciencia_por_sol, [0], "antecipação: sem ciência")
+	_igual(m.registros[0]["seguranca"], true, "antecipação: registro em segurança")
+	_igual(m.registros[0]["causa_contexto"], "poeira", "antecipação: registro com o contexto")
+	# Depois da noite: o sol seguinte já começa na tela, sem o plano, e o desligar é de uma entrada só.
+	var n = Missao.new(1)
+	n.sol = 3
+	n.st = _st(6, 4, 12)
+	n.fase = "fim_do_sol"
+	n.st_fim = _st(2, 0, 12)
+	_verdade(n.enviar_a_terra(), "noite: enviar à Terra")
+	_igual(n.fase, "noite", "noite: a fase")
+	n.avancar(Missao.NOITE_S + 0.01)
+	_igual(n.sol, 4, "noite: o sol 4")
+	_igual(n.fase, "seguranca", "noite: o sol 4 começa em segurança")
+	_igual(n.modos, 1, "noite: 1 modo só")
+	_igual(n.causa_contexto(), "poeira", "noite: contexto da poeira")
+	# O sol 5 (o gerador quebra ao entrar) sem salvação, com o painel sujo: nem o conserto salvaria, então
+	# a tela não diz "aperte Consertar"; sem poeira, o contexto fica vazio (só a barra que zerou).
+	var q = Missao.new(1)
+	q.sol = 4
+	q.st = _st(6, 4, 12)
+	q.fase = "fim_do_sol"
+	q.st_fim = _st(1.2, 0, 12, 0.0)
+	q.enviar_a_terra()
+	q.avancar(Missao.NOITE_S + 0.01)
+	_igual(q.sol, 5, "sol 5: depois da noite")
+	_igual(q.st["gerador_quebrado"], true, "sol 5: o gerador quebrou ao entrar")
+	_igual(q.fase, "seguranca", "sol 5: sem salvação, segurança antes do plano")
+	_igual(q.causa_contexto(), "", "sol 5: antecipado, sem o contexto do gerador")
+	_igual(q.tem_conserto, false, "sol 5: sem conserto")
+	# O que o plano de emergência salva não é antecipado: a mesma bateria com mais energia segue no plano.
+	var ok = Missao.new(1)
+	ok.montar_sol(4, _st(6, 0, 12))
+	_igual(ok.fase, "plano", "um plano salva: o sol começa no plano")
+	_igual(ok.modos, 0, "um plano salva: nenhum modo")
 
 
 func _poeira() -> void:
@@ -1225,6 +1362,8 @@ func _jogar_missao(m, plano_do_sol: Callable, espera_a_lista: bool) -> Array:
 				m.avancar(2.0)
 			"seguranca":
 				sois_com_modo.append(m.sol)
+				if m.t == 0.0:
+					antecipados.append(m.sol)
 				if m.tem_conserto:
 					m.reiniciar_sol()
 					var q := int(floorf(m.para_dividir() / Modelo.N.GEN_CUSTO + Modelo.EPS))
@@ -1236,7 +1375,7 @@ func _jogar_missao(m, plano_do_sol: Callable, espera_a_lista: bool) -> Array:
 
 func _agenda_fixa() -> void:
 	var casos := [
-		# nome, ciência por sol, ciência, modos, sóis com modo
+		# nome, ciência por sol, ciência, modos, sóis com modo (todos antecipados: a tela vem antes do plano)
 		["tudo", [3, 2, 2, 0, 2], 9, 1, [4]],
 		["equil", [3, 2, 0, 0, 0], 5, 0, []],
 		["cons", [0, 0, 0, 0, 0], 0, 2, [3, 4]],
@@ -1244,18 +1383,21 @@ func _agenda_fixa() -> void:
 	for c in casos:
 		var m = Missao.new(1)
 		var id: String = c[0]
+		antecipados = []
 		var sois := _jogar_missao(m, func(mm) -> Array: return _plano_da_estrategia(id, mm), false)
 		_igual(m.fase, "relatorio", "agenda fixa, %s: chega ao relatório" % id)
 		_igual(m.ciencia_por_sol, c[1], "agenda fixa, %s: ciência por sol" % id)
 		_igual(m.ciencia_total(), c[2], "agenda fixa, %s: ciência" % id)
 		_igual(m.modos, c[3], "agenda fixa, %s: modos de segurança" % id)
 		_igual(sois, c[4], "agenda fixa, %s: sóis dos modos de segurança" % id)
+		_igual(antecipados, c[4], "agenda fixa, %s: todo modo de segurança vem antes do plano" % id)
 		_igual(m.estrelas(), Modelo.estrelas(m.modos, m.ciencia_total()), "agenda fixa, %s: estrelas vêm do modelo" % id)
 	# "Tudo em ciência": o modo do sol 4 é sem conserto (a causa veio do sol 3, o oxigênio).
 	var t = Missao.new(1)
 	_jogar_missao(t, func(mm) -> Array: return _plano_da_estrategia("tudo", mm), false)
 	_igual(t.registros[3]["seguranca"], true, "tudo: o sol 4 foi em modo de segurança, sem conserto")
 	_igual(t.registros[3]["causa"], "oxigenio", "tudo: a causa do sol 4 é o oxigênio")
+	_igual(t.registros[3]["causa_contexto"], "poeira", "tudo: o contexto do sol 4 é a poeira")
 	# O melhor plano possível: 7 de ciência, nenhum modo. Sol 1: 1 de ciência; sol 2: 3, e abriga depois da
 	# lista (aos 30 s, dose 5); sóis 3 e 4: 2 de O2 e nenhuma ciência; sol 5: 2 de O2, 3 de ciência e o conserto.
 	var planos := {1: [0, 1], 2: [0, 3], 3: [2, 0], 4: [2, 0], 5: [2, 3]}

@@ -692,6 +692,7 @@ func _sonda_teste() -> void:
 		"ciencia": m.ciencia_ate_agora(), "ciencia_sol": m.ciencia_do_sol(), "modos": m.modos,
 		"tem_conserto": m.tem_conserto if m.fase == "seguranca" else null,
 		"causa": m.causa if m.fase == "seguranca" else null,
+		"causa_contexto": m.causa_contexto() if m.fase == "seguranca" else null,
 		"estrelas": m.estrelas(),
 		"terminal_aberto": _terminal.aberto,
 		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),

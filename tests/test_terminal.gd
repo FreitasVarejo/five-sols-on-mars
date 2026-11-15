@@ -19,6 +19,10 @@ var total := 0
 
 
 func _init() -> void:
+	_tudo()
+
+
+func _tudo() -> void:
 	_duracao_da_url()
 	_easing()
 	_botao_sobe_e_desce()
@@ -33,6 +37,8 @@ func _init() -> void:
 	_alerta_por_cima_do_terminal()
 	_linha_do_abrigo_fecha_o_terminal_e_pede_o_pan()
 	_pan_ate_o_botao_do_abrigo()
+	_da_noite_para_a_seguranca()
+	await _frase_com_o_contexto()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -501,3 +507,129 @@ func _pan_ate_o_botao_do_abrigo() -> void:
 	_igual(pan, 0.0, "chegou ao alvo")
 	_verdade(passos > 5 and passos < 60, "levou de 0,1 s a 1 s (%d quadros)" % passos)
 	_igual(Main.passo_do_pan(3.0, 0.0, 17.0), 0.0, "não passa do alvo")
+
+
+## Estado de bateria e oxigênio sem salvação no sol de poeira (o plano de emergência falha).
+func _sem_salvacao(e: float = 2.0) -> Dictionary:
+	return {"E": e, "O": 0.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false}
+
+
+## A tela do modo de segurança que nasce da noite (e de "seguir" de um sol anterior): sem travar, sem
+## o card do aviso por cima, e o desligar toca uma vez por entrada.
+func _da_noite_para_a_seguranca() -> void:
+	# Sol 3 já perdido (O2 0, poeira): a tela abre no sol 3; o terminal já a vê como entrada de partida.
+	var m := Missao.new(1)
+	m.montar_sol(3, _sem_salvacao())
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	_igual(m.fase, "seguranca", "noite: o sol 3 abre em segurança")
+	_igual(t.fase_ui, "seguranca", "noite: o terminal mostra a segurança")
+	_igual(t.card_aberto, false, "noite: sem card do aviso")
+	_rodar(t, m, 0.5)
+	_igual(som.historico, [], "a partida já em segurança não toca o desligar")
+	# Seguir, enviar à Terra: fim do sol e noite; da noite, o sol 4 abre direto na segurança.
+	t._acionar("seguir")
+	_igual(m.fase, "fim_do_sol", "seguir: fim do sol")
+	_rodar(t, m, t.duracao * 1.5)
+	_igual(t.fase_ui, "fim_do_sol", "seguir: o terminal mostra o fim do sol")
+	t._acionar("enviar")
+	_igual(m.fase, "noite", "enviar: a noite")
+	_rodar(t, m, 0.1)
+	_igual(t.fase_ui, "noite", "a noite aparece")
+	_igual(t.aberto, true, "a noite fica com o terminal aberto")
+	som.historico.clear()
+	_rodar(t, m, Missao.NOITE_S + 0.2)
+	_igual(m.sol, 4, "a noite passou para o sol 4")
+	_igual(m.fase, "seguranca", "o sol 4 abre em segurança (nenhum plano salva)")
+	_igual(m.modos, 2, "duas entradas")
+	_igual(t.fase_ui, "seguranca", "noite para segurança: o terminal mostra a tela")
+	_igual(t._fase_tela, "seguranca", "noite para segurança: a tela já é a da segurança")
+	_igual(t.aberto, true, "noite para segurança: o terminal fica aberto")
+	_igual(t.card_aberto, false, "noite para segurança: sem card do aviso por cima")
+	_igual(t._fade_estado, "", "noite para segurança: sem escurecimento")
+	_igual(som.historico.count("desligar"), 1, "noite para segurança: o desligar toca uma vez")
+	_igual(som.historico.count("terminal_desce"), 0, "noite para segurança: o terminal não desce")
+	_rodar(t, m, 2.0)
+	_igual(som.historico.count("desligar"), 1, "noite para segurança: o desligar não repete")
+	_igual(m.reiniciar_sol(), false, "noite para segurança: sem reinício possível")
+	t._acionar("reiniciar")
+	_igual(m.fase, "seguranca", "noite para segurança: o botão de reiniciar não faz nada")
+	# E ainda sai: seguir leva ao fim do sol de novo.
+	t._acionar("seguir")
+	_igual(m.fase, "fim_do_sol", "a segurança do sol 4 também segue")
+	som.free()
+	t.free()
+
+
+## O texto da tela traz a frase da barra e a do contexto; o quadro do caso real cabe até o botão, no
+## pior caso de cada contexto, em português e em inglês.
+func _frase_com_o_contexto() -> void:
+	var casos := {}
+	# O contexto da poeira, sem conserto (a antecipada).
+	var a := Missao.new(1)
+	a.montar_sol(4, _sem_salvacao())
+	casos["poeira"] = [a, "CAUSA_OXIGENIO", "CAUSA_POEIRA", "CASO_REAL_ENERGIA", "CASO_TEXTO_ENERGIA", "seguir"]
+	# Poeira com a causa energia, sem conserto: é o maior texto em português.
+	var b := Missao.new(1)
+	b.montar_sol(3, {"E": 0.0, "O": 10.0, "M": 8.0, "P": 0.0, "gerador_quebrado": false})
+	casos["poeira_energia"] = [b, "CAUSA_ENERGIA", "CAUSA_POEIRA", "CASO_REAL_ENERGIA", "CASO_TEXTO_ENERGIA", "seguir"]
+	# O gerador quebrado e não consertado, com conserto: reinicia.
+	var c := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	c.montar_sol(2, {"E": 6.0, "O": 0.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
+	c.confirmar_plano()
+	c.avancar(c.turno_s)
+	casos["gerador"] = [c, "CAUSA_OXIGENIO", "CAUSA_GERADOR", "CASO_REAL_OXIGENIO", "CASO_TEXTO_OXIGENIO", "reiniciar"]
+	# O abrigo tardio (margem 4: o abrigo salvaria, então há conserto): a frase mais longa da radiação.
+	var d := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	d.montar_sol(3, {"E": 6.0, "O": 4.0, "M": 4.0, "P": 1.0, "gerador_quebrado": false})
+	d.confirmar_plano()
+	for i in 4000:
+		if d.fase != "turno":
+			break
+		d.avancar(0.05)
+	casos["sem_abrigo"] = [d, "CAUSA_RADIACAO", "CAUSA_SEM_ABRIGO", "CASO_REAL_RADIACAO", "CASO_TEXTO_RADIACAO", "reiniciar"]
+	# Sem contexto: só a frase da barra, e o caso real é o da barra.
+	var e := Missao.new(1, {"sol_solar": 3})
+	e.montar_sol(1, {"E": 6.0, "O": 1.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+	e.confirmar_plano()
+	e.avancar(e.turno_s)
+	casos["vazio"] = [e, "CAUSA_OXIGENIO", "", "CASO_REAL_OXIGENIO", "CASO_TEXTO_OXIGENIO", "reiniciar"]
+	var idioma := TranslationServer.get_locale()
+	for loc in ["pt", "en"]:
+		TranslationServer.set_locale(loc)
+		for nome in casos:
+			var k: Array = casos[nome]
+			var m: Missao = k[0]
+			_igual(m.fase, "seguranca", "%s (%s): em segurança" % [nome, loc])
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, {})
+			root.add_child(t)
+			await process_frame
+			await process_frame
+			var textos: Array = t.textos()
+			var desenhados: Array = []
+			for linha in textos:
+				desenhados.append(linha[0])
+			var esperada: String = t.tr(k[1])
+			if k[2] != "":
+				esperada += " " + t.tr(k[2])
+			_verdade(desenhados.has(esperada), "%s (%s): a frase da barra e a do contexto" % [nome, loc])
+			_verdade(desenhados.has(t.tr(k[3])) and desenhados.has(t.tr(k[4])), "%s (%s): o caso real que acompanha o contexto" % [nome, loc])
+			if k[2] == "":
+				_igual(desenhados.has(t.tr(k[1]) + " "), false, "%s (%s): sem contexto, sem sobra de espaço" % [nome, loc])
+			# O quadro do caso real (62 px, a partir do rótulo menos 6) acaba acima do botão.
+			var y_rotulo := -1
+			for linha in textos:
+				if linha[0] == t.tr(k[3]):
+					y_rotulo = linha[2]
+			var botao: Array = t.ui().get(k[5], [])
+			_verdade(not botao.is_empty(), "%s (%s): o botão %s está na tela" % [nome, loc, k[5]])
+			if not botao.is_empty():
+				_verdade(y_rotulo - 6 + 62 <= botao[1] - 4, "%s (%s): o caso real cabe acima do botão (fim %d, botão %d)" % [nome, loc, y_rotulo - 6 + 62, botao[1]])
+			# O texto da causa acaba antes do quadro.
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
