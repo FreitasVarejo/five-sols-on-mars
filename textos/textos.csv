@@ -8,9 +8,9 @@ MEDIDOR,Radiation,Radiação
 CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
 SOL_N,Sol %d,Sol %d
-AVISO_TEMPESTADE,A storm from the Sun is coming. It should arrive between sol 3 and sol 4.,Uma tempestade do Sol vem aí. Deve chegar entre o sol 3 e o sol 4.
+AVISO_TEMPESTADE,"The Sun is active this week. A new explosion could send fast particles in the next sols. When the meter goes up, go to the shelter.","O Sol está agitado nesta semana. Uma explosão nova pode mandar partículas rápidas nos próximos sóis. Quando o medidor subir, vá para o abrigo."
 DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
-DONKI_FRASE_HISTORICO,"In May 2024, DONKI predicted CMEs arriving at Mars. The simulator replays one.","Em maio de 2024, o DONKI previu CMEs chegando a Marte. O simulador reencena uma."
+DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
 ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
 DONKI_DADO_DE,DONKI data from %s,Dados do DONKI de %s
 DONKI_DADO_HISTORICO,Historical data: May 2024,Dado histórico: maio de 2024
@@ -50,7 +50,7 @@ ABRIGO,Shelter,Abrigo
 IR_AO_ABRIGO,Go to shelter,Ir ao abrigo
 ABRIGO_ATE_FIM,The crew stays in the shelter until the end of the sol.,A tripulação fica no abrigo até o fim do sol.
 DIARIO_CALMO,A calm sol.,Um sol calmo.
-DIARIO_TEMPESTADE,The storm from the Sun arrived.,A tempestade do Sol chegou.
+DIARIO_TEMPESTADE,An explosion on the Sun sent fast particles to the base.,Uma explosão no Sol mandou partículas rápidas até a base.
 DIARIO_POEIRA,Dust storm: the panel produced only %d%%.,Tempestade de poeira: o painel rendeu só %d%%.
 DIARIO_ABRIGO_A_TEMPO,The crew sheltered in time. It cost %d of margin.,A tripulação foi para o abrigo a tempo. Gastou %d de margem.
 DIARIO_ABRIGO_TARDE,The crew sheltered late. It cost %d of margin.,A tripulação foi para o abrigo tarde. Gastou %d de margem.
@@ -70,10 +70,10 @@ MODO_SEGURANCA,Safe mode,Modo de segurança
 CAUSA_ENERGIA,The base ran out of energy.,A base ficou sem energia.
 CAUSA_OXIGENIO,The oxygen ran out.,O oxigênio acabou.
 CAUSA_RADIACAO,The radiation margin ran out.,A margem de radiação acabou.
-CAUSA_SEM_ABRIGO,The crew did not shelter in time.,A tripulação não foi para o abrigo a tempo.
+CAUSA_SEM_ABRIGO,"The crew reached the shelter too late and took too much radiation in the storm. When the meter goes up, go to the shelter right away.","A tripulação foi para o abrigo tarde demais e recebeu radiação demais na tempestade. Quando o medidor subir, vá para o abrigo na hora."
 SEM_CONSERTO,"This came from earlier sols, so no plan today saves this sol.",Isso veio dos sóis anteriores. Nenhum plano de hoje salva este sol.
 CASO_REAL_ENERGIA,Real case · 2018,Caso real · 2018
-CASO_TEXTO_ENERGIA,"In 2018, Opportunity ran out of energy in a dust storm. Its panel fell from 645 to 22 Wh.","Em 2018, o Opportunity ficou sem energia numa tempestade de poeira. O painel caiu de 645 para 22 Wh."
+CASO_TEXTO_ENERGIA,"In 2018, Opportunity ran out of energy in a dust storm. Its panel fell from 645 to 22 Wh per sol.","Em 2018, o Opportunity ficou sem energia numa tempestade de poeira. O painel caiu de 645 para 22 Wh por sol."
 CASO_REAL_RADIACAO,Real case · October 1989,Caso real · outubro de 1989
 CASO_TEXTO_RADIACAO,"October 1989 is the reference event that NASA designs the shelter for. In the game, the dose was scaled up.","Outubro de 1989 é o evento de referência para o qual a NASA projeta o abrigo. No jogo, a dose foi ampliada."
 CASO_REAL_OXIGENIO,Real number,Número real
@@ -93,7 +93,7 @@ N_DE_12,%d of 12,%d de 12
 MODOS_SEGURANCA,Safe modes,Modos de segurança
 DE_VERDADE,What really happened,O que aconteceu de verdade
 DE_VERDADE_DATA,May 2024,Maio de 2024
-DE_VERDADE_TEXTO,"DONKI warned of a week of storms heading for Mars. The strongest hit came as a surprise, minutes after an explosion on the Sun. No one warned first: only the instruments already at Mars, like Curiosity's, measured the hit as it arrived.","O DONKI avisou de uma semana de tempestades a caminho de Marte. O golpe mais forte veio de surpresa, minutos depois de uma explosão no Sol. Ninguém avisou antes: só os aparelhos que já estavam em Marte, como o do Curiosity, mediram o golpe quando ele chegou."
+DE_VERDADE_TEXTO,"In May 2024, NASA's forecast (DONKI) showed a week of solar storms heading to Mars. On 20 May, a huge explosion on the Sun launched fast particles that reached Mars in tens of minutes. Curiosity measured its biggest jump in radiation since landing.","Em maio de 2024, a previsão da NASA (DONKI) mostrou uma semana de tempestades solares a caminho de Marte. Em 20 de maio, uma explosão enorme no Sol lançou partículas rápidas, que chegaram a Marte em dezenas de minutos. O Curiosity mediu o maior salto de radiação desde o pouso."
 JOGAR_DE_NOVO,Play again,Jogar de novo
 ABA_CAMERAS,Cameras,Câmeras
 ABA_TAREFAS,Tasks,Tarefas
@@ -115,15 +115,21 @@ FONTE_DONKI_HIST_FONTE,"NASA DONKI (CCMC), WSA-ENLIL. Historical data.","NASA DO
 FONTE_O2_FATO,Each person breathes about 0.9 kg of oxygen per day.,"Cada pessoa respira cerca de 0,9 kg de oxigênio por dia."
 FONTE_O2_FONTE,"NASA, BVAD Rev2 (2022).","NASA, BVAD Rev2 (2022)."
 FONTE_MOXIE_FATO,"A giant version of MOXIE, which does not exist yet, would use 8 to 12 kWh per kg of O2.","Uma versão gigante do MOXIE, que ainda não existe, gastaria de 8 a 12 kWh por kg de O2."
-FONTE_MOXIE_FONTE,"Team estimate from MOXIE data (NASA/JPL, 2023).","Conta do time com dados do MOXIE (NASA/JPL, 2023)."
+FONTE_MOXIE_FONTE,"Team estimate from MOXIE data (NASA, 2022).","Conta do time com dados do MOXIE (NASA, 2022)."
 FONTE_LIMITE_FATO,NASA designs the protection so that the reference solar event (October 1989) gives less than 250 mSv.,A NASA projeta a proteção para que o evento solar de referência (outubro de 1989) dê menos de 250 mSv.
 FONTE_LIMITE_FONTE,"NASA-STD-3001, vol. 1 Rev C (V1 4031).","NASA-STD-3001, vol. 1 Rev C (V1 4031)."
-FONTE_RAD_FATO,"On 20/05/2024, Curiosity's dose for the day was about 17 times that of the days before, with a peak about 80 times.","Em 20/05/2024, a dose do dia no Curiosity foi cerca de 17 vezes a dos dias anteriores, com pico de cerca de 80 vezes."
+FONTE_RAD_FATO,"On 20 May 2024, Curiosity's radiation reading jumped from about 4 to about 300 at the peak.","Em 20/05/2024, a leitura de radiação do Curiosity saltou de cerca de 4 para cerca de 300 no pico."
 FONTE_RAD_FONTE,"Curiosity RAD, NASA RadLab.","Curiosity RAD, NASA RadLab."
 FONTE_ESCALA_FATO,"In the game, each sol stands for many days of real radiation.","No jogo, cada sol vale muitos dias de radiação de verdade."
 FONTE_ESCALA_FONTE,"Team estimate from Curiosity RAD data (SwRI, 2013; NASA, 2024) and NASA-STD-3001.","Conta do time com dados do RAD do Curiosity (SwRI, 2013; NASA, 2024) e o NASA-STD-3001."
-FONTE_PAINEL_FATO,"In 2018, Opportunity's panel fell from 645 to 22 Wh. The real dust storm lasted from 30/05/2018 until August or September; the game's 2-sol storm is shortened.","Em 2018, o painel do Opportunity caiu de 645 para 22 Wh. A tempestade de poeira real durou de 30/05/2018 até agosto ou setembro; a de 2 sóis do jogo é encurtada."
+FONTE_PAINEL_FATO,"In 2018, Opportunity's panel fell from 645 to 22 Wh per sol. The real dust storm lasted from 30 May 2018 until August or September; the game's 2-sol storm is shortened.","Em 2018, o painel do Opportunity caiu de 645 para 22 Wh por sol. A tempestade de poeira real durou de 30/05/2018 até agosto ou setembro; a de 2 sóis do jogo é encurtada."
 FONTE_PAINEL_FONTE,"The Planetary Society, citing JPL; dates: NASA/JPL and Guzewich et al. (2019).","Planetary Society, citando o JPL; datas: NASA/JPL e Guzewich et al. (2019)."
 FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem da Terra a Marte leva de 3 a 22 min.
 FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
+CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the generator made no oxygen. Next time, save power in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, guarde energia na bateria."
+CAUSA_GERADOR,The generator was broken and nobody fixed it. Open the Terminal and press the fix button.,O gerador estava quebrado e ninguém consertou. Abra o Terminal e aperte Consertar.
+FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
+FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
+RELATORIO_CIENCIA_ENVIADA,Science sent home: %d of %d,Ciência enviada: %d de %d
+RELATORIO_26_MESES,"In the simulator, the ship arrives in 5 sols. In real life, the way to Mars opens about every 26 months.","No simulador, a nave chega em 5 sóis. De verdade, o caminho para Marte abre a cada 26 meses, mais ou menos."

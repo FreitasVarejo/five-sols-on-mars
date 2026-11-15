@@ -1323,11 +1323,14 @@ func _desenhar_relatorio() -> void:
 			Desenho.icone(self, "poeira", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
 
 	# O que aconteceu de verdade.
-	# O texto tem 3 linhas de 13 px em português e em inglês: o quadro tem 86 px de altura.
-	y = 162.0
+	# O quadro vai até 274, logo acima do botão: o texto vai em 13 px se couber; senão, em 12 px (o
+	# português de 15/11 tem 4 linhas).
+	y = 158.0
 	_t(tr("DE_VERDADE"), x, y, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	var rv := Rect2(x, y + 22, 612, 86)
+	var rv := Rect2(x, y + 20, 612, 96)
 	_caixa(rv)
 	_t(tr("DE_VERDADE_DATA"), rv.position.x + 10, rv.position.y + 7, 11, Desenho.TEXTO_SUAVE, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	_t(tr("DE_VERDADE_TEXTO"), rv.position.x + 10, rv.position.y + 24, 13, Desenho.TEXTO, rv.size.x - 20)
+	var de_verdade := tr("DE_VERDADE_TEXTO")
+	var tam_dv := 13 if Desenho.altura_texto(de_verdade, 13, rv.size.x - 20) <= rv.size.y - 26 else 12
+	_t(de_verdade, rv.position.x + 10, rv.position.y + 24, tam_dv, Desenho.TEXTO, rv.size.x - 20)
 	_botao("jogar_de_novo", Rect2(220, 276, 200, 40), tr("JOGAR_DE_NOVO"), "", true, 14)
