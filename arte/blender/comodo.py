@@ -19,10 +19,11 @@ scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como
 persiana.
 
 Os PNGs da sala com a alavanca (15/11) não são o render cru: são o render só na região de repintura
-da alavanca (x 154..271, y 131..257, que cobre o botão antigo e a sombra dos dois) colado sobre os
-PNGs anteriores, com o pilar do suporte de vida na cor de antes. Com a geometria nova o render inteiro
-muda o tom desse pilar na tempestade (a emissão do botão grande sumiu) e uns pixels esparsos
-mudam longe dela; fora da região os PNGs ficam idênticos aos do commit anterior.
+da alavanca (x 154..271, y 131..257), colado sobre os PNGs anteriores por scripts/compor_sala.py,
+que leva a região, a tabela de cor do pilar e a prova de que fora dela os PNGs ficam idênticos. O
+render inteiro muda o tom do pilar na tempestade e uns pixels longe do objeto. Depois do render:
+`scripts/compor_sala.py --render <pasta do --saida> --regiao 154 131 272 258`, depois
+scripts/gerar_persiana.py. O `--saida` tem de ficar dentro do repo (o Blender é um Flatpak).
 
 Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
 em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
@@ -330,7 +331,7 @@ ESTUFA_C = (2.315, 0.66)
 ALAVANCA = {"cima": [], "baixo": []}
 ESTADOS_ABRIGADOS = ("abrigo", "abrigo_aberto")
 ALAVANCA_Z = 1.12                    # altura do pino, centro da placa
-ALAVANCA_CURSO = 0.16                # do pino ao centro do punho, para cima ou para baixo
+ALAVANCA_CURSO = 0.17                # do pino ao centro do punho (a barra em T), para cima ou para baixo
 
 
 def botao(nome, cor):
@@ -743,8 +744,9 @@ def construir():
     caixa("porta_lampada", (-W + 0.06, py, 2.2), (0.08, 0.3, 0.1), lampada_porta, next(i))
 
     # suporte de vida: coluna voltada para o olho, com a tela de radiação em cima
-    # e a alavanca do abrigo embaixo: placa de aro amarelo, fenda escura, pino e, no braço de aço,
-    # o punho vermelho (a cor do alerta que pede o abrigo). Em cima, o abrigo está desligado;
+    # e a alavanca do abrigo embaixo: placa de aro amarelo, fenda escura, pino cinza e, no braço de aço,
+    # o punho em T, uma barra vermelha (a cor do alerta que pede o abrigo) atravessada na ponta do braço
+    # e mais larga que a fenda, como o punho de incêndio de um avião. Em cima, o abrigo está desligado;
     # embaixo, ativo. O braço sai do pino para a posição do estado: ver ALAVANCA e aplicar_estado.
     s = Painel(-2.14, 1.235)
     s.caixa("suporte_base", 0, 0, 0.06, 0.95, 0.42, 0.12, moldura, next(i))
@@ -754,15 +756,17 @@ def construir():
     botao("botao_abrigo", "cf573c")
     aco = mat("alavanca_aco", "a8b5b2")
     pino = mat("alavanca_pino", "577277")
-    s.caixa("abrigo_aro", 0, 0.175, ALAVANCA_Z, 0.40, 0.05, 0.54, amarelo, next(i))
-    s.caixa("abrigo_fenda", 0, 0.20, ALAVANCA_Z, 0.26, 0.03, 0.48, moldura, next(i))
-    s.cil("abrigo_pino", 0, 0.23, ALAVANCA_Z, 0.05, 0.03, pino, next(i))
+    s.caixa("abrigo_aro", 0, 0.175, ALAVANCA_Z, 0.34, 0.05, 0.54, amarelo, next(i))
+    s.caixa("abrigo_fenda", 0, 0.20, ALAVANCA_Z, 0.14, 0.03, 0.48, moldura, next(i))
+    s.cil("abrigo_pino", 0, 0.23, ALAVANCA_Z, 0.03, 0.03, pino, next(i))
     for pos, sinal in (("cima", 1), ("baixo", -1)):
         zc = ALAVANCA_Z + sinal * ALAVANCA_CURSO
         ALAVANCA[pos] += [
             s.caixa(f"abrigo_braco_{pos}", 0, 0.225, ALAVANCA_Z + sinal * ALAVANCA_CURSO / 2,
-                    0.05, 0.03, ALAVANCA_CURSO, aco, next(i)),
-            s.cil(f"abrigo_punho_{pos}", 0, 0.28, zc, 0.078, 0.09, MATS["botao_abrigo"], next(i)),
+                    0.035, 0.03, ALAVANCA_CURSO, aco, next(i)),
+            # o T: 0,20 x 0,048 m, uns 33 x 8 px no panorama, 3 cm mais largo que a fenda de cada lado
+            s.caixa(f"abrigo_punho_{pos}", 0, 0.25, zc, 0.20, 0.035, 0.048, MATS["botao_abrigo"],
+                    next(i)),
         ]
 
     # parede da frente, à esquerda: a tela de comunicação com a Terra, num pilar voltado para o
