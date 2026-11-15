@@ -24,9 +24,12 @@ que leva a região, a tabela de cor do pilar e a prova de que fora dela os PNGs 
 render inteiro muda o tom do pilar na tempestade e uns pixels longe do objeto. Depois do render:
 `scripts/compor_sala.py --render <pasta do --saida> --regiao 154 131 272 258`, depois
 scripts/gerar_persiana.py. O `--saida` tem de ficar dentro do repo (o Blender é um Flatpak).
-O pato de borracha (15/11, `_pato`) entra do mesmo jeito, com a região de repintura x 621..661,
-y 191..273 (o pato, a sombra dele na moldura da janela e a que cai no vão entre as telas):
-`scripts/compor_sala.py --render <pasta> --regiao 621 191 662 274 --objeto pato_ --base <ref>`.
+O pato de borracha (15/11, `_pato`) entra do mesmo jeito, com a região de repintura x 848..891,
+y 192..221 (o pato, na quina direita do console, no tampo da rampa de oxigênio):
+`scripts/compor_sala.py --render <pasta> --regiao 848 192 892 222 --objeto pato_ --base <ref>
+--pilar parede_frente,janela_moldura_montante`, depois scripts/gerar_persiana.py e
+`scripts/compor_sala.py --persiana` com os mesmos argumentos (o fluxo completo está no docstring do
+compor_sala.py). Os pilares são as faces cujo tom o render inteiro muda perto dele.
 O pato não muda de um estado para outro: só a luz muda (nenhuma emissão). Ele é um botão do
 regioes.json (`botoes.pato`: o retângulo de todas as partes), clicável para o squeak.
 
@@ -618,11 +621,11 @@ def _console(i):
     caixa("caneca_alca", (cx + 0.05, cy, BANCADA_Z + 0.055), (0.02, 0.012, 0.05), caneca, next(i))
 
 
-# O pato de borracha da tripulação: um brinquedo amarelo no topo da rampa do console, entre as telas
-# de energia e de oxigênio (easter egg: o clique faz squeak). Objeto de cena, não UI: não acende e é
-# o mesmo em todos os estados. Original, sem nada do FNAF.
-PATO_BASE = (0.0, 1.97, 1.0)         # onde o pato pousa: a crista da rampa, no meio da sala
-PATO_GIRO = -35.0                    # graus em torno de z; negativo vira o bico para a direita e para o olho
+# O pato de borracha da tripulação: um brinquedo amarelo na quina direita de cima do console, no tampo
+# da rampa da tela de oxigênio, ao lado da grade de ventilação (easter egg: o clique faz squeak).
+# Objeto de cena, não UI: não acende e é o mesmo em todos os estados. Original, sem nada do FNAF.
+PATO_BASE = (1.22, 1.869, 0.975)     # onde o pato pousa: o tampo da rampa de oxigênio, perto da quina
+PATO_GIRO = 183.0                    # graus em torno de z; o bico aponta para a janela (esquerda) e um pouco para o olho
 PATO_ESCALA = 0.85
 PATO_OBJS = ("pato_corpo", "pato_cola", "pato_cabeca", "pato_bico", "pato_asa", "pato_olho0",
              "pato_olho1")
@@ -1463,11 +1466,11 @@ def validar_regioes(reg):
     checa(g["x"] + g["w"] <= e["x"] or e["x"] + e["w"] <= g["x"],
           f"glovebox x {g['x']}..{g['x'] + g['w']} e estufa x {e['x']}..{e['x'] + e['w']} "
           f"não se sobrepõem")
-    r = reg["pato"]
-    checa(320 <= r["x"] and r["x"] + r["w"] <= 960,
-          f"pato: x {r['x']}..{r['x'] + r['w']} no centro, dentro de 320..960")
-    checa(r["x"] <= 640 <= r["x"] + r["w"],
-          f"pato: x {r['x']}..{r['x'] + r['w']} cobre o meio do panorama (x 640, a vista de repouso)")
+    r, o, g = reg["pato"], reg["oxigenio"], reg["glovebox"]
+    checa(o["x"] + o["w"] - 40 <= r["x"] and r["x"] + r["w"] <= g["x"],
+          f"pato: x {r['x']}..{r['x'] + r['w']} na quina direita do console (de {o['x'] + o['w'] - 40} até a glovebox, x {g['x']})")
+    checa(r["y"] + r["h"] <= o["y"] or r["x"] >= o["x"] + o["w"] or r["x"] + r["w"] <= o["x"],
+          f"pato: y {r['y']}..{r['y'] + r['h']} não se sobrepõe à tela de oxigênio (x {o['x']}..{o['x'] + o['w']}, y {o['y']})")
     r = reg["comunicacao"]
     checa(r["x"] + r["w"] <= 420, f"comunicacao: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
     checa(r["w"] >= 70 and r["h"] >= 50,

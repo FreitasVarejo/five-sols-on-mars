@@ -111,5 +111,5 @@ func _imagens() -> void:
 	_igual(incoerentes, 0, "camada, índice e vidro coerentes")
 	_igual(no_montante, 0, "nenhum pixel da camada sobre o montante")
 	_igual(fora_de_ordem, 0, "lâmina nunca diminui ao descer")
-	_igual(vidro, 58193, "pixels de vidro (o pato de borracha cobre 125 dos 58318 de antes)")
+	_igual(vidro, 58318, "pixels de vidro")
 	_igual(laminas.size(), N_LAMINAS_ESPERADAS, "lâminas no índice")
