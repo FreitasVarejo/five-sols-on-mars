@@ -389,6 +389,9 @@ func _gui_input(event: InputEvent) -> void:
 # --- layout --------------------------------------------------------------------
 
 func _calcular_layout() -> void:
+	if size.y > size.x:
+		_calcular_layout_retrato()
+		return
 	var w := size.x
 	var h := size.y
 	var m := roundf(clampf(minf(w, h) * 0.04, 4.0, 12.0))
@@ -413,6 +416,37 @@ func _calcular_layout() -> void:
 	# O fio da lâmpada ao banco de LEDs: na altura do banco, da borda do botão à borda da câmara.
 	var esp := maxf(2.0, roundf(_u * 2.0))
 	_fio = Rect2(_r_luz.end.x, roundf(_cam.position.y + 10.0 * _u - esp / 2.0), _cam.position.x - _r_luz.end.x, esp)
+
+
+## O layout em retrato (a vista de perto da estufa, num vão mais alto que largo): a câmara em cima, na largura
+## útil, e os quatro botões numa fileira embaixo (luz, e as três ferramentas um pouco mais afastadas dela). O fio da
+## lâmpada não existe aqui: o botão da luz fica embaixo, longe do banco de LEDs, que fica no alto da câmara.
+func _calcular_layout_retrato() -> void:
+	var w := size.x
+	var h := size.y
+	var m := roundf(clampf(minf(w, h) * 0.025, 3.0, 8.0))
+	_painel = Rect2(m, m, w - 2.0 * m, h - 2.0 * m)
+	var pad := 6.0
+	var vao := 8.0  # entre a câmara e a fileira de botões
+	var gap := 6.0  # entre os botões
+	var gap_luz := 14.0  # entre a luz e as ferramentas
+	var util := _painel.size.x - 2.0 * pad
+	var b := clampf(floorf((util - 2.0 * gap - gap_luz) / 4.0), LADO_MIN, LADO_MAX)
+	var total := 4.0 * b + 2.0 * gap + gap_luz
+	var x := _painel.position.x + roundf((_painel.size.x - total) / 2.0)
+	var y := _painel.end.y - pad - b
+	_r_luz = Rect2(x, y, b, b)
+	x += b + gap_luz
+	for nome: String in FERRAMENTAS:
+		_r_ferr[nome] = Rect2(x, y, b, b)
+		x += b + gap
+	var topo := _painel.position.y + pad
+	_cam = Rect2(_painel.position.x + pad, topo, util, maxf(y - vao - topo, 1.0))
+	_u = clampf(minf(_cam.size.x / PROJETO_W, _cam.size.y / PROJETO_H), 0.5, 3.0)
+	_larg = _cam.size.x / _u
+	_alt = _cam.size.y / _u
+	_xc = Transform2D(Vector2(_u, 0.0), Vector2(0.0, _u), _cam.position)
+	_fio = Rect2()
 
 
 # --- desenho: ajudantes ----------------------------------------------------------

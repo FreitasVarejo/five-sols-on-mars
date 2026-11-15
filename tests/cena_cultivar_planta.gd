@@ -2,7 +2,7 @@ extends Control
 ## Cena de teste do minigame "Cultivar a planta": hospeda a peça sozinha.
 ## Sem argumento, é jogável à mão (área cheia, problema da semente 0; qualquer tecla sorteia outro).
 ## Com `--capturar=<pasta>` depois de `--`, percorre os estados, salva os PNGs e sai: a câmara sob a luz rosa, cada
-## problema sob a luz verde, um "pior" de cada, o crescimento, o fim e as áreas 368×207 e 320×180:
+## problema sob a luz verde, um "pior" de cada, o crescimento, o fim as áreas 368×207 e 320×180 e a de retrato 242×306:
 ##   godot --path . res://tests/cena_cultivar_planta.tscn -- --capturar=<pasta>
 
 const Planta := preload("res://scripts/minigames/cultivar_planta.gd")
@@ -118,4 +118,14 @@ func _capturar(pasta: String) -> void:
 	_g.acender_luz()
 	_passo(0.6)
 	await _salvar(pasta, "planta_320x180_seca.png")
+	# O retângulo da peça na vista de perto da estufa (242×306, em retrato; regioes.json, chave perto).
+	var area_retrato := Rect2(199, 42, 242, 306)
+	_abrir("mofo", area_retrato)
+	await _salvar(pasta, "planta_retrato_rosa.png")
+	_g.acender_luz()
+	_passo(0.6)
+	await _salvar(pasta, "planta_retrato_mofo.png")
+	_g.usar("tesoura")
+	_passo(0.22)
+	await _salvar(pasta, "planta_retrato_tesoura.png")
 	get_tree().quit()
