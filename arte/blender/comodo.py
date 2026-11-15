@@ -6,14 +6,23 @@ Uso (da raiz do repo):
 (o `blender` do PATH é o Flatpak: passe o script por caminho absoluto.)
 
 Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
-Mesma câmera em todos os estados. A geometria também é a mesma, com uma única exceção
-permitida: a persiana da janela, que só o estado `abrigo` fecha. O estado muda luz e emissão.
+Mesma câmera em todos os estados. A geometria também é a mesma, com duas exceções permitidas:
+a persiana da janela, que só o estado `abrigo` fecha, e a alavanca do abrigo, que fica embaixo
+em `abrigo` e `abrigo_aberto` e em cima nos outros estados (a placa, a fenda e o pino são os
+mesmos; muda só o braço, com o punho). O estado muda luz e emissão.
 A persiana fica dentro do vão da janela, entre a moldura de aço e o vidro, com a largura exata
 do vão: a moldura e o montante central a tapam e continuam visíveis por cima dela. Há o estado
 extra `abrigo_aberto`: a mesma luz e emissão do `abrigo`, sem a persiana e com o vidro em alpha 0.
-Ele não entra no padrão de `--estados` (renderize com `--estados abrigo,abrigo_aberto`);
+A alavanca está embaixo nos dois. Ele não entra no padrão de `--estados` (renderize com
+`--estados abrigo,abrigo_aberto`);
 scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como a camada da
 persiana.
+
+Os PNGs da sala com a alavanca (15/11) não são o render cru: são o render só na região de repintura
+da alavanca (x 154..271, y 131..257, que cobre o botão antigo e a sombra dos dois) colado sobre os
+PNGs anteriores, com o pilar do suporte de vida na cor de antes. Com a geometria nova o render inteiro
+muda o tom desse pilar na tempestade (a emissão do botão grande sumiu) e uns pixels esparsos
+mudam longe dela; fora da região os PNGs ficam idênticos aos do commit anterior.
 
 Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
 em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
@@ -29,9 +38,9 @@ sala, e o traço dele e as faces internas da moldura saem em neutro escuro (COR_
 Godot escurece a vista no pôr do Sol e à noite.
 
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
-calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa, glovebox e
-porta (a porta do dormitório, na ponta esquerda: tocá-la encerra o sol). Telas: energia, oxigenio,
-radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o Godot). Desenho: porta_lampada,
+calculados pela projeção real da câmera sobre os vértices). Botões: abrigo (a alavanca: o retângulo
+da união das duas posições), estufa, glovebox e porta (a porta do dormitório, na ponta esquerda:
+tocá-la encerra o sol). Telas: energia, oxigenio, radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o Godot). Desenho: porta_lampada,
 a lâmpada verde da porta, para o Godot acendê-la ou apagá-la por cima do render (o indicador de
 "pode dormir"). Região de desenho é o retângulo do que o passe de índice mostra de fato (justo, sem
 a folga da projeção), porque o Godot a pinta por cima do render. O terminal não é render: é camada de tela no Godot.
@@ -316,6 +325,12 @@ COR_AROS_JANELA = "151d28"           # traço do vidro e faces internas da moldu
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
 GLOVEBOX_C = (2.087, 1.466)          # (x, y) do painel da glovebox e o da estufa, no chão
 ESTUFA_C = (2.315, 0.66)
+# Braço e punho da alavanca do abrigo, nas duas posições: só um par é renderizado por estado.
+# Embaixo (abrigo ativo) em `abrigo` e `abrigo_aberto`; em cima nos outros estados.
+ALAVANCA = {"cima": [], "baixo": []}
+ESTADOS_ABRIGADOS = ("abrigo", "abrigo_aberto")
+ALAVANCA_Z = 1.12                    # altura do pino, centro da placa
+ALAVANCA_CURSO = 0.16                # do pino ao centro do punho, para cima ou para baixo
 
 
 def botao(nome, cor):
@@ -728,16 +743,27 @@ def construir():
     caixa("porta_lampada", (-W + 0.06, py, 2.2), (0.08, 0.3, 0.1), lampada_porta, next(i))
 
     # suporte de vida: coluna voltada para o olho, com a tela de radiação em cima
-    # e a alavanca (botão cogumelo) do abrigo embaixo
+    # e a alavanca do abrigo embaixo: placa de aro amarelo, fenda escura, pino e, no braço de aço,
+    # o punho vermelho (a cor do alerta que pede o abrigo). Em cima, o abrigo está desligado;
+    # embaixo, ativo. O braço sai do pino para a posição do estado: ver ALAVANCA e aplicar_estado.
     s = Painel(-2.14, 1.235)
     s.caixa("suporte_base", 0, 0, 0.06, 0.95, 0.42, 0.12, moldura, next(i))
     s.caixa("suporte_corpo", 0, 0, 1.05, 0.85, 0.30, 1.86, console, next(i))
     s.caixa("radiacao_moldura", 0, 0.17, 1.72, 0.80, 0.04, 0.50, moldura, next(i))
     s.caixa("radiacao_tela", 0, 0.195, 1.72, 0.72, 0.01, 0.42, ecra, next(i))
     botao("botao_abrigo", "cf573c")
-    s.cil("abrigo_aro", 0, 0.175, 1.10, 0.25, 0.05, amarelo, next(i))
-    s.cil("abrigo_anel", 0, 0.2, 1.10, 0.215, 0.05, moldura, next(i))
-    s.cil("abrigo_botao", 0, 0.25, 1.10, 0.17, 0.12, MATS["botao_abrigo"], next(i))
+    aco = mat("alavanca_aco", "a8b5b2")
+    pino = mat("alavanca_pino", "577277")
+    s.caixa("abrigo_aro", 0, 0.175, ALAVANCA_Z, 0.40, 0.05, 0.54, amarelo, next(i))
+    s.caixa("abrigo_fenda", 0, 0.20, ALAVANCA_Z, 0.26, 0.03, 0.48, moldura, next(i))
+    s.cil("abrigo_pino", 0, 0.23, ALAVANCA_Z, 0.05, 0.03, pino, next(i))
+    for pos, sinal in (("cima", 1), ("baixo", -1)):
+        zc = ALAVANCA_Z + sinal * ALAVANCA_CURSO
+        ALAVANCA[pos] += [
+            s.caixa(f"abrigo_braco_{pos}", 0, 0.225, ALAVANCA_Z + sinal * ALAVANCA_CURSO / 2,
+                    0.05, 0.03, ALAVANCA_CURSO, aco, next(i)),
+            s.cil(f"abrigo_punho_{pos}", 0, 0.28, zc, 0.078, 0.09, MATS["botao_abrigo"], next(i)),
+        ]
 
     # parede da frente, à esquerda: a tela de comunicação com a Terra, num pilar voltado para o
     # olho (como o suporte de vida) e encostado na parede da frente. O miolo fica apagado, na cor
@@ -818,7 +844,8 @@ def construir():
 # ---------------------------------------------------------------- estados
 
 def aplicar_estado(estado, luzes):
-    """Só luz e emissão (e a persiana da janela, no abrigo). Nada de material base ou câmera."""
+    """Só luz e emissão, a persiana da janela (no abrigo) e a posição da alavanca do abrigo.
+    Nada de material base ou câmera."""
     branco = hexrgb("ebede9")
     ambar = hexrgb("de9e41")
     vermelho = hexrgb("cf573c")
@@ -863,8 +890,11 @@ def aplicar_estado(estado, luzes):
         elif n in COR_BOTAO:
             emissao(m, COR_BOTAO[n], E["botoes"])
     emissao(MATS["janela"], None, E["janela"])
-    for ob in PERSIANA:                  # única diferença de geometria entre estados
+    for ob in PERSIANA:                  # diferença de geometria entre estados (1 de 2)
         ob.hide_render = estado != "abrigo"  # (abrigo_aberto também a esconde)
+    for pos, obs in ALAVANCA.items():    # diferença de geometria entre estados (2 de 2)
+        for ob in obs:
+            ob.hide_render = (pos == "baixo") == (estado not in ESTADOS_ABRIGADOS)
     bpy.context.scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = E["mundo"]
 
 
@@ -1203,7 +1233,9 @@ REGIOES = {
     "oxigenio": ["oxigenio_tela"],
     "radiacao": ["radiacao_tela"],
     "comunicacao": ["comunicacao_tela"],
-    "abrigo": ["abrigo_aro", "abrigo_anel", "abrigo_botao"],
+    # a alavanca: a placa e as duas posições do braço com o punho (o retângulo é a união)
+    "abrigo": ["abrigo_aro", "abrigo_fenda", "abrigo_pino", "abrigo_braco_cima", "abrigo_punho_cima",
+               "abrigo_braco_baixo", "abrigo_punho_baixo"],
     "porta": ["porta_folha", "porta_moldura_topo", "porta_moldura_tras", "porta_moldura_frente"],
     "porta_lampada": ["porta_lampada"],
     "estufa": ["estufa_moldura", "estufa_vidro"],
@@ -1603,23 +1635,32 @@ def main():
 
     (CACHE / "indices.json").write_text(json.dumps(INDICE, indent=1))
 
-    # a geometria não pode mudar entre estados, salvo a persiana dentro do retângulo da janela:
-    # profundidade, normal, índice e contorno idênticos fora dele (com 3 px de folga para o traço)
+    # a geometria não pode mudar entre estados, salvo a persiana dentro do retângulo da janela e a
+    # alavanca dentro do retângulo do abrigo: profundidade, normal, índice e contorno idênticos fora
+    # deles (com 3 px de folga para o traço)
+    def caixa_com_folga(r):
+        m = np.zeros((a.altura, a.largura), bool)
+        m[max(r["y"] - 3, 0):r["y"] + r["h"] + 3, max(r["x"] - 3, 0):r["x"] + r["w"] + 3] = True
+        return m
+
     j = reg["janela"]
-    dentro = np.zeros((a.altura, a.largura), bool)
-    dentro[max(j["y"] - 3, 0):j["y"] + j["h"] + 3, max(j["x"] - 3, 0):j["x"] + j["w"] + 3] = True
+    dentro = caixa_com_folga(j)
+    dentro_alavanca = caixa_com_folga(reg["abrigo"])
     base = estados[0]
     for e in estados[1:]:
         dz = np.abs(passes[e]["z"] - passes[base]["z"])
         dn = np.abs(passes[e]["normal"] - passes[base]["normal"]).max(-1)
         di = passes[e]["indice"] != passes[base]["indice"]
         db = contorno(passes[e]) != contorno(passes[base])
-        fora = ~dentro
-        print(f"[comodo] {base} x {e}: FORA da janela max|Δz|={dz[fora].max():.2e} "
+        fora = ~dentro & ~dentro_alavanca
+        print(f"[comodo] {base} x {e}: FORA da janela e da alavanca max|Δz|={dz[fora].max():.2e} "
               f"max|Δnormal|={dn[fora].max():.2e} px índice diferente={int(di[fora].sum())} "
               f"px contorno diferente={int(db[fora].sum())}")
-        print(f"[comodo] {base} x {e}: DENTRO da janela (única diferença permitida, a persiana) "
+        print(f"[comodo] {base} x {e}: DENTRO da janela (a persiana) "
               f"px índice diferente={int(di[dentro].sum())} px contorno diferente={int(db[dentro].sum())}")
+        print(f"[comodo] {base} x {e}: DENTRO do retângulo da alavanca "
+              f"px índice diferente={int(di[dentro_alavanca].sum())} "
+              f"px contorno diferente={int(db[dentro_alavanca].sum())}")
 
     # vidro da janela: alpha 0 onde a persiana está aberta, tudo opaco no abrigo
     vidro_ok = True
