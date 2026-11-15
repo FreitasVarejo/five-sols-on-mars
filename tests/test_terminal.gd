@@ -51,9 +51,11 @@ func _tudo() -> void:
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
+	await _card_do_aviso_no_modo_livre()
 	await _aba_fontes_cabe()
 	await _aba_fontes_rola()
 	await _relatorio_cabe()
+	await _relatorio_livre_sem_melhor()
 	_historia_do_sol_no_diario()
 	_diario_cabe_no_pior_caso()
 	print("%d verificações, %d falhas" % [total, falhas])
@@ -1326,15 +1328,57 @@ func _card_do_aviso_cabe() -> void:
 				# Tudo derivado do dado do build, que o publicar.sh recoleta.
 				_verdade(f_atual.contains(str(real["chegadas_marte"].size())), "%s: a frase traz quantas chegadas há na janela" % rotulo)
 				_verdade(f_atual.contains(DadosDonki.data_texto(str(real["coletado_em"]), loc)), "%s: a data da coleta, no formato do idioma" % rotulo)
-				_verdade(f_atual.contains(" km/s"), "%s: a frase traz a velocidade" % rotulo)
+				_verdade(not f_atual.contains("km/s"), "%s: a frase não traz a velocidade" % rotulo)
+				var ultima := DadosDonki.mais_recente(real)
+				_verdade(f_atual.contains(DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc)),
+					"%s: a última é a mais recente de todas as chegadas, com ou sem velocidade" % rotulo)
 			root.remove_child(t)
 			t.free()
 	TranslationServer.set_locale(idioma)
 
 
-## A aba fontes (o par do histórico, os números do jogo e os créditos por último) cabe na caixa da direita, sem
-## sobreposição e sem rolagem, nos dois idiomas, com e sem o dado do build. O dado do build não aparece nela (é o
-## card do aviso que o mostra).
+## No Modo livre o card do aviso não abre com a frase histórica ("19 May 2024"): ela é da missão fixa. O aviso e a
+## frase do dado de hoje seguem, e nada pisa no Fechar.
+func _card_do_aviso_no_modo_livre() -> void:
+	var idioma := TranslationServer.get_locale()
+	var real := DadosDonki.carregar()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for historico in [true, false]:
+			var dado := real.duplicate()
+			dado["historico"] = historico
+			var rotulo := "livre, %s, %s" % [loc, "histórico" if historico else "atual"]
+			var m := Missao.new(1, {"livre": true, "sol_solar": 2})
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, dado)
+			root.add_child(t)
+			await _esperar_card(t)
+			_igual(t.card_id, "aviso", "%s: o aviso abre" % rotulo)
+			var desenhados: Array = []
+			var tem_aviso := false
+			var tem_atual := false
+			for linha in t.textos():
+				desenhados.append(linha[0])
+				tem_aviso = tem_aviso or linha[0] == t.tr("AVISO_TEMPESTADE")
+				tem_atual = tem_atual or (linha[0] == t._frase_donki_atual() and linha[0] != "")
+			_verdade(tem_aviso, "%s: o texto do aviso está no card" % rotulo)
+			_igual(tem_atual, not historico, "%s: a frase do dado de hoje só com o dado do build" % rotulo)
+			_igual(desenhados.has(t.tr("DONKI_FRASE_HISTORICO")), false, "%s: sem a frase histórica de 19 de maio de 2024" % rotulo)
+			for desen: String in desenhados:
+				_verdade(not desen.begins_with("19 May 2024") and not desen.begins_with("19 de maio de 2024"),
+					"%s: nenhuma linha abre com a data de 19 de maio (%s)" % [rotulo, desen.substr(0, 24)])
+			var fechar_a: Array = t.ui().get("fechar_card", [])
+			_verdade(not fechar_a.is_empty(), "%s: o Fechar está na tela" % rotulo)
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## A aba fontes (o par do histórico, os números do jogo, com o abrigo, e os créditos por último), nos dois
+## idiomas, com e sem o dado do build. Com o abrigo a lista passa da caixa por poucos px, então a rolagem liga
+## (2.5 da 3ª rodada); no fim dela tudo cabe no recorte, sem sobreposição, e os créditos são a última linha.
+## O dado do build não aparece nela (é o card do aviso que o mostra).
 func _aba_fontes_cabe() -> void:
 	var idioma := TranslationServer.get_locale()
 	var real := DadosDonki.carregar()
@@ -1354,53 +1398,61 @@ func _aba_fontes_cabe() -> void:
 			await process_frame
 			await process_frame
 			_igual(t.aba_na_tela(), "fontes", "%s: a aba abre" % rotulo)
-			var caixa := Rect2(Terminal.X0 + 186.0, Terminal.Y_CORPO, Terminal.X1 - Terminal.X0 - 186.0, Terminal.Y_FIM - Terminal.Y_CORPO)
+			var pares: Array = t._pares_fontes()
+			_verdade(pares.has([t.tr("FONTE_ABRIGO_FATO"), t.tr("FONTE_ABRIGO_FONTE")]), "%s: o abrigo está na lista" % rotulo)
+			_verdade(t.tr("FONTE_ABRIGO_FATO").contains("4") and t.tr("FONTE_ABRIGO_FATO").contains("5"),
+				"%s: o abrigo traz os dois números (4 na fonte, 5 no jogo)" % rotulo)
+			var rolagem: Dictionary = t.rolagem_fontes()
+			_igual(rolagem["ligada"], true, "%s: com o abrigo a lista rola" % rotulo)
+			_verdade(rolagem["maximo"] > 0.0 and rolagem["maximo"] <= 24.0, "%s: passa por poucos px (%f)" % [rotulo, rolagem["maximo"]])
+			var c: Control = t._coluna
+			_verdade(c.visible, "%s: o filho da rolagem está à vista" % rotulo)
+			var recorte := Rect2(rolagem["recorte"][0], rolagem["recorte"][1], rolagem["recorte"][2], rolagem["recorte"][3])
+			for i in 100:
+				if c.rolagem >= rolagem["maximo"]:
+					break
+				_roda(c, true)
+			await process_frame
+			await process_frame
+			_igual(c.rolagem, rolagem["maximo"], "%s: a roda chega ao fim" % rotulo)
 			var rects: Array = []
 			var tem_hist := false
 			var tem_atual := false
-			var tam_fato := 0
-			var fim := 0.0
-			var fim_creditos := 0.0
+			var tem_abrigo := false
 			var y_mais_baixo := -1.0
 			var texto_mais_baixo := ""
-			var antes: Array = t.textos()
+			var fim_creditos := 0.0
+			var fim := 0.0
 			for linha in t.textos():
 				var r := _rect_do_texto(linha)
-				if r.position.x < caixa.position.x or r.position.y < Terminal.Y_CORPO or linha[0] == t.tr("TERMINAL"):
+				if r.position.x < recorte.position.x or r.position.y < Terminal.Y_CORPO or linha[0] == t.tr("TERMINAL"):
 					continue
+				if linha[0] == t.tr("FONTE_ABRIGO_FATO"):
+					tem_abrigo = true
 				if linha[0] == t.tr("FONTE_DONKI_HIST_FATO"):
 					tem_hist = true
-					tam_fato = linha[3]
 				if linha[0] == t._frase_donki_atual() and linha[0] != "":
 					tem_atual = true
-				if linha[2] > y_mais_baixo:
+				if r.end.y > recorte.position.y and r.position.y < recorte.end.y and linha[2] > y_mais_baixo:
 					y_mais_baixo = linha[2]
 					texto_mais_baixo = linha[0]
 				if linha[0] == t.tr("CREDITOS") or linha[0] == t.tr("CREDITOS_README"):
 					fim_creditos = maxf(fim_creditos, r.end.y)
-				rects.append_array(_rects_das_linhas(linha))
+				if r.end.y <= recorte.position.y:
+					continue  # rolou para fora, pelo alto
+				for rr: Rect2 in _rects_das_linhas(linha):
+					rects.append(rr)
 				fim = maxf(fim, r.end.y)
-				_verdade(caixa.encloses(r), "%s: cabe na caixa (%s em %s)" % [rotulo, linha[0].substr(0, 20), str(r)])
-			_verdade(tem_hist, "%s: o par do histórico de maio de 2024 está sempre" % rotulo)
+			_verdade(tem_abrigo, "%s: o fato do abrigo está desenhado" % rotulo)
+			_verdade(tem_hist or c.rolagem > 0.0, "%s: o par do histórico de maio de 2024 está na lista" % rotulo)
 			_verdade(not tem_atual, "%s: o par do dado de hoje não aparece na aba" % rotulo)
-			_verdade(not t._pares_fontes().any(func(par): return par[1] == "NASA DONKI (CCMC), WSA-ENLIL."),
+			_verdade(not pares.any(func(par): return par[1] == "NASA DONKI (CCMC), WSA-ENLIL."),
 				"%s: nenhum par traz a fonte do dado de hoje" % rotulo)
-			_igual(t._pares_fontes().back(), [t.tr("CREDITOS"), t.tr("CREDITOS_README")], "%s: os créditos são o último par" % rotulo)
+			_igual(pares.back(), [t.tr("CREDITOS"), t.tr("CREDITOS_README")], "%s: os créditos são o último par" % rotulo)
 			_verdade(texto_mais_baixo == t.tr("CREDITOS") or texto_mais_baixo == t.tr("CREDITOS_README"),
-				"%s: o texto mais baixo da coluna é o dos créditos (%s)" % [rotulo, texto_mais_baixo.substr(0, 20)])
-			_igual(fim_creditos, fim, "%s: os créditos acabam na base da coluna" % rotulo)
-			var rolagem: Dictionary = t.rolagem_fontes()
-			_igual(rolagem["ligada"], false, "%s: a lista cabe, a rolagem está desligada" % rotulo)
-			_igual(rolagem["recorte"], [], "%s: sem rolagem, sem recorte" % rotulo)
-			_igual(rolagem["mais_embaixo"], false, "%s: sem rolagem, sem indicador" % rotulo)
-			_igual(t._coluna.visible, false, "%s: o filho da rolagem fica escondido" % rotulo)
-			_roda(t._coluna, true)
-			_roda(t._coluna, true)
-			await process_frame
-			await process_frame
-			_igual(t.rolagem_fontes()["rolagem"], 0.0, "%s: a roda não rola o que cabe" % rotulo)
-			_igual(t.textos(), antes, "%s: a roda não muda o desenho" % rotulo)
-			_verdade(not t._pares_fontes().any(func(par): return par[0].contains("%s") or par[0].begins_with("FONTE_")),
+				"%s: no fim da rolagem o texto mais baixo é o dos créditos (%s)" % [rotulo, texto_mais_baixo.substr(0, 20)])
+			_verdade(fim_creditos <= recorte.end.y - 5.0, "%s: no fim os créditos cabem no recorte com folga (%f)" % [rotulo, recorte.end.y - fim_creditos])
+			_verdade(not pares.any(func(par): return par[0].contains("%s") or par[0].begins_with("FONTE_")),
 				"%s: os fatos não têm chave nem %%s soltos" % rotulo)
 			for i in rects.size():
 				for j in range(i + 1, rects.size()):
@@ -1662,7 +1714,7 @@ func _relatorio_cabe() -> void:
 			var esperados := [
 				t.tr("RELATORIO_NAVE"), t.tr("RELATORIO_TITULO"), t.tr("RELATORIO_SUB") % 5,
 				t.tr("N_DE_3_ESTRELAS") % estrelas, t.tr("ESTRELAS_NOTA"), faltou_texto,
-				t.tr("RELATORIO_CIENCIA_ENVIADA") % [ciencia, 7],
+				t.tr("RELATORIO_CIENCIA_ENVIADA") % ciencia, t.tr("RELATORIO_MELHOR_SEM_MODO") % 7,
 				t.tr("MARGEM_FINAL"), t.tr("N_DE_12") % 9, t.tr("MODOS_SEGURANCA"), str(modos),
 				t.tr("RELATORIO_26_MESES"), t.tr("FONTE_ESCALA_FATO"),
 				t.tr("DE_VERDADE"), t.tr("DE_VERDADE_DATA"), t.tr("DE_VERDADE_TEXTO"), t.tr("JOGAR_DE_NOVO"),
@@ -1714,6 +1766,30 @@ func _relatorio_cabe() -> void:
 						_verdade(_rect_do_texto(linha).end.x <= 14 + i * 123 + 119 - 40, "%s: o +N do sol %d fica antes dos ícones" % [rotulo, i + 1])
 			root.remove_child(t)
 			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## O relatório do Modo livre não traz a linha do melhor sem modo de segurança (o teto de 7 é da missão fixa), e a
+## "Ciência enviada" não tem "de M": o Modo livre chega a 10 ou mais, e "10 de 7" seria falso.
+func _relatorio_livre_sem_melhor() -> void:
+	var idioma := TranslationServer.get_locale()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		var m := _missao_do_relatorio(0, 10)
+		m.livre = true
+		var t: Control = Terminal.new()
+		t.gravar_textos = true
+		t.iniciar(m, {})
+		root.add_child(t)
+		await process_frame
+		await process_frame
+		var desenhados: Array = []
+		for linha in t.textos():
+			desenhados.append(linha[0])
+		_verdade(desenhados.has(t.tr("RELATORIO_CIENCIA_ENVIADA") % 10), "livre, %s: a ciência enviada, sem \"de M\"" % loc)
+		_verdade(not desenhados.has(t.tr("RELATORIO_MELHOR_SEM_MODO") % 7), "livre, %s: sem a linha do melhor sem modo" % loc)
+		root.remove_child(t)
+		t.free()
 	TranslationServer.set_locale(idioma)
 
 
@@ -1816,7 +1892,7 @@ func _diario_cabe_no_pior_caso() -> void:
 	TranslationServer.set_locale(idioma)
 
 
-## O texto da tela traz a frase da barra e a do contexto; o quadro do caso real cabe até o botão, no
+## A tela traz só a frase do contexto (ou a da barra, sem contexto); o quadro do caso real cabe até o botão, no
 ## pior caso de cada contexto, em português e em inglês.
 func _frase_com_o_contexto() -> void:
 	var casos := {}
@@ -1866,10 +1942,13 @@ func _frase_com_o_contexto() -> void:
 			var desenhados: Array = []
 			for linha in textos:
 				desenhados.append(linha[0])
-			var esperada: String = t.tr(k[1])
+			var esperada: String = t.tr(k[2] if k[2] != "" else k[1])
+			_verdade(desenhados.has(esperada), "%s (%s): a frase do contexto (ou a da barra, sem contexto)" % [nome, loc])
 			if k[2] != "":
-				esperada += " " + t.tr(k[2])
-			_verdade(desenhados.has(esperada), "%s (%s): a frase da barra e a do contexto" % [nome, loc])
+				var solta := false
+				for desen: String in desenhados:
+					solta = solta or desen.begins_with(t.tr(k[1]))
+				_igual(solta, false, "%s (%s): com contexto, a frase da barra não aparece" % [nome, loc])
 			_verdade(desenhados.has(t.tr(k[3])) and desenhados.has(t.tr(k[4])), "%s (%s): o caso real que acompanha o contexto" % [nome, loc])
 			if k[2] == "":
 				_igual(desenhados.has(t.tr(k[1]) + " "), false, "%s (%s): sem contexto, sem sobra de espaço" % [nome, loc])

@@ -103,7 +103,7 @@ func _sorteios() -> void:
 		_igual(a.sol_quebra, 5, "fixa: o gerador quebra no sol 5")
 		_igual(a.atraso_min, Missao.FIXA_ATRASO_MIN, "fixa: atraso do card da Terra fixo")
 	_verdade(Missao.FIXA_ATRASO_MIN >= Missao.ATRASO_MIN and Missao.FIXA_ATRASO_MIN <= Missao.ATRASO_MAX, "o atraso fixo está no intervalo de antes")
-	_igual(Missao.FIXA_ATRASO_MIN, 12, "atraso fixo: 12 min")
+	_igual(Missao.FIXA_ATRASO_MIN, 16, "atraso fixo: 16 min")
 	# Poeira nos sóis 3 e 4; um evento por sol (solar 2, poeira 3-4, quebra 5).
 	var f = Missao.new(1)
 	var eventos := {}

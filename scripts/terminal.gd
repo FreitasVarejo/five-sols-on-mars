@@ -148,7 +148,7 @@ const ESTACAO_DA_TAREFA := {"planta": "estufa", "amostra": "glovebox"}
 const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador, "planta": CultivarPlanta, "amostra": SelarAmostra}
 const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador", "planta": "estufa",
 	"amostra": "glovebox"}
-const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
+const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "ABRIGO", "PAINEL", "ATRASO"]
 # A coluna "de onde vêm os números" da aba fontes: a caixa, o interior dela (onde o filho recorta) e a margem
 # da lista dentro do interior. A lista começa 7 px abaixo da caixa e 8 px à direita da borda; a faixa de 8 px
 # na direita (largura da lista = caixa − 16) fica livre para o indicador de rolagem.
@@ -1499,11 +1499,11 @@ func _desenhar_card(alvo: Rect2) -> void:
 
 
 ## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação. Três partes
-## de cima para baixo: o aviso (14, negrito), a frase do histórico de maio de 2024 (sempre) e, quando há dado
-## do build, a frase datada do dado de hoje. O rodapé (enviado da Terra) fica ao lado do "Fechar".
+## de cima para baixo: o aviso (14, negrito), a frase do histórico de maio de 2024 (só na missão fixa: no Modo
+## livre a data de 19/05/2024 não é a da missão) e, quando há dado do build, a frase datada do dado de hoje. O rodapé (enviado da Terra) fica ao lado do "Fechar".
 func _desenhar_card_aviso() -> void:
 	var larg := CARD.size.x - 28
-	var f_hist := tr("DONKI_FRASE_HISTORICO")
+	var f_hist := "" if missao.livre else tr("DONKI_FRASE_HISTORICO")
 	var f_atual := _frase_donki_atual()
 	# As três partes mandam na altura: o card cresce (centrado) se não couberem entre o alto e o "Fechar", que
 	# fica a 12 px da base. O texto acaba 10 px acima do "Fechar".
@@ -1513,7 +1513,7 @@ func _desenhar_card_aviso() -> void:
 	var altura := 0.0
 	for tentativa in [12, 11]:
 		tam_donki = tentativa
-		var h_hist := Desenho.altura_texto(f_hist, tam_donki, larg)
+		var h_hist := Desenho.altura_texto(f_hist, tam_donki, larg) + 6.0 if f_hist != "" else 0.0
 		var h_atual := Desenho.altura_texto(f_atual, tam_donki, larg) + 6.0 if f_atual != "" else 0.0
 		altura = maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_hist + h_atual + 10.0 + 36.0 + 12.0)
 		if CARD.get_center().y - altura / 2.0 >= Y_CORPO:
@@ -1523,7 +1523,8 @@ func _desenhar_card_aviso() -> void:
 	var x := r.position.x + 14
 	var y := r.position.y + 12
 	y += _t(tr("AVISO_TEMPESTADE"), x, y, 14, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	y += _t(f_hist, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg) + 6
+	if f_hist != "":
+		y += _t(f_hist, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg) + 6
 	if f_atual != "":
 		_t(f_atual, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg)
 	# O rodapé na altura do meio do "Fechar", à esquerda dele.
@@ -1536,22 +1537,18 @@ func _desenhar_card_aviso() -> void:
 
 ## A frase do dado do build, datada ("Dados do DONKI de 14/11/2026: 25 chegadas previstas a Marte em 60 dias. A
 ## última: ..."), para o card do aviso (a aba fontes não o mostra). "" quando o dado é o histórico ou não há chegada. A
-## "última" é a mais recente que traz velocidade (o DONKI manda algumas sem ela, e "0 km/s" seria dado falso).
+## "última" é a mais recente de todas. A velocidade não entra: a documentação do DONKI não diz se é a da saída do
+## Sol ou a da chegada, e ao lado da data ela se lê como chegada.
 func _frase_donki_atual() -> String:
 	if donki.get("historico", true):
 		return ""
-	var com_velocidade := []
-	for c in donki.get("chegadas_marte", []):
-		if c is Dictionary and (c.get("velocidade_kms") is float or c.get("velocidade_kms") is int):
-			com_velocidade.append(c)
-	var ultima := DadosDonki.mais_recente({"chegadas_marte": com_velocidade})
+	var ultima := DadosDonki.mais_recente(donki)
 	if ultima.is_empty():
 		return ""
 	var loc := TranslationServer.get_locale()
 	var raspao := tr("DONKI_RASPAO") if ultima.get("raspao", false) == true else ""
 	return tr("DONKI_FRASE_ATUAL") % [DadosDonki.data_texto(str(donki.get("coletado_em", "")), loc),
-		donki["chegadas_marte"].size(), DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc),
-		roundi(float(ultima["velocidade_kms"])), raspao]
+		donki["chegadas_marte"].size(), DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc), raspao]
 
 
 ## O card ao lado do controle `alvo`, na coluna que não o tem, com uma frase por linha. O ponteiro (seta do card
@@ -2141,11 +2138,10 @@ func _desenhar_seguranca() -> void:
 	_barra(x + 2 * larg_barra + 44, y + 4, larg_barra - 8, "radiacao", tr("MARGEM"), b["M"], 12, causa == "radiacao")
 	y += 38
 
-	# A causa: a barra que zerou e, se houver, o contexto (até 3 linhas no pior caso, medido).
-	var frase := tr("CAUSA_" + causa.to_upper())
+	# A causa: a frase do contexto, se houver (a spec: 1 a 2 frases, e a da barra somada a ela chegava a 91
+	# palavras); sem contexto, a frase da barra que zerou.
 	var contexto := missao.causa_contexto()
-	if contexto != "":
-		frase += " " + tr("CAUSA_" + contexto.to_upper())
+	var frase := tr("CAUSA_" + (contexto if contexto != "" else causa).to_upper())
 	y += _t(frase, x, y, 14, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, true) + 4
 	if not missao.tem_conserto:
 		y += _t(tr("SEM_CONSERTO"), x, y, 13, Desenho.TEXTO, w) + 4
@@ -2190,9 +2186,9 @@ const REL_MEDIDAS_W := 242.0
 ## A caixa das estrelas; a linha "o que faltou" (até 50 caracteres, 12 px) fica reservada na base dela.
 const REL_ESTRELAS := Rect2(264, 38, 362, 110)
 const REL_FALTOU := Rect2(272, 125, 346, 17)
-const REL_Y_SOIS := 153.0
+const REL_Y_SOIS := 156.0
 const REL_ALTURA_SOIS := 24.0
-const REL_Y_BAIXO := 182.0
+const REL_Y_BAIXO := 185.0
 const REL_Y_FIM := 314.0
 const REL_VERDADE_W := 372.0
 const REL_BOTAO := Rect2(394, 282, 232, 32)
@@ -2218,25 +2214,28 @@ func _desenhar_relatorio() -> void:
 	_t(tr("RELATORIO_TITULO"), x, y, 12, Desenho.TEXTO, REL_MEDIDAS_W, HORIZONTAL_ALIGNMENT_LEFT, true)
 	_t(tr("RELATORIO_SUB") % Modelo.N.SOLS, x, y + 17, 12, Desenho.TEXTO_SUAVE, REL_MEDIDAS_W)
 	var w := REL_MEDIDAS_W
-	var ry := y + 38.0
-	var r0 := Rect2(x, ry, w, 22)
-	var r1 := Rect2(x, ry + 25, w, 22)
-	var r2 := Rect2(x, ry + 50, w, 22)
+	var ry := y + 36.0
+	var r0 := Rect2(x, ry, w, 20)
+	var r1 := Rect2(x, ry + 22, w, 20)
+	var r2 := Rect2(x, ry + 44, w, 20)
 	_caixa(r0)
-	Desenho.icone(self, "ciencia", Rect2(r0.position.x + 6, ry + 4, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
-	_t(tr("RELATORIO_CIENCIA_ENVIADA") % [missao.ciencia_total(), Modelo.N.TEORICO], r0.position.x + 26, ry + 2, 12,
+	Desenho.icone(self, "ciencia", Rect2(r0.position.x + 6, ry + 3, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
+	_t(tr("RELATORIO_CIENCIA_ENVIADA") % missao.ciencia_total(), r0.position.x + 26, ry + 1, 12,
 		Desenho.TEXTO, w - 32, HORIZONTAL_ALIGNMENT_LEFT, true)
 	_caixa(r1)
-	Desenho.icone(self, "radiacao", Rect2(r1.position.x + 6, r1.position.y + 4, 14, 14), Desenho.RADIACAO, Prancha.CAIXA)
+	Desenho.icone(self, "radiacao", Rect2(r1.position.x + 6, r1.position.y + 3, 14, 14), Desenho.RADIACAO, Prancha.CAIXA)
 	var rotulo_margem := tr("MARGEM_FINAL")
-	_t(rotulo_margem, r1.position.x + 26, r1.position.y + 2, 12, Desenho.TEXTO_SUAVE)
+	_t(rotulo_margem, r1.position.x + 26, r1.position.y + 1, 12, Desenho.TEXTO_SUAVE)
 	_t(tr("N_DE_12") % roundi(missao.st["M"]), r1.position.x + 34 + Desenho.largura_texto(rotulo_margem, 12),
-		r1.position.y + 2, 13, Desenho.TEXTO, 52, HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.celulas(self, Rect2(r1.end.x - 70, r1.position.y + 7, 64, 8), missao.st["M"], 12, Desenho.RADIACAO, Prancha.CELULA_VAZIA)
+		r1.position.y + 1, 13, Desenho.TEXTO, 52, HORIZONTAL_ALIGNMENT_LEFT, true)
+	Desenho.celulas(self, Rect2(r1.end.x - 70, r1.position.y + 6, 64, 8), missao.st["M"], 12, Desenho.RADIACAO, Prancha.CELULA_VAZIA)
 	_caixa(r2)
-	Desenho.icone(self, "alerta", Rect2(r2.position.x + 6, r2.position.y + 4, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
-	_t(tr("MODOS_SEGURANCA"), r2.position.x + 26, r2.position.y + 2, 12, Desenho.TEXTO_SUAVE, w - 70)
-	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 2, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	Desenho.icone(self, "alerta", Rect2(r2.position.x + 6, r2.position.y + 3, 14, 14), Desenho.TEXTO, Prancha.CAIXA)
+	_t(tr("MODOS_SEGURANCA"), r2.position.x + 26, r2.position.y + 1, 12, Desenho.TEXTO_SUAVE, w - 70)
+	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 1, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	# Só na missão fixa: o melhor sem modo de segurança (o TEORICO). No Modo livre o teto não existe.
+	if not missao.livre:
+		_t(tr("RELATORIO_MELHOR_SEM_MODO") % Modelo.N.TEORICO, x + 2, r2.end.y + 1, 12, Desenho.TEXTO_SUAVE, w - 4)
 
 	# A caixa das estrelas: os três ícones, "N de 3", a nota e, na base, a linha reservada (2.9).
 	var re := REL_ESTRELAS

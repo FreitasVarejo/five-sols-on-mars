@@ -36,7 +36,7 @@ const DURACAO_POEIRA := 2   # sóis da tempestade de poeira (encurtada: a de in�
 const FIXA_SOL_SOLAR := 2
 const FIXA_SOL_POEIRA := 3     # a poeira cobre os sóis 3 e 4 (DURACAO_POEIRA)
 const FIXA_SOL_QUEBRA := 5
-const FIXA_ATRASO_MIN := 12    # o "há N min" do card da Terra na missão fixa
+const FIXA_ATRASO_MIN := 16    # o "há N min" do card da Terra na missão fixa
 const FIXA_PICO_S := 25.0      # pico da tempestade solar, em segundos de um turno de TURNO_S
 # O freeplay versão zero: as seis agendas de 5 sóis com um evento por sol, [solar, poeira (início), quebra].
 const AGENDAS_LIVRES := [
