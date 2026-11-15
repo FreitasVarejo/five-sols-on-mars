@@ -1,4 +1,4 @@
-> Cópia do vault do dono em 14/11/2026 22:43. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
+> Cópia do vault do dono em 14/11/2026 23:17. Não edite aqui: proponha a mudança ao dono, que atualiza a fonte e recopia.
 
 # Glossário
 
@@ -9,7 +9,11 @@ O vocabulário do jogo do Junior Astronaut Mission Trainer, no nasa-spaceapps-26
 - **Sol** — o dia marciano (24,6597 h) e a unidade de tempo do jogo, como nas missões da NASA, que contam os dias em Marte a partir do sol 1 do pouso. Cada sol tem uma fase de plano, uma fase de turno e o fim do sol. Não chamar de "noite" nem de "dia": o cenário é Marte. Em português colide com o Sol, a estrela de onde vêm as tempestades do jogo: o sol aparece sempre com número e ícone de dia ("sol 3"), a estrela sempre como "o Sol" com outro ícone, e a primeira tela diz "Em Marte, um dia se chama sol".
    → postos-avancados-lua-e-marte (pesquisa no vault do dono), dados-nasa-do-junior-astronaut (pesquisa no vault do dono)
 
-- **Missão** — uma partida: uma sequência curta de sóis (proposta: 5), com relatório no fim. Não confundir com sol, que é uma etapa dela, nem com tarefa: o que a criança faz no turno é tarefa, não "missão".
+- **Missão** — a partida principal: 5 sóis com agenda fixa, os mesmos eventos nos mesmos sóis a cada vez, e relatório no fim, quando a nave chega. O que vem depois dela é o freeplay. Não confundir com sol, que é uma etapa dela, nem com tarefa: o que a criança faz no turno é tarefa, não "missão".
+
+- **Agenda** — a tabela que diz em que sol cai cada evento. Na missão é fixa; no freeplay é sorteada, sempre com um evento por vez.
+
+- **Freeplay** — o modo que destrava depois do relatório da missão, com os eventos sorteados. Não chamar de missão: a missão é a dos 5 sóis de agenda fixa.
 
 - **Fase de plano** — a parte calma de cada sol, sem relógio, dentro do terminal: a criança lê o aviso do clima espacial e os pedidos da Terra e distribui energia. Junto com o fim do sol, é onde mora o texto do jogo, porque a leitura nessa idade é lenta.
    → jogos-educativos-7-a-12-anos (pesquisa no vault do dono)
