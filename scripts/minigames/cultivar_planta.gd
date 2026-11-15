@@ -1,7 +1,7 @@
 extends Control
-## Minigame "Cultivar a planta": regular a luz e a água até os dois medidores caírem na faixa verde.
+## Minigame "Cultivar a planta": regular a luz e a água até os dois medidores caírem na faixa-alvo.
 ## Sem texto: o controle da luz tem uma lâmpada, o da água, uma gota; cada um tem um medidor com a faixa
-## verde e dois botões grandes, − e + (o mesmo gesto do O2 −/+ do plano). Não há falha: passar da faixa
+## marcada (colchetes claros, sem verde: verde é só o que se clica) e dois botões grandes, − e + (o mesmo gesto do O2 −/+ do plano). Não há falha: passar da faixa
 ## só pede um toque para voltar. Com os dois na faixa, a planta cresce um degrau e a peça termina.
 ##
 ## Base real: Veggie e APH na ISS, em que a luz e a água se regulam para a planta crescer.
@@ -20,7 +20,7 @@ const Desenho := preload("res://scripts/desenho.gd")
 const LUZ := 0
 const AGUA := 1
 const NIVEIS := 9  # cada medidor tem 9 casas, de 0 (embaixo) a 8
-const FAIXA_DE := 4  # a faixa verde são as casas 4 e 5, no meio
+const FAIXA_DE := 4  # a faixa-alvo são as casas 4 e 5, no meio
 const FAIXA_ATE := 5
 const INICIOS := [1, 2, 7, 8]  # onde cada controle pode começar: sempre fora da faixa, a 2 ou 3 toques dela
 
@@ -266,22 +266,22 @@ func _desenhar_medidor(c: int) -> void:
 	var dentro := na_faixa(c)
 	var x0 := r.position.x
 	var base := r.end.y - 2.0  # a casa 0 fica embaixo
-	# A faixa verde: uma régua mais larga que o medidor, atrás das casas.
+	# A faixa-alvo: uma régua mais larga que o medidor, atrás das casas, marcada por colchetes. Não se clica,
+	# então não é verde: fora da faixa os colchetes são suaves e o fundo é só uma moldura; na faixa ficam
+	# na cor do texto, o fundo clareia e o check aparece ao lado do ícone.
 	var y_faixa := base - (FAIXA_ATE + 1) * _casa_h
 	var faixa := Rect2(x0 - 6.0, y_faixa, r.size.x + 12.0, (FAIXA_ATE - FAIXA_DE + 1) * _casa_h)
 	draw_rect(faixa.grow(1.0), Desenho.MOLDURA)
-	draw_rect(faixa, Desenho.VERDE if dentro else Desenho.VERDE_ESCURO)
+	draw_rect(faixa, Color(Desenho.TEXTO, 0.38) if dentro else Desenho.BORDA)
+	_colchetes(faixa, Desenho.TEXTO if dentro else Desenho.TEXTO_SUAVE, 2.0 if dentro else 1.0)
 	draw_rect(r, Desenho.FUNDO_TELA)
 	Desenho.moldura(self, r, Desenho.BORDA, 1.0)
 	var topo_vis := clampi(roundi(_vis[c]), 0, NIVEIS - 1)
 	for i in NIVEIS:
 		var y := base - (i + 1) * _casa_h
-		var na_f := i >= FAIXA_DE and i <= FAIXA_ATE
 		var cor := Desenho.FUNDO_TERMINAL
 		if i <= topo_vis:
 			cor = Desenho.TEXTO if i == topo_vis else Desenho.TEXTO_SUAVE
-		elif na_f:
-			cor = Desenho.VERDE_ESCURO
 		draw_rect(Rect2(x0 + 3.0, y + 1.0, r.size.x - 6.0, _casa_h - 1.0), cor)
 	# Ponteiros nos dois lados da casa atual.
 	var yc := base - (_vis[c] + 0.5) * _casa_h
@@ -289,6 +289,17 @@ func _desenhar_medidor(c: int) -> void:
 		var xb := x0 - 8.0 if lado < 0.0 else r.end.x + 8.0
 		draw_colored_polygon(PackedVector2Array([
 			Vector2(xb, yc), Vector2(xb - lado * 6.0, yc - 4.0), Vector2(xb - lado * 6.0, yc + 4.0)]), Desenho.TEXTO)
+
+
+## Colchetes [ ] em volta da faixa: um traço vertical de cada lado e uma ponta de 5 px para dentro, em cima e embaixo.
+func _colchetes(r: Rect2, cor: Color, esp: float) -> void:
+	var ponta := 5.0
+	var g := r.grow(1.0)
+	draw_rect(Rect2(g.position.x, g.position.y, esp, g.size.y), cor)
+	draw_rect(Rect2(g.end.x - esp, g.position.y, esp, g.size.y), cor)
+	for y in [g.position.y, g.end.y - esp]:
+		draw_rect(Rect2(g.position.x, y, ponta, esp), cor)
+		draw_rect(Rect2(g.end.x - ponta, y, ponta, esp), cor)
 
 
 ## Botão − ou +, no estilo dos botões verdes do terminal (verde é o que se clica).
