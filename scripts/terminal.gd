@@ -1476,10 +1476,16 @@ func _desenhar_diario() -> void:
 		_botao("enviar", Rect2(rb.position.x, Y_FIM - 50, rb.size.x, 50), tr("ENVIAR_A_TERRA"), "terra", true, 14)
 
 
-## As linhas do diário do sol, na ordem: o que aconteceu, a poeira, a ciência, a tarefa não feita, a
-## manutenção e a mensagem recebida. Cada uma: ícone (opcional), texto, tamanho, cor e espaço depois.
+## As linhas do diário do sol, na ordem: a história do sol (só na missão fixa), o que aconteceu, a poeira,
+## a ciência, a tarefa não feita, a manutenção e a mensagem recebida. Cada uma: ícone (opcional), texto,
+## tamanho, cor e espaço depois.
 func _itens_diario(reg: Dictionary) -> Array:
 	var itens: Array = []
+	# 0. A história do sol: clima, sem regra de jogo. Só na missão fixa, e só se o sol tem texto.
+	if not missao.livre:
+		var k := "DIARIO_HISTORIA_%d" % reg["sol"]
+		if tr(k) != k:
+			itens.append({"texto": tr(k), "tam": 11, "cor": Desenho.TEXTO_SUAVE, "gap": 6})
 	# 1. O que aconteceu.
 	if reg["seguranca"]:
 		itens.append({"icone": "alerta", "cor_icone": Desenho.AMARELO, "texto": tr("DIARIO_SEGURANCA"), "tam": 12,
