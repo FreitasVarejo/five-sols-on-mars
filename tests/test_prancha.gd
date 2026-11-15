@@ -51,6 +51,8 @@ func _conta() -> void:
 	_verdade(absf(Prancha.contraste(Desenho.TEXTO_SUAVE, Prancha.FUNDO) - 7.07) < 0.05, "contraste: suave sobre o fundo, 7,1")
 	_verdade(absf(Prancha.contraste(Desenho.AZUL, Prancha.FUNDO) - 6.89) < 0.05, "contraste: card da Terra sobre o fundo, 6,9")
 	_igual(Prancha.FUNDO, Color("#122a4a"), "o fundo é o azul-marinho #122a4a")
+	_igual(Prancha.FUNDO_MAPA, Color("#0c1f38"), "o fundo do mapa das câmeras é #0c1f38")
+	_verdade(Prancha.luminancia(Prancha.FUNDO_MAPA) < Prancha.luminancia(Prancha.FUNDO), "o fundo do mapa é mais escuro que o papel")
 
 
 ## Todo texto do terminal, sobre o fundo da tela e sobre as caixas.

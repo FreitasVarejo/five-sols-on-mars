@@ -17,6 +17,7 @@ const Desenho := preload("res://scripts/desenho.gd")
 # Fundos.
 const FUNDO := Color("#122a4a")        # a tela do terminal
 const CAIXA := Color("#17375f")        # as caixas internas
+const FUNDO_MAPA := Color("#0c1f38")   # o mapa da aba Câmeras e os chips de telemetria: mais escuro que o papel, como a tela da câmera
 # Linhas. A borda externa e a linha do título são claras, como no papel; a das caixas é um azul-claro.
 const LINHA := Color("#e8f1ff")        # borda externa (2 px)
 const LINHA_SUAVE := Color(1, 1, 1, 0.5)  # borda interna (1 px) e linha sob o título: enfeite, sem informação
