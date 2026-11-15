@@ -334,15 +334,18 @@ func _desenhar_contador() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, true)
 
 
-## A mira (cruz fina em TEXTO_SUAVE) segue o ponteiro; perto de um alvo pendente, gruda no centro.
+## A mira (cruz fina em TEXTO_SUAVE) segue o ponteiro. Perto de um alvo pendente ela gruda no centro e
+## abre para fora do anel do alvo, para mostrar que o toque vai acertar.
 func _desenhar_mira() -> void:
 	var p := _mira if _mira_movida else size / 2.0
 	var i := _alvo_pendente_perto(p)
+	var de := 4.0
+	var ate := 11.0
 	if i >= 0:
 		p = _locais[i]
-	var folga := 4.0
-	var fim := 11.0
+		de = _tam_icone() * 0.75 + 3.0
+		ate = de + 8.0
 	for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
-		draw_line(p + d * folga, p + d * fim, Color(Desenho.MOLDURA, 0.7), 3.0)
+		draw_line(p + d * de, p + d * ate, Color(Desenho.MOLDURA, 0.7), 3.0)
 	for d in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
-		draw_line(p + d * folga, p + d * fim, Desenho.TEXTO_SUAVE, 1.0)
+		draw_line(p + d * de, p + d * ate, Desenho.TEXTO_SUAVE, 1.0)
