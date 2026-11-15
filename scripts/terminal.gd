@@ -1491,6 +1491,8 @@ func _coluna_previsao(r: Rect2, p: Dictionary) -> void:
 		_nota(x, y + 36, w, tr("FALHA_ENERGIA"), Prancha.VERMELHO_TEXTO, true, "alerta")
 	elif p["perdida_no_teto"] > 0.0:
 		_nota(x, y + 36, w, tr("BATERIA_CHEIA_PERDE") % roundi(p["perdida_no_teto"]), Desenho.TEXTO, true)
+	elif p["sem_reserva"]:
+		_nota(x, y + 36, w, tr("BATERIA_SEM_RESERVA"), Desenho.TEXTO, true, "alerta")
 	y += 58
 
 	# Oxigênio.
