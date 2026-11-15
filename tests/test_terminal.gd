@@ -902,7 +902,7 @@ func _pecas_nas_cameras() -> void:
 	peca.avancar(0.3)
 	_verdade(peca.progresso() > 0.0, "a peça andou")
 	_igual(t._progresso_da_linha("chemcam"), peca.progresso(), "a barra acompanha a peça")
-	_igual(t._progresso_da_linha("amostra"), 0.0, "tarefa de relógio: a do relógio")
+	_igual(t._progresso_da_linha("amostra"), 0.0, "sem peça hospedada: 0, não o relógio")
 	# A peça conclui: a tarefa fica feita e a peça sai no quadro seguinte.
 	peca.concluido.emit()
 	_igual(m.tarefas["chemcam"], "feita", "concluido da peça marca a tarefa feita")

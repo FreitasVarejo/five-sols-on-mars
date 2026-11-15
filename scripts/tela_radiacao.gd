@@ -1,5 +1,5 @@
 extends Control
-## Tela de radiação do cômodo (129x77 px): a margem de radiação (barra de recurso, ícone, texto e
+## Tela de radiação do cômodo (124x70 px, o retângulo inscrito na tela do PNG): a margem de radiação (barra de recurso, ícone, texto e
 ## número) e, separado dela, o medidor de radiação com as duas marcas (atenção e abrigo).
 ## Fica dentro da Sala, antes do shader, para curvar com a parede.
 ##
@@ -31,16 +31,16 @@ func _draw() -> void:
 	var larg := size.x - m * 2.0
 
 	# Margem: ícone, "MARGEM", n/12 e a barra de células.
-	Desenho.icone(self, "radiacao", Rect2(m, 5, 12, 12), Desenho.RADIACAO, Desenho.FUNDO_TELA)
-	Desenho.texto(self, tr("MARGEM").to_upper(), Vector2(m + 16, 5), 10, Desenho.TEXTO)
-	Desenho.texto(self, "%d/%d" % [roundi(margem), maximo], Vector2(m, 2), 14, Desenho.TEXTO, larg,
+	Desenho.icone(self, "radiacao", Rect2(m, 3, 12, 12), Desenho.RADIACAO, Desenho.FUNDO_TELA)
+	Desenho.texto(self, tr("MARGEM").to_upper(), Vector2(m + 16, 3), 10, Desenho.TEXTO)
+	Desenho.texto(self, "%d/%d" % [roundi(margem), maximo], Vector2(m, 0), 14, Desenho.TEXTO, larg,
 		HORIZONTAL_ALIGNMENT_RIGHT, true)
-	Desenho.celulas(self, Rect2(m, 20, larg, 7), margem, maximo, Desenho.RADIACAO)
-	draw_line(Vector2(m, 31), Vector2(size.x - m, 31), Desenho.BORDA, 1.0)
+	Desenho.celulas(self, Rect2(m, 17, larg, 7), margem, maximo, Desenho.RADIACAO)
+	draw_line(Vector2(m, 27), Vector2(size.x - m, 27), Desenho.BORDA, 1.0)
 
 	# Medidor: rótulo, trilho com as duas marcas, ponteiro.
-	Desenho.texto(self, tr("MEDIDOR").to_upper(), Vector2(m, 32), 10, Desenho.TEXTO_SUAVE)
-	var trilho := Rect2(m, 56, larg, 8)
+	Desenho.texto(self, tr("MEDIDOR").to_upper(), Vector2(m, 28), 10, Desenho.TEXTO_SUAVE)
+	var trilho := Rect2(m, 50, larg, 8)
 	draw_rect(trilho, Desenho.CELULA_VAZIA)
 	var x_valor := trilho.position.x + trilho.size.x * clampf(medidor, 0.0, 1.0)
 	var x_atencao := trilho.position.x + trilho.size.x * Missao.LIMIAR_ATENCAO

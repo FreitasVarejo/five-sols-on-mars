@@ -1192,6 +1192,10 @@ REGIOES = {
     "janela": list(JANELA_OBJS),
 }
 TELAS = ("energia", "oxigenio", "radiacao", "comunicacao")
+# As telas saem como trapézio na câmera cilíndrica (as da rampa, em ~10 px de folga; radiação e comunicação,
+# em 1 a 3 px): o json guarda o retângulo inscrito (o que o Godot pinta), não a caixa envolvente. O resto do
+# trapézio continua escuro pelo próprio PNG.
+MARGEM_TELA = 2   # px: o traço do contorno come 1 a 2 px da borda da tela no PNG (medido em normal.png)
 BOTOES = ("abrigo", "estufa", "glovebox")
 # A porta é botão, mas fica na ponta esquerda do panorama (x < 60), sob a seta de pan quando o pan está
 # em 0: não segue ZONA_LIVRE_X nem FAIXA_CLIQUE, que valem para os botões do meio da sala. O Godot
@@ -1246,12 +1250,52 @@ def retangulo(pts_xy, largura, altura):
     return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0}
 
 
+def retangulo_inscrito(pts_xy, largura, altura, margem=0):
+    """Maior retângulo alinhado aos eixos que cabe inteiro no contorno projetado (pixels cujo
+    centro está dentro). A tela fica numa rampa e a câmera a projeta como trapézio: a caixa
+    envolvente (retangulo) passa da moldura; este não. Os pontos são os vértices e as amostras
+    das arestas, e o contorno é lido ordenando-os em volta do centro (vale para tela convexa).
+    `margem` (px) encolhe o resultado de cada lado: o traço do contorno come 1 a 2 px da borda."""
+    x, y = pts_xy
+    ang = np.arctan2(y - y.mean(), x - x.mean())
+    px, py = x[np.argsort(ang)], y[np.argsort(ang)]
+    qx, qy = np.roll(px, -1), np.roll(py, -1)
+    y0, y1 = max(int(np.floor(y.min())), 0), min(int(np.ceil(y.max())), altura)
+    linhas = []  # (y, esquerda, direita) no centro de cada linha de pixels
+    for j in range(y0, y1):
+        yc = j + 0.5
+        cruza = (py <= yc) != (qy <= yc)
+        if cruza.sum() < 2:
+            continue
+        xs = px[cruza] + (yc - py[cruza]) * (qx[cruza] - px[cruza]) / (qy[cruza] - py[cruza])
+        linhas.append((j, xs.min(), xs.max()))
+    melhor = None
+    for i in range(len(linhas)):
+        esq, dir_ = -np.inf, np.inf
+        for k in range(i, len(linhas)):
+            if linhas[k][0] != linhas[i][0] + (k - i):
+                break  # linha sem cruzamento no meio: o contorno não é contínuo
+            esq, dir_ = max(esq, linhas[k][1]), min(dir_, linhas[k][2])
+            xa, xb = int(np.ceil(esq - 0.5)), int(np.floor(dir_ - 0.5)) + 1
+            if xb <= xa:
+                break
+            area = (xb - xa) * (k - i + 1)
+            if melhor is None or area > melhor[0]:
+                melhor = (area, xa, linhas[i][0], xb - xa, k - i + 1)
+    _, xa, ya, w, h = melhor
+    return {"x": xa + margem, "y": ya + margem, "w": w - 2 * margem, "h": h - 2 * margem}
+
+
 def calcular_regioes(a, rad_px):
     bpy.context.view_layer.update()
     out = {}
     for nome, objs in REGIOES.items():
         pts = np.concatenate([pontos_do_objeto(o) for o in objs])
-        out[nome] = retangulo(projetar(pts, a, rad_px), a.largura, a.altura)
+        proj = projetar(pts, a, rad_px)
+        if nome in TELAS:
+            out[nome] = retangulo_inscrito(proj, a.largura, a.altura, MARGEM_TELA)
+        else:
+            out[nome] = retangulo(proj, a.largura, a.altura)
     return out
 
 

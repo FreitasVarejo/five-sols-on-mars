@@ -36,10 +36,15 @@ extends Control
 ## (segura_o_relogio, que a main lê); com ele aberto a sala não se clica e o botão TERMINAL fica apagado.
 ##
 ## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
+## Card da primeira vez com confirmação (pedir_confirmacao): na primeira vez que a criança toca uma ação da
+## sala no turno, abre um card azul embaixo, como o do primeiro turno, com "o que a ação faz" e dois botões;
+## a ação só roda se ela confirmar. O relógio fica parado e a sala não se clica enquanto ele está aberto. Vale
+## uma vez por carregamento da página, por ação: a flag mora em `_vistos`, que a missão não toca (o reinício
+## do sol restaura a missão, não o terminal).
 ## A aba câmeras é o visor (scripts/cameras/visor_cameras.gd), filho deste nó, por cima da aba. Ele só
 ## aparece com a aba na tela, o terminal parado no alto, sem card e sem escurecer. Escolher a câmera de
 ## uma tarefa de POR_PECA (missao.gd) pendente começa a tarefa e põe a peça dela (ChemCam, gerador) na
-## vista; a peça é quem conclui a tarefa (concluir_tarefa), e sai quando a tarefa deixa de rodar. Na aba
+## vista; a planta e a amostra começam pela estação da sala (abrir_na_estacao), sem botão aqui; a peça é quem conclui a tarefa (concluir_tarefa), e sai quando a tarefa deixa de rodar. Na aba
 ## tarefas, o botão da linha (ir_chemcam, ir_gerador) leva à câmera. Com o visor à vista, o clique dentro
 ## dele não é consumido aqui: segue para o visor e para a peça.
 ##
@@ -60,6 +65,8 @@ const VisorCameras := preload("res://scripts/cameras/visor_cameras.gd")
 const ColunaFontes := preload("res://scripts/coluna_fontes.gd")
 const Chemcam := preload("res://scripts/minigames/chemcam.gd")
 const ConsertarGerador := preload("res://scripts/minigames/consertar_gerador.gd")
+const CultivarPlanta := preload("res://scripts/minigames/cultivar_planta.gd")
+const SelarAmostra := preload("res://scripts/minigames/selar_amostra.gd")
 
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
@@ -111,6 +118,11 @@ const CARD_X_ESQUERDA := 98.0
 # (nas bordas, de y 120 a 240).
 const CARD_TURNO_LARGURA := 340.0
 const CARD_TURNO_FUNDO := 322.0
+# O card de confirmação é mais estreito e escolhe o x: nunca cobre as telas das barras nem o medidor (zonas_a_evitar),
+# entre as setas (que ficam nas bordas, de x 0 a 48 e de 592 a 640).
+const CARD_CONF_LARGURA := 300.0
+const CARD_CONF_X_MIN := 52.0
+const CARD_CONF_X_MAX := 588.0
 
 # Tela cheia (relatório).
 const X_ESQ := 14.0
@@ -118,9 +130,13 @@ const X_ESQ := 14.0
 const ROTULOS_TAREFA := {"chemcam": "TAREFA_CHEMCAM", "amostra": "TAREFA_AMOSTRA", "planta": "TAREFA_PLANTA",
 	"gerador": "TAREFA_GERADOR"}
 # Tarefa -> câmera onde ela se faz, e a peça (minigame) de cada uma; o som de começar pela câmera.
+# A planta e a amostra não têm câmera nem botão no terminal: começam na estação da sala (a estufa, a glovebox)
+# e, aqui, só aparecem como linha com estado e andamento. A estação é onde o visor hospeda a peça delas.
 const CAMERA_DA_TAREFA := {"chemcam": "rocha", "gerador": "moxie"}
-const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador}
-const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador"}
+const ESTACAO_DA_TAREFA := {"planta": "estufa", "amostra": "glovebox"}
+const PECAS := {"chemcam": Chemcam, "gerador": ConsertarGerador, "planta": CultivarPlanta, "amostra": SelarAmostra}
+const SOM_DE_INICIAR := {"chemcam": "iniciar_chemcam", "gerador": "consertar_gerador", "planta": "estufa",
+	"amostra": "glovebox"}
 const PARES_FONTES := ["O2", "MOXIE", "LIMITE", "RAD", "ESCALA", "PAINEL", "ATRASO"]
 # A coluna "de onde vêm os números" da aba fontes: a caixa, o interior dela (onde o filho recorta) e a margem
 # da lista dentro do interior. A lista começa 7 px abaixo da caixa e 8 px à direita da borda; a faixa de 8 px
@@ -140,6 +156,10 @@ var fase_ui := "plano"      # a fase que a sala vê (atrasa o fim do turno, por 
 var aba := ""               # "" = a tela própria da fase; ou "cameras", "tarefas", "diario", "fontes"
 var card_id := ""           # o card da Terra na tela agora ("" = nenhum): "aviso" ou um de CARD_TEXTO
 var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
+## As zonas da tela (Rect2, px da tela de 640x360) que o card de confirmação não pode cobrir: as barras e o medidor,
+## como a sala os mostra agora (a main as liga). Sem ela, o card fica no centro.
+var zonas_a_evitar := Callable()
+var rect_do_card_confirmacao := Rect2()  # onde o último quadro desenhou o card de confirmação (a sonda e os testes leem)
 
 var _fase_logica := "plano"
 var _modos_vistos := 0      # quantas entradas no modo de segurança o terminal já viu (cada uma toca o desligar)
@@ -158,6 +178,8 @@ var _hover := ""
 var _versao_vista := -1
 var _alarmou := false       # o alarme já tocou nesta travessia do limiar de abrigo
 var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
+var _confirma_id := ""      # a ação do card de confirmação aberto ("" = nenhum); card_id é "confirmacao"
+var _confirma_acao := Callable()  # o que roda se a criança confirmar
 var _visor: VisorCameras    # o corpo da aba câmeras
 var _visor_chave := ""      # "sol|poeira" da última configuração do visor
 var _visor_pend := {}       # as últimas pendências enviadas ao visor
@@ -221,7 +243,7 @@ func ui() -> Dictionary:
 func minigame() -> Dictionary:
 	if _visor == null or not _visor.visible:
 		return {}
-	var p := _visor.peca(_visor.camera_atual())
+	var p := _visor.peca(_visor.vista_atual())
 	if p == null or not p.visible:
 		return {}
 	var m := p.get_global_transform()
@@ -243,6 +265,19 @@ func minigame() -> Dictionary:
 		var e: Vector2 = m * p.centro_do_encaixe()
 		return {"tipo": "gerador", "pecas": pecas, "certa": sorteio["certa"], "formas": sorteio["formas"],
 			"encaixe": [roundi(e.x), roundi(e.y)], "progresso": p.progresso()}
+	if p.has_method("retangulo_do_botao"):
+		var botoes := {}
+		for c in 2:
+			for mais in [false, true]:
+				var rb: Rect2 = p.retangulo_do_botao(c, mais)
+				var ob: Vector2 = m * rb.position
+				botoes["%s_%s" % [["luz", "agua"][c], "mais" if mais else "menos"]] = [roundi(ob.x), roundi(ob.y), roundi(rb.size.x), roundi(rb.size.y)]
+		return {"tipo": "planta", "botoes": botoes, "luz": p.nivel(0), "agua": p.nivel(1), "progresso": p.progresso()}
+	if p.has_method("alvo_do_passo"):
+		var a: Rect2 = p.alvo_do_passo()
+		var o: Vector2 = m * a.position
+		return {"tipo": "amostra", "passo": p.passo(), "alvo": [roundi(o.x), roundi(o.y), roundi(a.size.x), roundi(a.size.y)],
+			"profundidade": p.profundidade(), "graus": p.graus(), "progresso": p.progresso()}
 	return {}
 
 
@@ -343,17 +378,22 @@ var card_aberto: bool:
 
 ## O card da tela está à vista? Os do plano, com o terminal no alto; o do primeiro turno, com ele embaixo.
 func _card_visivel() -> bool:
-	if card_id == "turno":
+	if _card_sobre_a_sala():
 		return _pos <= 0.0
 	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
 
 
+## O card da tela é dos que ficam sobre a sala, com o terminal embaixo (o do primeiro turno e o de confirmação)?
+func _card_sobre_a_sala() -> bool:
+	return card_id == "turno" or card_id == "confirmacao"
+
+
 ## O relógio do turno espera? Do "Confirmar plano" do sol 1 da missão fixa até o card do primeiro turno fechar
-## (uma vez por sessão). A main não avança a missão enquanto isto vale.
+## (uma vez por sessão), e enquanto um card de confirmação está aberto. A main não avança a missão enquanto isto vale.
 func segura_o_relogio() -> bool:
 	if missao == null:
 		return false
-	if _segura_turno:
+	if _segura_turno or card_id == "confirmacao":
 		return true
 	# Já no quadro em que a missão entrou no turno, antes de o terminal ver a troca de fase.
 	return missao.fase == "turno" and _fase_logica != "turno" and _tem_card_de_turno()
@@ -374,6 +414,8 @@ func _mostrar_na_tela(f: String) -> void:
 	_fase_tela = f
 	aba = ""
 	_zerar_rolagem()
+	_confirma_id = ""
+	_confirma_acao = Callable()
 	_fila = _cards_do_plano() if f == "plano" else []
 	card_id = ""
 	_abrir_proximo()
@@ -406,6 +448,35 @@ func _abrir_proximo() -> void:
 		return
 	card_id = _fila.pop_front()
 	_vistos[card_id] = true
+
+
+## Pede a confirmação da primeira vez de uma ação da sala, para quem chama (a main). `id` nomeia a ação e os
+## textos do card: CONFIRMA_<ID> (o que a ação faz), CONFIRMA_<ID>_SIM e CONFIRMA_<ID>_NAO (os botões), em
+## textos/textos.csv. `ao_confirmar` é o que a ação faz; roda só se a criança confirmar.
+## Devolve true se o card abriu (quem chama não age: a ação espera a confirmação) e false se a criança já viu o
+## card dessa ação neste carregamento da página (quem chama age direto). Confirmar ou cancelar conta como visto.
+## Só abre com o terminal embaixo e sem outro card; senão devolve true sem abrir (a ação não roda).
+func pedir_confirmacao(id: String, ao_confirmar: Callable) -> bool:
+	var chave := "confirmacao_" + id
+	if _vistos.has(chave):
+		return false
+	if aberto or _pos > 0.0 or card_aberto:
+		return true
+	_vistos[chave] = true
+	_confirma_id = id
+	_confirma_acao = ao_confirmar
+	card_id = "confirmacao"
+	queue_redraw()
+	return true
+
+
+## Fecha o card de confirmação e devolve o que ele guardava para rodar (vazio se não havia).
+func _fechar_confirmacao() -> Callable:
+	var acao := _confirma_acao
+	_confirma_id = ""
+	_confirma_acao = Callable()
+	card_id = ""
+	return acao
 
 
 ## Muda o alvo do terminal (sobe ou desce) e toca o som do começo do movimento. Se `valor` já é o
@@ -534,7 +605,7 @@ func _botao_em(p: Vector2) -> String:
 ## Faz a ação `nome` e, se ela aconteceu de fato, toca o clique do peso dela (som.gd). O botão TERMINAL
 ## não faz clique: tem o som de subir e descer.
 func _acionar(nome: String) -> void:
-	if card_aberto and nome != "fechar_card":
+	if card_aberto and nome != "fechar_card" and not (card_id == "confirmacao" and nome in ["card_confirmar", "card_cancelar"]):
 		return
 	var fez := true
 	match nome:
@@ -544,6 +615,12 @@ func _acionar(nome: String) -> void:
 			_abrir_proximo()
 			if card_id == "":
 				_segura_turno = false
+		"card_confirmar":
+			var acao := _fechar_confirmacao()
+			if acao.is_valid():
+				acao.call()
+		"card_cancelar":
+			_fechar_confirmacao()
 		"voltar_plano":
 			aba = ""
 			_zerar_rolagem()
@@ -612,11 +689,12 @@ func _atualizar_visor() -> void:
 	var no_turno := missao.fase == "turno" and not missao.abrigado
 	_visor.visible = aba_na_tela() == "cameras" and _pos >= 1.0 and not _card_visivel() and _fade_estado == ""
 	var pend := {}
-	for tarefa: String in CAMERA_DA_TAREFA:
-		var cam: String = CAMERA_DA_TAREFA[tarefa]
+	for tarefa: String in PECAS:
+		var cam := _lugar_da_peca(tarefa)
 		var estado: String = missao.tarefas.get(tarefa, "")
 		var rodando := no_turno and missao.tarefa_rodando == tarefa
-		pend[cam] = no_turno and (estado == "pendente" or rodando)
+		if CAMERA_DA_TAREFA.has(tarefa):  # as estações da sala não são câmera do mapa: sem pendência
+			pend[cam] = no_turno and (estado == "pendente" or rodando)
 		if _visor.peca(cam) != null and not rodando:
 			_visor.hospedar(cam, null)
 	var chave := "%d|%s" % [missao.sol, missao.eh_poeira()]
@@ -634,8 +712,8 @@ func _atualizar_visor() -> void:
 ## começa e a peça entra na vista. Se a tarefa já roda, só se mostra a peça que está lá. Outra tarefa
 ## rodando (amostra, planta): nada começa, o marcador fica.
 func _ao_escolher_camera(cam: String) -> void:
-	for tarefa: String in CAMERA_DA_TAREFA:
-		if CAMERA_DA_TAREFA[tarefa] != cam:
+	for tarefa: String in PECAS:
+		if _lugar_da_peca(tarefa) != cam:
 			continue
 		if missao.tarefa_rodando == tarefa:
 			if _visor.peca(cam) == null:
@@ -652,13 +730,38 @@ func _hospedar_peca(tarefa: String) -> void:
 	if peca.has_method("semente"):
 		peca.semente(missao.sol * 100 + missao.modos)  # muda a cada conserto e segue determinística
 	peca.concluido.connect(_ao_concluir_peca.bind(tarefa))
-	_visor.hospedar(CAMERA_DA_TAREFA[tarefa], peca)
+	_visor.hospedar(_lugar_da_peca(tarefa), peca)
+
+
+## Onde o visor hospeda a peça da tarefa: a câmera dela (ChemCam, gerador) ou a estação da sala (planta, amostra).
+func _lugar_da_peca(tarefa: String) -> String:
+	return CAMERA_DA_TAREFA.get(tarefa, ESTACAO_DA_TAREFA.get(tarefa, ""))
 
 
 ## A peça terminou: a tarefa vira feita; o quadro seguinte tira a peça.
 func _ao_concluir_peca(tarefa: String) -> void:
 	missao.concluir_tarefa(tarefa)
 	queue_redraw()
+
+
+## Tocar na estação da sala (a estufa, a glovebox): a tarefa começa, o terminal sobe já na aba câmeras com a
+## peça dela à vista e a peça fica hospedada. Se a tarefa já roda (o terminal foi abaixado no meio), a mesma
+## peça volta à vista, sem recriar. O som de começar é o clique da própria estação (main.gd), por isso aqui não
+## toca. Devolve se aconteceu.
+func abrir_na_estacao(tarefa: String) -> bool:
+	if not ESTACAO_DA_TAREFA.has(tarefa) or not _pode_ir_a_camera(tarefa):
+		return false
+	if missao.tarefa_rodando != tarefa:
+		missao.iniciar_tarefa(tarefa)
+		_hospedar_peca(tarefa)
+	elif _visor.peca(_lugar_da_peca(tarefa)) == null:
+		_hospedar_peca(tarefa)
+	aba = "cameras"
+	_zerar_rolagem()
+	_definir_aberto(true)
+	_visor.escolher(_lugar_da_peca(tarefa))
+	queue_redraw()
+	return true
 
 
 ## O botão da linha da tarefa vale no turno, fora do abrigo, quando a tarefa roda ou está pendente e
@@ -671,10 +774,16 @@ func _pode_ir_a_camera(tarefa: String) -> bool:
 	return missao.tarefas.get(tarefa, "") == "pendente" and missao.tarefa_rodando == ""
 
 
+## O andamento da tarefa `nome` (0 a 1): a peça hospedada, para a tarefa que só acaba por ela; o relógio,
+## para as demais. A barra da linha e a barra da estação na sala leem daqui.
+func progresso_da_tarefa(nome: String) -> float:
+	return _progresso_da_linha(nome)
+
+
 ## A barra da linha: a peça hospedada, para a tarefa que só acaba por ela; o relógio, para as demais.
 func _progresso_da_linha(nome: String) -> float:
 	if nome in Missao.POR_PECA:
-		var peca: Control = _visor.peca(CAMERA_DA_TAREFA[nome]) if _visor != null else null
+		var peca: Control = _visor.peca(_lugar_da_peca(nome)) if _visor != null else null
 		return clampf(peca.progresso(), 0.0, 1.0) if peca != null else 0.0
 	return missao.progresso_tarefa(nome)
 
@@ -816,7 +925,7 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
 		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
-		if card and card_id != "turno":
+		if card and not _card_sobre_a_sala():
 			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica. O card ao lado
 			# de um controle deixa esse controle claro, com contorno.
 			var alvo := _alvo_do_card()
@@ -831,6 +940,9 @@ func _draw() -> void:
 	if card and card_id == "turno":
 		_travado = false
 		_desenhar_card_turno()
+	elif card and card_id == "confirmacao":
+		_travado = false
+		_desenhar_card_confirmacao()
 	if alerta_sobre_o_terminal():
 		_desenhar_alerta()
 	if _fade > 0.0:
@@ -1256,6 +1368,57 @@ func _desenhar_card_turno() -> void:
 	for frase: String in frases:
 		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
 	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
+
+
+## O card de confirmação da primeira vez, sobre a sala, no lugar do card do primeiro turno (embaixo, longe do
+## medidor e das setas): o que a ação faz, o rótulo de procedimento gravado (no lugar do "há N min") e dois botões,
+## cancelar à esquerda e confirmar à direita. Confirmar é o verde de sempre; cancelar também é botão (todo botão é verde).
+func _desenhar_card_confirmacao() -> void:
+	var chave := "CONFIRMA_" + _confirma_id.to_upper()
+	var larg := CARD_CONF_LARGURA - 24.0
+	var frases := Abertura.frases(tr(chave))
+	var altura_texto := 0.0
+	for frase: String in frases:
+		altura_texto += Desenho.altura_texto(frase, CARD_TAM, larg, true) + 4.0
+	var altura := 12.0 + altura_texto + 4.0 + 14.0 + 10.0 + 36.0 + 12.0
+	var y0 := CARD_TURNO_FUNDO - altura
+	var r := Rect2(_x_do_card_confirmacao(y0, altura), y0, CARD_CONF_LARGURA, altura)
+	rect_do_card_confirmacao = r
+	draw_rect(r, Desenho.AZUL)
+	var x := r.position.x + 12.0
+	var yy := r.position.y + 12.0
+	for frase: String in frases:
+		yy += _t(frase, x, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	yy += 4.0
+	Desenho.icone(self, "terra", Rect2(x, yy + 1.0, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
+	_t(tr("ENVIADO_PACOTE_DA_MANHA"), x + 16.0, yy, 11, Desenho.TEXTO_ESCURO, larg - 16.0)
+	var y_botoes := r.end.y - 12.0 - 36.0
+	_botao("card_confirmar", Rect2(r.end.x - 12.0 - 110.0, y_botoes, 110, 36), tr(chave + "_SIM"), "", true, 13)
+	_botao("card_cancelar", Rect2(r.end.x - 12.0 - 110.0 - 8.0 - 110.0, y_botoes, 110, 36), tr(chave + "_NAO"), "", true, 13)
+
+
+## O x do card de confirmação: o mais perto do centro em que ele não cobre nenhuma zona de zonas_a_evitar (com 4 px
+## de folga). Se nenhum serve, o centro.
+func _x_do_card_confirmacao(y: float, altura: float) -> float:
+	var centro := roundf((640.0 - CARD_CONF_LARGURA) / 2.0)
+	if not zonas_a_evitar.is_valid():
+		return centro
+	var zonas: Array = zonas_a_evitar.call()
+	var melhor := centro
+	var achou := false
+	var x := CARD_CONF_X_MIN
+	while x + CARD_CONF_LARGURA <= CARD_CONF_X_MAX:
+		var r := Rect2(x, y, CARD_CONF_LARGURA, altura).grow(4.0)
+		var livre := true
+		for z: Rect2 in zonas:
+			if r.intersects(z):
+				livre = false
+				break
+		if livre and (not achou or absf(x - centro) < absf(melhor - centro)):
+			melhor = x
+			achou = true
+		x += 4.0
+	return melhor
 
 
 # --- aba câmeras -----------------------------------------------------------------

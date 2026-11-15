@@ -13,6 +13,8 @@ signal concluido
 signal camera_escolhida(nome: String)
 
 const CAMERAS := ["painel", "rocha", "moxie", "visao_geral"]  # a câmera do céu é P2 e fica fora
+# Estações da sala (não são câmeras do mapa, sem botão): hospedam a peça de uma tarefa que se faz lá (a estufa, a glovebox).
+const ESTACOES := ["estufa", "glovebox"]
 
 const GAP := 6
 const TELEM_H := 30
@@ -70,6 +72,7 @@ var _origem := Vector2.ZERO
 var _alvos: Dictionary = {}  # câmera -> Rect2 do botão
 
 var _atual := "visao_geral"
+var _estacao := ""  # a estação cuja peça está na vista agora; "" = a da câmera atual
 var _duracao := 0.0
 var _poeira := false
 var _pecas: Dictionary = {}  # câmera -> Control
@@ -151,10 +154,12 @@ func pendencias(mapa: Dictionary) -> void:
 
 ## Põe `peca` na câmera `camera` (cobre a vista). `null` tira e libera a que estava lá.
 func hospedar(camera: String, peca: Control) -> void:
-	if not CAMERAS.has(camera):
+	if not CAMERAS.has(camera) and not ESTACOES.has(camera):
 		push_warning("visor_cameras: câmera desconhecida '%s'" % camera)
 		return
 	var antiga: Control = _pecas.get(camera)
+	if peca == null and _estacao == camera:
+		_estacao = ""  # a vista volta à câmera atual
 	if antiga != null and antiga != peca:
 		_pecas.erase(camera)
 		if is_instance_valid(antiga):
@@ -170,7 +175,7 @@ func hospedar(camera: String, peca: Control) -> void:
 		add_child(peca)
 	_pecas[camera] = peca
 	peca.configurar(_vista, _duracao, _poeira)
-	peca.visible = camera == _atual
+	peca.visible = camera == vista_atual()
 	queue_redraw()
 
 
@@ -184,9 +189,13 @@ func sol(n: int, total: int) -> void:
 
 ## Seleciona a câmera e avisa (mesmo se já era ela). Nome fora de CAMERAS: false, nada muda.
 func escolher(nome: String) -> bool:
-	if not CAMERAS.has(nome):
+	if ESTACOES.has(nome):
+		_estacao = nome  # a vista mostra a peça da estação; a câmera atual do mapa não muda
+	elif CAMERAS.has(nome):
+		_estacao = ""
+		_atual = nome
+	else:
 		return false
-	_atual = nome
 	_atualizar_visibilidade()
 	queue_redraw()
 	camera_escolhida.emit(nome)
@@ -195,6 +204,11 @@ func escolher(nome: String) -> bool:
 
 func camera_atual() -> String:
 	return _atual
+
+
+## O que a vista mostra: a estação escolhida ou, sem ela, a câmera atual.
+func vista_atual() -> String:
+	return _estacao if _estacao != "" else _atual
 
 
 func alvos() -> Dictionary:
@@ -260,11 +274,11 @@ func _atualizar_visibilidade() -> void:
 	for c in _pecas:
 		var p: Control = _pecas[c]
 		if is_instance_valid(p):
-			p.visible = c == _atual
+			p.visible = c == vista_atual()
 
 
 func _peca_visivel() -> bool:
-	var p := peca(_atual)
+	var p := peca(vista_atual())
 	return p != null and p.visible
 
 

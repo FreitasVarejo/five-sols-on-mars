@@ -33,6 +33,7 @@ func _init() -> void:
 	_poeira()
 	_quebra_do_gerador()
 	_encerrar_sol()
+	_encerrar_sol_fator()
 	_fim_do_sol_noite_e_relatorio()
 	_aviso()
 	_missao_inteira()
@@ -402,15 +403,17 @@ func _abrigo_de_mao_unica() -> void:
 	_igual(g.iniciar_tarefa("gerador"), false, "abrigado não conserta o gerador")
 
 
-## As tarefas de POR_PECA (ChemCam e gerador) só acabam pelo `concluido` da peça: o relógio não as termina, e
+## As tarefas de POR_PECA (ChemCam, gerador, planta e amostra) só acabam pelo `concluido` da peça: o relógio não as termina, e
 ## concluir_tarefa só vale no turno, fora do abrigo e para a que está rodando.
 func _tarefas_da_peca() -> void:
-	_igual(Missao.POR_PECA, ["chemcam", "gerador"], "as tarefas que só a peça termina")
+	_igual(Missao.POR_PECA, ["chemcam", "gerador", "planta", "amostra"], "as tarefas que só a peça termina")
 	for nome in Missao.POR_PECA:
 		_verdade(nome in Missao.TAREFAS or nome in Missao.MANUTENCAO, "POR_PECA só tem tarefa da missão: " + nome)
 	_igual("painel" in Missao.TAREFAS or "painel" in Missao.MANUTENCAO or "painel" in Missao.POR_PECA, false,
 		"o painel não está na missão")
-	# O relógio não termina a da peça, e termina a das estações (amostra), no mesmo turno.
+	# O relógio não termina a da peça; as de ciência e o gerador são todas de peça, nenhuma é de relógio.
+	for nome in Missao.TAREFAS + Missao.MANUTENCAO:
+		_verdade(nome in Missao.POR_PECA, "só a peça termina: " + nome)
 	var m = Missao.new(1, {"sol_solar": 3})
 	m.alternar_tarefa("chemcam")
 	m.confirmar_plano()
@@ -425,7 +428,8 @@ func _tarefas_da_peca() -> void:
 	a.confirmar_plano()
 	a.iniciar_tarefa("amostra")
 	a.avancar(a.tarefa_s + 0.1)
-	_igual(a.tarefas["amostra"], "feita", "o relógio segue terminando a amostra")
+	_igual(a.tarefas["amostra"], "rodando", "o relógio não termina a amostra: só a peça")
+	_verdade(a.concluir_tarefa("amostra"), "a peça conclui a amostra")
 	_igual(a.concluir_tarefa("amostra"), false, "concluir uma já feita não vale")
 	# Falha: no plano, sem a tarefa rodando, com outra rodando, abrigado, depois do turno.
 	var f = Missao.new(1, {"sol_solar": 3})
@@ -504,7 +508,9 @@ func _tarefa_nao_feita_e_teto() -> void:
 	m.avancar(10.0)
 	m.concluir_tarefa("chemcam")
 	m.iniciar_tarefa("amostra")
-	_ate_sair_do_turno(m)  # a amostra roda até o fim do turno e termina; a planta nunca inicia
+	m.avancar(10.0)
+	m.concluir_tarefa("amostra")
+	_ate_sair_do_turno(m)  # a amostra termina pela peça; a planta nunca inicia
 	var r: Dictionary = m.registros[0]
 	_igual(r["feitas"], ["chemcam", "amostra"], "registro: feitas")
 	_igual(r["nao_feitas"], ["planta"], "registro: não feitas")
@@ -1118,25 +1124,24 @@ func _encerrar_sol() -> void:
 	var p = Missao.new(1, {"sol_solar": 3})
 	_igual(p.encerrar_sol(), false, "encerrar: não vale no plano")
 	_igual(p.pode_encerrar_sol(), false, "encerrar: o botão não aparece no plano")
-	# Lista vazia conta como acabada. Acelera 8 vezes: 1 s de tempo real = 8 s do turno.
+	# Lista vazia conta como acabada. O resto do turno (60 s) passa em 1,5 s reais: fator 40.
 	var m = Missao.new(1, {"sol_solar": 3})
 	m.confirmar_plano()
 	_igual(m.lista_acabou(), true, "lista vazia: acabou")
 	_igual(m.pode_encerrar_sol(), true, "lista vazia: dá para encerrar")
 	_verdade(m.encerrar_sol(), "encerrar o sol")
 	_igual(m.acelerado, true, "acelerado")
+	_igual(m.fator_acelerado, 40.0, "60 s em 1,5 s reais: fator 40")
 	_igual(m.encerrar_sol(), false, "enquanto acelerado, não encerra de novo")
 	_igual(m.pode_encerrar_sol(), false, "enquanto acelerado, o botão some")
 	m.avancar(0.25)
-	_igual(m.t, 2.0, "0,25 s reais correm 2 s do turno (8x)")
+	_igual(m.t, 10.0, "0,25 s reais correm 10 s do turno (40x)")
 	m.avancar(1.0)
-	_igual(m.t, 10.0, "1 s real corre 8 s do turno")
-	_igual(m.relogio(), 10.0 / 60.0, "o relógio do turno acompanha")
-	m.avancar(6.0)
-	_igual(m.t, 58.0, "7,25 s reais: 58 s do turno")
-	_igual(m.fase, "turno", "ainda no turno aos 58 s")
-	m.avancar(0.5)
-	_igual(m.fase, "fim_do_sol", "o turno acaba no pôr do Sol, depois de 7,5 s reais")
+	_igual(m.t, 50.0, "1,25 s reais: 50 s do turno")
+	_igual(m.relogio(), 50.0 / 60.0, "o relógio do turno acompanha")
+	_igual(m.fase, "turno", "ainda no turno aos 50 s")
+	m.avancar(0.25)
+	_igual(m.fase, "fim_do_sol", "o turno acaba no pôr do Sol, depois de 1,5 s reais")
 	_igual(m.acelerado, false, "acelerado desliga no fim do turno")
 	_igual(m.registros[0]["dose"], 1.0, "dose do sol comum, em tempo de jogo")
 	_igual(m.registros[0]["depois"]["M"], 11.0, "margem 12 - 1")
@@ -1255,6 +1260,124 @@ func _encerrar_sol() -> void:
 	v.encerrar_sol()
 	v.avancar(1000.0)
 	_igual(v.fase, "fim_do_sol", "sol comum: a aceleração vai até o pôr do Sol")
+
+
+## Resultado da missão ao encerrar o sol com o fator dado (duracao_encerrar), com passos de `passo` s reais.
+## Devolve o estado de fim do sol e o registro, para comparar com outro fator.
+func _encerrar_com(solar: bool, duracao: float, passo: float, abrigar_antes: bool, t_antes: float, tarefa: bool = false):
+	var m = _solar(9, _st(6, 4, 12)) if solar else Missao.new(1, {"sol_solar": 3})
+	m.duracao_encerrar = duracao
+	if tarefa:
+		m.alternar_tarefa("amostra")
+	m.confirmar_plano()
+	if tarefa:
+		m.iniciar_tarefa("amostra")
+		_ate(m, Missao.TAREFA_S)
+		m.concluir_tarefa("amostra")  # só a peça termina a amostra
+	if t_antes > 0.0:
+		_ate(m, t_antes)
+	if abrigar_antes:
+		m.abrigar()
+	if not m.encerrar_sol():
+		return null
+	var voltas := 0
+	while m.acelerado and m.fase == "turno" and voltas < 100000:
+		m.avancar(passo)
+		voltas += 1
+	return m
+
+
+func _encerrar_sol_fator() -> void:
+	# O fator vem do que sobra do turno: 1,5 s reais para qualquer resto, mas nunca abaixo de 8.
+	var a = Missao.new(1, {"sol_solar": 3})
+	a.confirmar_plano()
+	_ate(a, 20.0)
+	a.encerrar_sol()
+	_igual(a.fator_acelerado, 40.0 / 1.5, "40 s restantes em 1,5 s: fator 26,67")
+	var b = Missao.new(1, {"sol_solar": 3})
+	b.confirmar_plano()
+	_ate(b, 55.0)
+	b.encerrar_sol()
+	_igual(b.fator_acelerado, Missao.ACELERAR, "5 s restantes: o piso, 8x (nunca mais lento que antes)")
+	b.avancar(0.625)
+	_igual(b.fase, "fim_do_sol", "5 s restantes passam em 0,625 s reais, no piso")
+	var c = Missao.new(1, {"sol_solar": 3})
+	c.duracao_encerrar = 3.0
+	c.confirmar_plano()
+	c.encerrar_sol()
+	_igual(c.fator_acelerado, 20.0, "?acelerar=3: 60 s em 3 s, fator 20")
+	_igual(Missao.duracao_da_url(null), 1.5, "?acelerar ausente: 1,5 s")
+	_igual(Missao.duracao_da_url("0.5"), 0.5, "?acelerar=0.5")
+	_igual(Missao.duracao_da_url("3"), 3.0, "?acelerar=3")
+	_igual(Missao.duracao_da_url("0.1"), 1.5, "?acelerar abaixo do limite")
+	_igual(Missao.duracao_da_url("99"), 1.5, "?acelerar acima do limite")
+	_igual(Missao.duracao_da_url("abc"), 1.5, "?acelerar texto")
+
+	# Mesmo estado final com o fator alto e com o piso de 8 (duração de 1000 s força o piso), em quadros de
+	# 60 fps (como o jogo, 0,25 s no máximo) e em passos gigantes, em cada situação.
+	var casos := [
+		["sol comum", false, false, 0.0, false],
+		["sol comum, aos 30 s", false, false, 30.0, false],
+		["sol comum, com amostra feita", false, false, 0.0, true],
+		["tempestade, abrigado antes do pico", true, true, 5.0, false],
+		["tempestade, abrigado depois de meia exposição", true, true, -1.0, false],
+	]
+	for caso in casos:
+		var t_antes: float = caso[3]
+		var solar: bool = caso[1]
+		var abrigar_antes: bool = caso[2]
+		if t_antes < 0.0:
+			var ref = _solar(9, _st(6, 4, 12))
+			ref.confirmar_plano()
+			t_antes = ref.t_pico + (ref.turno_s - ref.t_pico) / 2.0
+		var rapido = _encerrar_com(solar, 1.5, 1.0 / 60.0, abrigar_antes, t_antes, caso[4])
+		var piso = _encerrar_com(solar, 1000.0, 1.0 / 60.0, abrigar_antes, t_antes, caso[4])
+		var gigante = _encerrar_com(solar, 1.5, 100.0, abrigar_antes, t_antes, caso[4])
+		_verdade(rapido != null and piso != null and gigante != null, "%s: encerra" % caso[0])
+		if rapido == null or piso == null or gigante == null:
+			continue
+		_igual(piso.fator_acelerado, 8.0, "%s: o piso é 8x" % caso[0])
+		_verdade(rapido.fator_acelerado > 8.0, "%s: o fator rápido passa de 8x" % caso[0])
+		for outro in [piso, gigante]:
+			_igual(outro.fase, rapido.fase, "%s: mesma fase" % caso[0])
+			_igual(outro.t, rapido.t, "%s: mesmo relógio" % caso[0])
+			_igual(outro.t_exposto, rapido.t_exposto, "%s: mesma exposição" % caso[0])
+			_igual(outro.modos, rapido.modos, "%s: mesmos modos de segurança" % caso[0])
+			if not outro.registros.is_empty() and not rapido.registros.is_empty():
+				var ro: Dictionary = outro.registros[0]
+				var rr: Dictionary = rapido.registros[0]
+				for chave in ["dose", "f_exposto", "ciencia", "o2_produzido", "devolvida", "depois", "feitas", "abrigou"]:
+					_igual(ro[chave], rr[chave], "%s: registro %s" % [caso[0], chave])
+		_igual(rapido.fase, "fim_do_sol", "%s: o turno fechou" % caso[0])
+
+	# O freio no limiar de atenção continua com fator alto: para antes do pico, com o relógio no limiar
+	# exato, em quadros de 60 fps e com o delta de 0,25 s que a main aceita, e o pico segue surpresa.
+	for passo in [1.0 / 60.0, 0.25, 100.0]:
+		var f = _solar(5, _st(6, 4, 12))
+		f.confirmar_plano()
+		_ate(f, 1.0)
+		_verdade(f.encerrar_sol(), "freio: encerra (passo %s)" % passo)
+		_verdade(f.fator_acelerado > 8.0, "freio: com fator alto (passo %s)" % passo)
+		var voltas := 0
+		while f.acelerado and voltas < 100000:
+			f.avancar(passo)
+			voltas += 1
+		_igual(f.acelerado, false, "freio: desligou (passo %s)" % passo)
+		_igual(f.fase, "turno", "freio: ainda no turno (passo %s)" % passo)
+		_igual(f.t, f.t_atencao(), "freio: parou no limiar exato (passo %s)" % passo)
+		_verdade(f.t < f.t_pico, "freio: antes do pico (passo %s)" % passo)
+		_igual(f.t_exposto, 0.0, "freio: sem exposição (passo %s)" % passo)
+		_igual(f.modos, 0, "freio: sem modo de segurança (passo %s)" % passo)
+		# Abrigada, encerra de novo: o fator é recalculado sobre o que sobrou e a dose é a do abrigo.
+		_verdade(f.abrigar(), "freio: abriga (passo %s)" % passo)
+		_verdade(f.encerrar_sol(), "freio: encerra de novo (passo %s)" % passo)
+		_igual(f.fator_acelerado, (f.turno_s - f.t) / 1.5, "freio: o fator é recalculado (passo %s)" % passo)
+		voltas = 0
+		while f.fase == "turno" and voltas < 100000:
+			f.avancar(passo)
+			voltas += 1
+		_igual(f.fase, "fim_do_sol", "freio: o resto acelera até o fim (passo %s)" % passo)
+		_igual(f.registros[0]["dose"], 3.0, "freio: abrigou a tempo, dose 3 (passo %s)" % passo)
 
 
 func _fim_do_sol_noite_e_relatorio() -> void:

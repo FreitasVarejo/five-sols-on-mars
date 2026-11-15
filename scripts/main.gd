@@ -121,11 +121,13 @@ func _ready() -> void:
 	_depuracao.hide()
 	_donki = DadosDonki.carregar()
 	_missao = Missao.new(int(_parametros.get("semente", -1)), _opcoes_da_missao())
+	_missao.duracao_encerrar = Missao.duracao_da_url(_parametros.get("acelerar"))
 	_carregar_regioes()
 	_hud_turno.missao = _missao
 	_terminal.iniciar(_missao, _donki)
 	_terminal.desenhou.connect(_sonda_se_mudou)
 	_terminal.pediu_abrigo.connect(_virar_para_abrigo)
+	_terminal.zonas_a_evitar = _zonas_das_barras
 
 	var tamanho := _panorama.texture.get_size()
 	_panorama.size = tamanho
@@ -334,14 +336,14 @@ func _atualizar_sala() -> void:
 		for tarefa: String in ESTACOES:
 			if _missao.tarefas.has(tarefa):
 				estados[tarefa] = _missao.tarefas[tarefa]
-				progresso[tarefa] = _missao.progresso_tarefa(tarefa)
+				progresso[tarefa] = _terminal.progresso_da_tarefa(tarefa)
 				clicaveis[tarefa] = _clicavel(ESTACOES[tarefa])
 	_estacoes.atualizar(estados, progresso, clicaveis)
 	_indicador_porta.atualizar(_missao.pode_encerrar_sol())
 
 
 ## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
-## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
+## delas está escolhida, pendente (ou já rodando: o toque volta à peça), sem outra rodando e fora do abrigo; a porta do dormitório quando dá
 ## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
 	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala() or _terminal.card_aberto \
@@ -351,9 +353,9 @@ func _clicavel(nome: String) -> bool:
 		"abrigo":
 			return not _missao.abrigado
 		"estufa":
-			return _pode_iniciar("planta")
+			return _pode_iniciar("planta") or _missao.tarefa_rodando == "planta"
 		"glovebox":
-			return _pode_iniciar("amostra")
+			return _pode_iniciar("amostra") or _missao.tarefa_rodando == "amostra"
 		"porta":
 			return _missao.pode_encerrar_sol()
 	return false
@@ -361,6 +363,23 @@ func _clicavel(nome: String) -> bool:
 
 func _pode_iniciar(tarefa: String) -> bool:
 	return _missao.tarefas.get(tarefa, "") == "pendente" and not _missao.abrigado and _missao.tarefa_rodando == ""
+
+
+## Onde, na tela, estão agora as telas das barras (energia, oxigênio e a da radiação, com o medidor): o que um card
+## sobre a sala não pode cobrir. O retângulo que contém os quatro cantos de cada uma, como a sala as mostra.
+func _zonas_das_barras() -> Array:
+	var zonas: Array = []
+	for nome: String in ["energia", "oxigenio", "radiacao"]:
+		var r: Rect2 = _regioes_telas[nome]
+		var a := _panorama_para_tela(r.position)
+		var b := _panorama_para_tela(r.end)
+		var c := _panorama_para_tela(Vector2(r.position.x, r.end.y))
+		var d := _panorama_para_tela(Vector2(r.end.x, r.position.y))
+		var caixa := Rect2(a, Vector2.ZERO)
+		for q: Vector2 in [b, c, d]:
+			caixa = caixa.expand(q)
+		zonas.append(caixa)
+	return zonas
 
 
 ## A linha do abrigo foi tocada no terminal (já descendo): a sala vira até o botão do abrigo ficar à vista.
@@ -587,13 +606,21 @@ func _ao_clicar(nome: String) -> void:
 	var fez := false
 	match nome:
 		"abrigo":
-			fez = _missao.abrigar()
+			# Abrigar não tem volta no turno: na primeira vez, o card da Terra explica e pede confirmação.
+			if not _missao.abrigado and _terminal.pedir_confirmacao("abrigo", func() -> void: _missao.abrigar()):
+				pass
+			else:
+				fez = _missao.abrigar()
 		"estufa":
-			fez = _missao.iniciar_tarefa("planta")
+			fez = _terminal.abrir_na_estacao("planta")
 		"glovebox":
-			fez = _missao.iniciar_tarefa("amostra")
+			fez = _terminal.abrir_na_estacao("amostra")
 		"porta":
-			fez = _missao.encerrar_sol()
+			# Na primeira vez abre o card da Terra e a ação espera a confirmação (o terminal toca o clique dela).
+			if _missao.pode_encerrar_sol() and _terminal.pedir_confirmacao("dormir", func() -> void: _missao.encerrar_sol()):
+				pass
+			else:
+				fez = _missao.encerrar_sol()
 	if fez:
 		_som.clique(nome)
 	_sonda_teste()

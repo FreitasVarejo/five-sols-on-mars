@@ -72,9 +72,10 @@ func _tocar() -> void:
 
 func _peso_dos_cliques() -> void:
 	var navegar := ["aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes", "voltar_plano", "fechar_card",
-		"o2_menos", "o2_mais", "tarefa_chemcam", "tarefa_amostra", "tarefa_planta", "ir_chemcam", "ir_gerador"]
+		"o2_menos", "o2_mais", "tarefa_chemcam", "tarefa_amostra", "tarefa_planta", "ir_chemcam", "ir_gerador",
+		"card_cancelar"]
 	var confirmar := ["confirmar", "enviar", "iniciar_chemcam", "consertar_gerador", "reiniciar", "seguir",
-		"jogar_de_novo", "estufa", "glovebox", "porta"]
+		"jogar_de_novo", "estufa", "glovebox", "porta", "card_confirmar"]
 	for acao: String in navegar:
 		_igual(Som.clique_da_acao(acao), "clique_navegar", "navegar: " + acao)
 	for acao: String in confirmar:
