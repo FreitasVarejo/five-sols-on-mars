@@ -32,15 +32,33 @@ https://freitasvarejo.github.io/five-sols-on-mars/
 
 ### What it does
 
-The player sits in the command module of a Mars outpost in Gale crater, the crater where Curiosity works. The room is a pixel-art panorama: a window onto Mount Sharp, the energy and oxygen gauges on the console, the radiation meter, the shelter button and a terminal, the Panel.
+The player sits in the command module of a Mars outpost in Gale crater, the crater where Curiosity works. The room is a pixel-art panorama: a window onto Mount Sharp, the energy and oxygen gauges on the console, the radiation meter, the shelter lever and a terminal, the Panel.
+
+![The command module: the window onto Gale crater, the oxygen gauge, the glovebox and the greenhouse](docs/relatorio/1-room.png)
+
+_The command module: the window onto Gale crater, the gauges and the Panel._
 
 A mission lasts five sols. Each sol has three parts.
 
 1. **Plan, with no clock.** A message from Earth brings the space-weather notice. The player sets how much energy goes to the oxygen generator and which science tasks to run. Each gauge shows "before → after" for the choice, and the oxygen gauge says "air for N sols". Energy that is left over goes to the battery by itself. The battery has a ceiling, and the surplus is lost.
-2. **Shift, 60 seconds in real time, with nothing to read.** The player runs the science tasks, repairs what broke and watches the radiation meter. A sun crossing a bar at the top of the screen is the clock, and the room turns blue as it sets. Work outside is done through the base's cameras: the player aims ChemCam's laser at points on a rock, and fits the right part into the broken oxygen generator. A task counts only when the player finishes it.
+2. **Shift, 60 seconds in real time, with nothing to read.** The player runs the science tasks, repairs what broke and watches the radiation meter. A sun crossing a bar at the top of the screen is the clock, and the room turns blue as it sets. Work outside is done through the base's cameras: the player aims ChemCam's laser at points on a rock, and fits the right part into the broken oxygen generator. Inside the base, the sample is drilled in a close-up of the glovebox, and the plant is checked and treated in a close-up of the greenhouse. A task counts only when the player finishes it.
 3. **End of sol, with no clock.** The base writes its own log of what happened and what it cost, and the player sends it to Earth. The night heating then comes out of the battery.
 
+![The plan of sol 1: night heating, oxygen and three science tasks on the left; energy, oxygen and margin as "before → after" on the right](docs/relatorio/2-plan.png)
+
+_The plan of sol 1: oxygen and science are paid from the same energy, and each gauge shows "before → after"._
+
+The first time a task comes up, two slides from Earth introduce it with a real NASA photo of the instrument behind it: ChemCam on Curiosity, a Perseverance sample tube, the Veggie plants on the ISS and MOXIE.
+
+![A slide from Earth: "This is ChemCam, at the top of the Curiosity rover's mast", with a NASA/JPL-Caltech photo](docs/relatorio/3-slide-chemcam-nasa-photo.png)
+
+_A slide from Earth before the ChemCam task, with a NASA/JPL-Caltech photo reduced to the game's palette._
+
 At the end of sol 5 a ship arrives and takes the science to Earth. The mission report is that cargo: the science sent, the radiation margin left, the number of safe modes, a rating of one to three stars and a "What really happened" section about the real event.
+
+![The mission report: science sent home, final margin, safe modes, three stars and "What really happened" in May 2024](docs/relatorio/7-mission-report.png)
+
+_The mission report, with "What really happened" in May 2024._
 
 The five-sol mission is the same for every player: a guided first sol, a solar storm on sol 2, a dust storm on sols 3 and 4, and a generator failure on sol 5. After the report, "Free play" starts a mission in which the sol of each event is drawn.
 
@@ -48,11 +66,9 @@ The five-sol mission is the same for every player: a guided first sol, a solar s
 
 Three gauges, all read the same way: full is good, empty is danger. Each one has an icon, a label and a number, never colour alone.
 
-| Gauge | Fills with | Drains with |
-|---|---|---|
-| Energy (battery) | The solar panel, every sol; much less under dust | Night heating, the oxygen generator, science tasks |
-| Oxygen (tank) | A generator like MOXIE, which costs energy | The crew, every sol |
-| Radiation margin | Never refills | Every sol's background; far more in a solar storm |
+- **Energy (battery)** fills with the solar panel every sol, much less under dust. It drains with the night heating, the oxygen generator and the science tasks.
+- **Oxygen (tank)** fills with a generator like MOXIE, which costs energy. It drains with the crew, every sol.
+- **Radiation margin** never refills. It drains with every sol's background, and far more in a solar storm.
 
 How the game answers the challenge's guiding questions:
 
@@ -60,6 +76,14 @@ How the game answers the challenge's guiding questions:
 - **Shielding against a radiation event or energy for the night.** Real crews shield by moving mass: the Artemis II procedure has the crew build a shelter from stowage, which costs work time and no power. So in the game the shelter costs science. Tasks done before sheltering count, and after it the crew does no more tasks in that shift. Shelter too early and science is lost for nothing; too late and the crew takes the dose. The squeeze on night energy is in the dust storm: the panel falls to a tenth for two sols, the night heating still has to be paid, and only a battery charged beforehand carries the base through. Opportunity in 2018 and InSight in 2022 both ended when dust left them without power.
 - **Communication delay.** There is no conversation with Earth and no assistant on board. Earth sends a package in the morning, and during the shift the player decides alone, as a crew would with a signal that takes 3 to 22 minutes each way.
 - **Food.** The challenge advises two or three core resources, and we kept energy, oxygen and radiation. Food is not a gauge; growing a plant is one of the science tasks.
+
+![Sol 2: the radiation meter in the red, and the card from Earth that says what sheltering costs, with "Not yet" and "Shelter now"](docs/relatorio/5-solar-storm-shelter.png)
+
+_Sol 2, solar storm: the radiation meter in the red, and the card that says what sheltering costs before it happens._
+
+![Sol 3: dust in the window, two bars of energy and four of oxygen](docs/relatorio/6-dust-storm.png)
+
+_Sol 3, dust storm: dust in the window, and two bars of energy left._
 
 We measured the mission by playing the published build. Putting everything into science sends 9 points of science and ends one sol in safe mode. A balanced plan sends 5 with no safe mode. Filling the oxygen tank first sends none and ends two sols in safe mode, because the dust arrives with the battery empty. The best plan without a safe mode sends 7. No strategy is best at both science and safety.
 
@@ -69,6 +93,10 @@ When energy, oxygen or the radiation margin runs out, the base goes into safe mo
 
 If some plan can still save the sol, the simulator restarts that sol at the plan. If no plan can, because the cause came from earlier sols, the sol passes in safe mode and the screen says the cause came earlier. The child never replays a sol that cannot be won.
 
+![Safe mode on sol 2: the margin at zero, "The crew reached the shelter too late", the real case of October 1989, and the sol restarts](docs/relatorio/8-safe-mode.png)
+
+_Safe mode after a late shelter: the cause, the real case, and the sol restarts at the plan._
+
 ### NASA data, and why
 
 - **NASA DONKI (CCMC), WSA-ENLIL simulations.** DONKI is the NASA record that says a solar storm is predicted to reach Mars before it arrives, and that is what turns the warning into a decision. A script downloads the last 60 days when we build the game, and the game shows the date of the data; stored data is never presented as live. The mission uses the DONKI record for 19 to 21 May 2024, when five arrivals at Mars were predicted.
@@ -77,6 +105,17 @@ If some plan can still save the sol, the simulator restarts that sol at the plan
 - **MOXIE (NASA/JPL):** oxygen made from the carbon dioxide of the Martian air, and what it costs in power. The game calls its generator "a giant version of MOXIE, which does not exist yet".
 - **NASA-STD-3001:** volume 1 gives the 250 mSv design limit for the reference solar event of October 1989. Volume 2 guided the terminal: only what is needed on the screen, shallow navigation (we keep four tabs and no sub-tabs), and red and yellow only for alerts.
 - **Opportunity, 2018:** the panel fell from 645 to 22 Wh in the dust storm.
+- **NASA photos:** six photos of Curiosity, Perseverance, MOXIE and the ISS plant chamber, in the slides that introduce the tasks.
+
+![The card from Earth on sol 1: the solar-storm warning, with the date and count of the NASA DONKI records behind it](docs/relatorio/4-earth-card-donki.png)
+
+_The warning from Earth on sol 1, with the date and the count of the NASA DONKI records behind it._
+
+The game's Sources tab says where each real-world number comes from.
+
+![The Sources tab: each real-world number with its source](docs/relatorio/9-sources-tab.png)
+
+_The Sources tab: each real-world number with its source._
 
 What we simplified:
 
@@ -104,7 +143,7 @@ The game makes no requests to third parties: no analytics, no cookies, no login.
 ### How it is built
 
 - **Engine:** Godot 4.7.2, GDScript, Compatibility renderer, single-threaded Web export, 640×360 pixel art.
-- **Art:** the room and the Mars exterior are modelled and rendered by Python scripts in Blender (`bpy`, Cycles), in the Apollo palette by AdamCYounis. Each state of the room is one pre-rendered panorama, curved in the game by a CC0 panorama shader. No image was generated by AI.
+- **Art:** the room and the Mars exterior are modelled and rendered by Python scripts in Blender (`bpy`, Cycles), in the Apollo palette by AdamCYounis. Each state of the room is one pre-rendered panorama, curved in the game by a CC0 panorama shader. No image was generated by AI. The only third-party images are the six NASA photos, cropped and reduced to the same palette by a Python script (Pillow, numpy).
 - **Data:** a Python script (standard library only) downloads DONKI at build time and writes the JSON the game reads.
 - **Rules:** one model script holds the rules, with unit tests. The strategies above were measured by playing the published build in the browser with Playwright.
 - **Hosting:** GitHub Pages.
@@ -144,14 +183,15 @@ A dated log of this use is in the repository, in `docs/uso-de-si.md` (in Portugu
 - **Communication delays for crewed Mars missions** (NASA Langley): https://ntrs.nasa.gov/api/citations/20220013418/downloads/ASCEND-Communication%20Delays%2C%20Disruptions%2C%20and%20Blackouts%20for%20Crewed%20Mars%20Missions.pdf. Why a question and its answer take at least twice the delay. The 3 to 22 minutes each way come from NASA: https://science.nasa.gov/mars/mars-2020-perseverance/speaking-percys-language-how-to-talk-so-perseverance-will-listen/
 - **Mars launch windows** (NASA): https://science.nasa.gov/planetary-science/programs/mars-exploration/mission-timeline/. The 26 months in the report.
 - **"Sunset in Mars' Gale Crater"** (Curiosity, sol 956): https://science.nasa.gov/photojournal/sunset-in-mars-gale-crater. The reference for the blue light at the end of the shift.
+- **Photos in the task slides** (NASA/JPL-Caltech and NASA), cropped and reduced to the game's palette: PIA13809, "Top of Mars Rover Curiosity's Remote Sensing Mast": https://science.nasa.gov/photojournal/top-of-mars-rover-curiositys-remote-sensing-mast. PIA24808, "Perseverance Sample Tube 266": https://science.nasa.gov/photojournal/perseverance-sample-tube-266. PIA24799, "Sample Tube in Perseverance's Coring Drill": https://science.nasa.gov/photojournal/sample-tube-in-perseverances-coring-drill. iss040e009125, "Veg-01 Plant Harvest": https://images.nasa.gov/details/iss040e009125. iss046e001336, "Zinnia Flowers Starting to Grow on the International Space Station": https://www.nasa.gov/image-feature/zinnia-flowers-starting-to-grow-on-the-international-space-station. PIA23154, "This Is One Mars Rover With MOXIE": https://science.nasa.gov/photojournal/this-is-one-mars-rover-with-moxie.
 
-The game uses no NASA image and no NASA insignia.
+The game uses no NASA insignia.
 
 ## Space Agency Partner Data and other references
 
 **Partner agencies**
 
-- George et al., "Space radiation measurements during the Artemis I lunar mission", Nature 634, 48–52 (2024): https://www.nature.com/articles/s41586-024-07927-7. A paper by NASA, DLR and ESA researchers. We use its fourfold difference in dose rate between shielding locations inside Orion. ESA is one of the 2026 Space Apps partner agencies; DLR is not on that list. TODO(owner): confirm ESA on the official 2026 partner page. The greenhouse task is based on NASA's Veggie, so no CSA material is cited.
+- George et al., "Space radiation measurements during the Artemis I lunar mission", Nature 634, 48–52 (2024): https://www.nature.com/articles/s41586-024-07927-7. A paper by NASA, DLR and ESA researchers. We use its fourfold difference in dose rate between shielding locations inside Orion. ESA is one of the 2026 Space Apps partner agencies; DLR is not on that list. The greenhouse task is based on NASA's Veggie, so no CSA material is cited.
 
 **Code, art and sound by others**
 
@@ -174,7 +214,7 @@ The game uses no NASA image and no NASA insignia.
 - WCAG 2.2, Target Size (Minimum): https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
 - Nielsen Norman Group, Usability Testing with Minors: https://www.nngroup.com/articles/usability-testing-minors/
 
-**Tools:** Blender, Playwright, Node.js, ffmpeg, GitHub Pages, and Claude by Anthropic (see Use of SI).
+**Tools:** Blender, Pillow, numpy, Playwright, Node.js, ffmpeg, GitHub Pages, and Claude by Anthropic (see Use of SI).
 
 ## For developers
 
