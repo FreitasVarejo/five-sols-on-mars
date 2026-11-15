@@ -197,3 +197,6 @@ ENVIADO_PACOTE_DA_MANHA,Sent from Earth in the morning packet,Enviado da Terra n
 CONFIRMA_DORMIR,Going to sleep ends the sol. The rest of the sol passes fast. Nothing is lost.,Ir dormir encerra o sol. O resto do sol passa rápido. Nada se perde.
 CONFIRMA_DORMIR_SIM,Sleep,Dormir
 CONFIRMA_DORMIR_NAO,Not yet,Ainda não
+CONFIRMA_ABRIGO,"Sheltering protects the crew from radiation. The blind closes and cargo lines the walls. After that, no more tasks this sol. The task in progress stops. Science already done still counts.","Abrigar protege a tripulação da radiação. A persiana fecha e a carga cobre as paredes. Depois, ninguém faz mais tarefas neste sol. A tarefa em andamento para. A ciência já feita continua valendo."
+CONFIRMA_ABRIGO_SIM,Shelter now,Abrigar agora
+CONFIRMA_ABRIGO_NAO,Not yet,Ainda não

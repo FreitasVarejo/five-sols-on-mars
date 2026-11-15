@@ -606,7 +606,11 @@ func _ao_clicar(nome: String) -> void:
 	var fez := false
 	match nome:
 		"abrigo":
-			fez = _missao.abrigar()
+			# Abrigar não tem volta no turno: na primeira vez, o card da Terra explica e pede confirmação.
+			if not _missao.abrigado and _terminal.pedir_confirmacao("abrigo", func() -> void: _missao.abrigar()):
+				pass
+			else:
+				fez = _missao.abrigar()
 		"estufa":
 			fez = _terminal.abrir_na_estacao("planta")
 		"glovebox":
