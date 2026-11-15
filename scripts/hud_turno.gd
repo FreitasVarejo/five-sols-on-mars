@@ -1,7 +1,8 @@
 extends Control
 ## HUD do turno, depois do shader (não curva e não muda com o pan). Só ícones e números, porque o
 ## turno não tem texto para ler:
-##  - canto superior esquerdo, fixo: o sol atual, o evento em curso e o alerta do medidor;
+##  - canto superior esquerdo, fixo: o sol atual, os eventos em curso (tempestade do Sol, poeira),
+##    o alerta do gerador quebrado e o alerta do medidor;
 ##  - faixa do Sol no topo, no centro: o Sol anda da esquerda para a direita e é o relógio do turno.
 ## Sem cor de pôr do Sol: a cor do pôr do Sol em Marte ainda não tem fonte conferida.
 
@@ -37,6 +38,17 @@ func _draw() -> void:
 	if missao.tempestade_em_curso():
 		_chip(Rect2(x, 6, 26, 22))
 		Desenho.icone(self, "tempestade", Rect2(x + 4, 9, 18, 16), Desenho.TEXTO, Desenho.NOITE)
+		x += 30
+	# A tempestade de poeira, o sol inteiro: só o ícone.
+	if missao.eh_poeira():
+		_chip(Rect2(x, 6, 26, 22))
+		Desenho.icone(self, "poeira", Rect2(x + 4, 9, 18, 16), Desenho.TEXTO, Desenho.NOITE)
+		x += 30
+	# O gerador quebrado e ainda não consertado: alerta amarelo, só o ícone.
+	if missao.gerador_quebrado_agora():
+		_chip(Rect2(x, 6, 26, 22))
+		draw_rect(Rect2(x, 6, 26, 22), Desenho.AMARELO, false, 2.0)
+		Desenho.icone(self, "gerador", Rect2(x + 4, 9, 18, 16), Desenho.AMARELO, Desenho.NOITE)
 		x += 30
 	# O alerta: amarelo em "atenção", vermelho em "abrigo", enquanto fora do abrigo. Fixo, sem piscar.
 	var m := missao.medidor()

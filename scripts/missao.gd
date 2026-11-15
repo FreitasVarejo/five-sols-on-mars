@@ -2,15 +2,17 @@ extends RefCounted
 ## Máquina da missão em lógica pura: sem nó, sem cena, sem UI.
 ##
 ## Dona do estado do jogo: o sol, a fase, o estado do modelo, o plano em edição, o relógio do
-## turno, o abrigo, a exposição, as tarefas de ciência, os modos de segurança e o registro de cada
-## sol (que alimenta o diário e o relatório). Toda conta de recurso vem de modelo.gd; aqui só mora
-## a ordem das coisas e as regras do turno.
+## turno, o abrigo, a exposição, as tarefas (de ciência e de manutenção), os eventos sorteados da
+## missão (tempestade solar, tempestade de poeira, quebra do gerador), os modos de segurança e o
+## registro de cada sol (que alimenta o diário e o relatório). Toda conta de recurso vem de
+## modelo.gd; aqui só mora a ordem das coisas e as regras do turno.
 ##
 ## Fases: "plano" -> "turno" -> "fim_do_sol" -> "noite" -> "plano" do sol seguinte; depois do sol 5,
 ## "relatorio". Falha leva a "seguranca" (ver _entrar_seguranca).
 ##
-## A UI chama as ações (mudar_q, alternar_tarefa, confirmar_plano, iniciar_tarefa, alternar_abrigo,
-## enviar_a_terra, reiniciar_sol, seguir_em_seguranca, jogar_de_novo) e avancar(delta), e lê o estado.
+## A UI chama as ações (mudar_q, alternar_tarefa, confirmar_plano, iniciar_tarefa, abrigar,
+## encerrar_sol, enviar_a_terra, reiniciar_sol, seguir_em_seguranca, jogar_de_novo) e avancar(delta),
+## e lê o estado.
 ## `versao` sobe a cada mudança, para a UI redesenhar só quando precisa.
 ##
 ## O sorteio vem de um gerador próprio: a semente pode ser injetada (testes e ?semente= na URL).
@@ -28,6 +30,9 @@ const SOLS_SOLAR := [3, 4]  # sóis em que pode cair a tempestade solar (um por 
 const ATRASO_MIN := 3       # o "há N min" do card da Terra, sorteado por missão
 const ATRASO_MAX := 22
 const SOL_AVISO := 2        # sol do primeiro aviso da tempestade solar
+const SOLS_EVENTO := [2, 3, 4, 5]  # sóis em que podem começar a tempestade de poeira e a quebra do gerador
+const DURACAO_POEIRA := 2   # sóis da tempestade de poeira (encurtada: a de início no sol 5 fica só nele)
+const ACELERAR := 8.0       # "Encerrar o sol": o relógio do turno corre tantas vezes mais rápido
 
 # Medidor de radiação (0..1) e seus dois limiares.
 const LIMIAR_ATENCAO := 0.4
@@ -35,15 +40,20 @@ const LIMIAR_ABRIGO := 0.7
 const MEDIDOR_BAIXO := 0.15
 const MEDIDOR_ALTO := 0.9
 
-const TAREFAS := ["chemcam", "amostra", "planta"]
+const TAREFAS := ["chemcam", "amostra", "planta"]  # as de ciência, escolhidas no plano
+const MANUTENCAO := ["gerador"]  # as que a base pede; não contam como ciência
 const EPS := 1e-9
 
 var rng := RandomNumberGenerator.new()
 var turno_s := TURNO_S
 var tarefa_s := TAREFA_S
 var forcar_sol_solar := 0   # 3 ou 4 força o sol da tempestade; 0 sorteia
+var forcar_sol_poeira := 0  # 2 a 5 força o sol de início da poeira; 0 sorteia
+var forcar_sol_quebra := 0  # 2 a 5 (e diferente de sol_solar) força o sol da quebra; 0 sorteia
 
 var sol_solar := 3
+var sol_poeira := 2         # sol em que a tempestade de poeira começa (dura DURACAO_POEIRA)
+var sol_quebra := 2         # sol em que o gerador quebra (uma vez por missão, nunca no sol_solar)
 var atraso_min := 3
 var sol := 1
 var fase := "plano"
@@ -63,7 +73,8 @@ var t_pico := -1.0         # < 0: sem pico neste turno
 var abrigado := false
 var t_exposto := 0.0       # tempo fora do abrigo depois do pico
 var t_abrigado := 0.0      # tempo abrigado no turno
-var tarefas := {}          # nome -> "pendente" | "rodando" | "feita"
+var tarefas := {}          # nome -> "pendente" | "rodando" | "feita" (ciência escolhida e manutenção)
+var acelerado := false     # "Encerrar o sol": o relógio corre ACELERAR vezes até o pôr do Sol
 var tarefa_rodando := ""
 var tarefa_t := 0.0
 
@@ -82,7 +93,8 @@ var ciencia_por_sol: Array = []
 var registros: Array = []
 
 
-## `opcoes`: turno_s, tarefa_s, sol_solar (3 ou 4, força o sol da tempestade).
+## `opcoes`: turno_s, tarefa_s, sol_solar (3 ou 4, força o sol da tempestade), sol_poeira (2 a 5) e
+## sol_quebra (2 a 5, diferente de sol_solar); valor inválido ou ausente = sorteio.
 func _init(semente: int = -1, opcoes: Dictionary = {}) -> void:
 	if semente >= 0:
 		rng.seed = semente
@@ -91,14 +103,23 @@ func _init(semente: int = -1, opcoes: Dictionary = {}) -> void:
 	turno_s = float(opcoes.get("turno_s", TURNO_S))
 	tarefa_s = float(opcoes.get("tarefa_s", TAREFA_S))
 	forcar_sol_solar = int(opcoes.get("sol_solar", 0))
+	forcar_sol_poeira = int(opcoes.get("sol_poeira", 0))
+	forcar_sol_quebra = int(opcoes.get("sol_quebra", 0))
 	nova_missao()
 
 
-## Começa uma missão nova, com novo sorteio.
+## Começa uma missão nova, com novo sorteio. Os eventos são da missão: o reinício de um sol não
+## sorteia de novo.
 func nova_missao() -> void:
 	var sorteado: int = SOLS_SOLAR[rng.randi_range(0, SOLS_SOLAR.size() - 1)]
 	sol_solar = forcar_sol_solar if forcar_sol_solar in SOLS_SOLAR else sorteado
 	atraso_min = rng.randi_range(ATRASO_MIN, ATRASO_MAX)
+	var poeira: int = SOLS_EVENTO[rng.randi_range(0, SOLS_EVENTO.size() - 1)]
+	sol_poeira = forcar_sol_poeira if forcar_sol_poeira in SOLS_EVENTO else poeira
+	# A quebra nunca cai no sol da tempestade solar, nem quando a URL força esse sol.
+	var possiveis: Array = SOLS_EVENTO.filter(func(n: int) -> bool: return n != sol_solar)
+	var quebra: int = possiveis[rng.randi_range(0, possiveis.size() - 1)]
+	sol_quebra = forcar_sol_quebra if forcar_sol_quebra in possiveis else quebra
 	modos = 0
 	ciencia_por_sol = []
 	registros = []
@@ -120,21 +141,26 @@ func eh_sol_solar() -> bool:
 	return sol == sol_solar
 
 
+## O sol está dentro da tempestade de poeira (só efeito na energia: o painel rende FATOR_POEIRA)?
+func eh_poeira() -> bool:
+	return sol >= sol_poeira and sol < sol_poeira + DURACAO_POEIRA
+
+
 ## Aviso da tempestade solar nos planos do sol 2 até o sol da tempestade, inclusive.
 func aviso_ativo() -> bool:
 	return sol >= SOL_AVISO and sol <= sol_solar
 
 
 func para_dividir() -> float:
-	return Modelo.manha(st, false)["para_dividir"]
+	return Modelo.manha(st, eh_poeira())["para_dividir"]
 
 
 func previsao() -> Dictionary:
-	return Modelo.previsao(st, false, plano_q, plano_tarefas.size())
+	return Modelo.previsao(st, eh_poeira(), plano_q, plano_tarefas.size())
 
 
 func plano_cabe(q: int, n: int) -> bool:
-	return Modelo.plano_cabe(st, false, q, n)
+	return Modelo.plano_cabe(st, eh_poeira(), q, n)
 
 
 func relogio() -> float:
@@ -182,7 +208,7 @@ func tempestade_em_curso() -> bool:
 func barras_na_fase(f: String) -> Dictionary:
 	match f:
 		"turno":
-			var bateria: float = Modelo.previsao(st, false, plano_q, plano_tarefas.size())["bateria_apos_plano"]
+			var bateria: float = Modelo.previsao(st, eh_poeira(), plano_q, plano_tarefas.size())["bateria_apos_plano"]
 			return {"E": bateria, "O": st["O"], "M": margem_ao_vivo()}
 		"fim_do_sol":
 			if not st_fim.is_empty():
@@ -198,12 +224,68 @@ func ciencia_ate_agora() -> int:
 	return ciencia_total() + (ciencia_do_sol() if fase == "turno" else 0)
 
 
+## Ciência feita no sol: só as tarefas de ciência. A manutenção não conta.
 func ciencia_do_sol() -> int:
 	var n := 0
 	for nome in tarefas:
-		if tarefas[nome] == "feita":
+		if nome in TAREFAS and tarefas[nome] == "feita":
 			n += 1
 	return n
+
+
+## A lista do turno na ordem em que a tela a mostra: a ciência escolhida e, depois, a manutenção que a
+## base pede (o gerador, enquanto o sol começou com ele quebrado).
+func lista_do_turno() -> Array:
+	var lista: Array = plano_tarefas.duplicate()
+	for nome in MANUTENCAO:
+		if _manutencao_pedida(nome):
+			lista.append(nome)
+	return lista
+
+
+## A base pede esta manutenção neste sol? (A próxima parte acrescenta o painel sujo.)
+func _manutencao_pedida(nome: String) -> bool:
+	match nome:
+		"gerador":
+			return st_inicio.get("gerador_quebrado", false)
+	return false
+
+
+## O gerador está quebrado e ainda não foi consertado neste turno?
+func gerador_quebrado_agora() -> bool:
+	return fase == "turno" and st_inicio.get("gerador_quebrado", false) and tarefas.get("gerador", "") != "feita"
+
+
+## A lista acabou: abrigado (a tripulação não faz mais nada), ou toda tarefa da lista (ciência e
+## manutenção) feita. Lista vazia conta como acabada.
+func lista_acabou() -> bool:
+	if abrigado:
+		return true
+	for nome in tarefas:
+		if tarefas[nome] != "feita":
+			return false
+	return true
+
+
+## O medidor está em "atenção" ou acima.
+func em_atencao() -> bool:
+	return medidor() >= LIMIAR_ATENCAO - EPS
+
+
+## "Encerrar o sol" valeria agora? Só no turno e só uma vez, com a lista acabada, e recusa enquanto
+## o medidor pede atenção e a tripulação está fora do abrigo (aí a criança decide: abrigar).
+func pode_encerrar_sol() -> bool:
+	if fase != "turno" or acelerado or not lista_acabou():
+		return false
+	return abrigado or not em_atencao()
+
+
+## Instante do turno em que o medidor chega a "atenção", pela rampa antes do pico. -1 sem pico.
+func t_atencao() -> float:
+	if not eh_sol_solar() or t_pico < 0.0:
+		return -1.0
+	var f := (LIMIAR_ATENCAO - MEDIDOR_BAIXO) / (LIMIAR_ABRIGO - MEDIDOR_BAIXO)
+	return t_pico - RAMPA_S + RAMPA_S * f
 
 
 func ciencia_total() -> int:
@@ -233,7 +315,7 @@ func mudar_q(delta: int) -> bool:
 	if fase != "plano":
 		return false
 	var novo := plano_q + delta
-	if not Modelo.plano_cabe(st, false, novo, plano_tarefas.size()):
+	if not Modelo.plano_cabe(st, eh_poeira(), novo, plano_tarefas.size()):
 		return false
 	plano_q = novo
 	versao += 1
@@ -248,7 +330,7 @@ func alternar_tarefa(nome: String) -> bool:
 	for n in TAREFAS:
 		if (n in plano_tarefas) != (n == nome):
 			novas.append(n)
-	if not Modelo.plano_cabe(st, false, plano_q, novas.size()):
+	if not Modelo.plano_cabe(st, eh_poeira(), plano_q, novas.size()):
 		return false
 	plano_tarefas = novas
 	versao += 1
@@ -267,9 +349,14 @@ func confirmar_plano() -> bool:
 	t_abrigado = 0.0
 	tarefa_rodando = ""
 	tarefa_t = 0.0
+	acelerado = false
 	tarefas = {}
 	for nome in plano_tarefas:
 		tarefas[nome] = "pendente"
+	# A manutenção que a base pede entra na lista (o gerador, enquanto estiver quebrado).
+	for nome in MANUTENCAO:
+		if _manutencao_pedida(nome):
+			tarefas[nome] = "pendente"
 	# O pico é sorteado de novo a cada turno (inclusive quando o sol reinicia).
 	t_pico = -1.0
 	if eh_sol_solar():
@@ -280,7 +367,8 @@ func confirmar_plano() -> bool:
 
 # --- turno -------------------------------------------------------------------
 
-## Inicia uma tarefa de ciência: escolhida no plano, pendente, sem outra rodando e fora do abrigo.
+## Inicia uma tarefa da lista (ciência escolhida ou manutenção): pendente, sem outra rodando e fora
+## do abrigo.
 func iniciar_tarefa(nome: String) -> bool:
 	if fase != "turno" or abrigado or tarefa_rodando != "":
 		return false
@@ -293,16 +381,29 @@ func iniciar_tarefa(nome: String) -> bool:
 	return true
 
 
-## O abrigo vale a qualquer momento do turno. Abrigar interrompe a tarefa que rodava: ela volta a
-## pendente e perde o andamento. É assim que o abrigo custa tempo, não energia.
-func alternar_abrigo() -> bool:
-	if fase != "turno":
+## O abrigo é de mão única: vale só no turno e só uma vez, em qualquer sol. Depois dele a tripulação
+## não faz mais tarefa nenhuma (nem ciência, nem manutenção) e não sai do abrigo. A ciência já feita
+## conta; a tarefa que rodava volta a pendente, perde o andamento e não conta. É assim que o abrigo
+## custa tempo, não energia.
+func abrigar() -> bool:
+	if fase != "turno" or abrigado:
 		return false
-	abrigado = not abrigado
-	if abrigado and tarefa_rodando != "":
+	abrigado = true
+	if tarefa_rodando != "":
 		tarefas[tarefa_rodando] = "pendente"
 		tarefa_rodando = ""
 		tarefa_t = 0.0
+	versao += 1
+	return true
+
+
+## "Encerrar o sol": o relógio do turno corre ACELERAR vezes até o pôr do Sol. A exposição e a dose
+## seguem contando em tempo de jogo (o relógio do turno), não em tempo real. No sol da tempestade, o
+## relógio acelerado para quando o medidor chega a "atenção" (ver _avancar_turno), e a criança decide.
+func encerrar_sol() -> bool:
+	if not pode_encerrar_sol():
+		return false
+	acelerado = true
 	versao += 1
 	return true
 
@@ -311,7 +412,7 @@ func alternar_abrigo() -> bool:
 func avancar(delta: float) -> void:
 	match fase:
 		"turno":
-			_avancar_turno(delta)
+			_avancar_turno(delta * (ACELERAR if acelerado else 1.0))
 		"noite":
 			t_noite += delta
 			if t_noite >= NOITE_S - EPS:
@@ -321,6 +422,12 @@ func avancar(delta: float) -> void:
 func _avancar_turno(delta: float) -> void:
 	var dt := minf(maxf(delta, 0.0), turno_s - t)
 	var t1 := t + dt
+	# Acelerado fora do abrigo no sol da tempestade: nunca passa de "atenção" (o pico segue surpresa).
+	if acelerado and not abrigado and t_atencao() >= 0.0 and t1 >= t_atencao() - EPS:
+		t1 = maxf(t, minf(t1, t_atencao()))
+		dt = t1 - t
+		acelerado = false
+		versao += 1
 	if dt > 0.0:
 		if eh_sol_solar() and t_pico >= 0.0 and not abrigado:
 			t_exposto += maxf(0.0, t1 - maxf(t, t_pico))
@@ -353,14 +460,18 @@ func _fechar_turno() -> void:
 			feitas.append(nome)
 		else:
 			nao_feitas.append(nome)
-	var r := Modelo.fechar_sol(st_inicio, false, plano_q, plano_tarefas.size(), feitas.size(), dose, false)
+	var quebrado: bool = st_inicio["gerador_quebrado"]
+	var consertou: bool = tarefas.get("gerador", "") == "feita"
+	var r := Modelo.fechar_sol(st_inicio, eh_poeira(), plano_q, plano_tarefas.size(), feitas.size(), dose, consertou)
+	acelerado = false
 	if not r["falhas"].is_empty():
 		_entrar_seguranca(r["falhas"], r["st"])
 		return
 	st_fim = r["st"]
 	ciencia_por_sol.append(feitas.size())
 	registros.append({
-		"sol": sol, "tempestade": solar, "aviso": aviso_ativo(), "atraso_min": atraso_min,
+		"sol": sol, "tempestade": solar, "poeira": eh_poeira(), "aviso": aviso_ativo(), "atraso_min": atraso_min,
+		"gerador_quebrado": quebrado, "consertou": consertou,
 		"antes": _barras(st_inicio), "depois": _barras(st_fim),
 		"q": plano_q, "escolhidas": plano_tarefas.duplicate(), "feitas": feitas, "nao_feitas": nao_feitas,
 		"ciencia": feitas.size(), "devolvida": r["devolvida"], "perdida_no_teto": r["perdida_no_teto"],
@@ -381,9 +492,10 @@ func _entrar_seguranca(lista: Array, barras: Dictionary) -> void:
 	causas = lista.duplicate()
 	causa = String(lista[0])
 	causa_sem_abrigo = causa == "radiacao" and eh_sol_solar() and t_exposto > 0.0
-	tem_conserto = Modelo.algum_plano_salva(st_inicio, false, eh_sol_solar())
+	tem_conserto = Modelo.algum_plano_salva(st_inicio, eh_poeira(), eh_sol_solar())
 	fase = "seguranca"
 	abrigado = false
+	acelerado = false
 	tarefa_rodando = ""
 	versao += 1
 
@@ -402,10 +514,11 @@ func reiniciar_sol() -> bool:
 func seguir_em_seguranca() -> bool:
 	if fase != "seguranca" or tem_conserto:
 		return false
-	st_fim = Modelo.seguir_em_seguranca(st_inicio, false, eh_sol_solar())
+	st_fim = Modelo.seguir_em_seguranca(st_inicio, eh_poeira(), eh_sol_solar())
 	ciencia_por_sol.append(0)
 	registros.append({
-		"sol": sol, "tempestade": eh_sol_solar(), "aviso": aviso_ativo(), "atraso_min": atraso_min,
+		"sol": sol, "tempestade": eh_sol_solar(), "poeira": eh_poeira(), "aviso": aviso_ativo(), "atraso_min": atraso_min,
+		"gerador_quebrado": st_inicio["gerador_quebrado"], "consertou": false,
 		"antes": _barras(st_inicio), "depois": _barras(st_fim),
 		"q": 0, "escolhidas": [], "feitas": [], "nao_feitas": [],
 		"ciencia": 0, "devolvida": 0.0, "perdida_no_teto": 0.0, "o2_produzido": 0,
@@ -435,6 +548,10 @@ func enviar_a_terra() -> bool:
 
 func _terminar_noite() -> void:
 	sol += 1
+	# O gerador quebra ao entrar no sol sorteado; o instantâneo do sol já o leva quebrado, e o
+	# reinício do sol volta a ele.
+	if sol == sol_quebra:
+		st["gerador_quebrado"] = true
 	_comecar_sol()
 
 
@@ -462,6 +579,7 @@ func _comecar_sol() -> void:
 	tarefas = {}
 	tarefa_rodando = ""
 	tarefa_t = 0.0
+	acelerado = false
 	causa = ""
 	causas = []
 	causa_sem_abrigo = false
@@ -469,7 +587,7 @@ func _comecar_sol() -> void:
 	barras_falha = {}
 	fase = "plano"
 	versao += 1
-	if Modelo.manha(st, false)["falta_aquecimento"]:
+	if Modelo.manha(st, eh_poeira())["falta_aquecimento"]:
 		_entrar_seguranca(["energia"], {"E": 0.0, "O": st["O"], "M": st["M"]})
 
 

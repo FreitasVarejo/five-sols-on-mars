@@ -10,10 +10,19 @@
 [ext_resource type="Texture2D" path="res://assets/exterior/vista_janela_normal.png" id="12_vista"]
 [ext_resource type="Script" path="res://scripts/hud_turno.gd" id="13_hud"]
 [ext_resource type="Script" path="res://scripts/terminal.gd" id="14_terminal"]
+[ext_resource type="Script" path="res://scripts/persiana.gd" id="15_persiana"]
+[ext_resource type="Shader" path="res://shaders/persiana.gdshader" id="16_persiana_sh"]
+[ext_resource type="Texture2D" path="res://assets/comodo/persiana.png" id="17_persiana"]
+[ext_resource type="Texture2D" path="res://assets/comodo/persiana_indice.png" id="18_indice"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_pan"]
 shader = ExtResource("6_shader")
 shader_parameter/zoom = 195
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_persiana"]
+shader = ExtResource("16_persiana_sh")
+shader_parameter/indice = ExtResource("18_indice")
+shader_parameter/laminas = 0
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -35,10 +44,22 @@ layout_mode = 0
 mouse_filter = 2
 texture = ExtResource("12_vista")
 
+[node name="PanoramaAnterior" type="TextureRect" parent="Sala"]
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("2_sala")
+
 [node name="Panorama" type="TextureRect" parent="Sala"]
 layout_mode = 0
 mouse_filter = 2
 texture = ExtResource("2_sala")
+
+[node name="Persiana" type="TextureRect" parent="Sala"]
+material = SubResource("ShaderMaterial_persiana")
+layout_mode = 0
+mouse_filter = 2
+texture = ExtResource("17_persiana")
+script = ExtResource("15_persiana")
 
 [node name="Telas" type="Control" parent="Sala"]
 layout_mode = 3

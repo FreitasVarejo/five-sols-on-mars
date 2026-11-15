@@ -55,8 +55,9 @@ static func largura_texto(s: String, tam: int, negrito: bool = false) -> float:
 	return f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, tam).x
 
 
-static func altura_texto(s: String, tam: int, largura: float) -> float:
-	return fonte().get_multiline_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, largura, tam).y
+static func altura_texto(s: String, tam: int, largura: float, negrito: bool = false) -> float:
+	var f := fonte_negrito() if negrito else fonte()
+	return f.get_multiline_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, largura, tam).y
 
 
 ## Barra de células: `valor` de `maximo`, cheia é bom. Cada célula é inteira ou vazia.
@@ -141,6 +142,26 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 				p + Vector2(s * 0.82, s * 0.38), p + Vector2(s * 0.52, s * 0.72), p + Vector2(s * 0.68, s * 0.72),
 				p + Vector2(s * 0.56, s * 1.0), p + Vector2(s * 0.98, s * 0.60), p + Vector2(s * 0.80, s * 0.60),
 				p + Vector2(s * 0.92, s * 0.38)]), cor)
+		"poeira":
+			# Três faixas de vento, cada uma mais curta: poeira no ar.
+			for k in 3:
+				var yk := p.y + s * (0.22 + 0.28 * k)
+				var fim_k := 8 - k * 2
+				var linha := PackedVector2Array()
+				for j in fim_k + 1:
+					linha.append(Vector2(p.x + s * (0.06 + 0.88 * j / 8.0), yk + sin(j * PI / 2.0 + k) * s * 0.07))
+				ci.draw_polyline(linha, cor, w)
+			ci.draw_circle(p + Vector2(s * 0.86, s * 0.5), maxf(1.0, s * 0.06), cor)
+			ci.draw_circle(p + Vector2(s * 0.74, s * 0.84), maxf(1.0, s * 0.05), cor)
+		"gerador":
+			# Caixa do gerador com o raio da energia dentro e dois pés.
+			ci.draw_rect(Rect2(p.x + s * 0.08, p.y + s * 0.18, s * 0.84, s * 0.58), cor, false, w)
+			ci.draw_rect(Rect2(p.x + s * 0.18, p.y + s * 0.78, s * 0.14, s * 0.14), cor)
+			ci.draw_rect(Rect2(p.x + s * 0.68, p.y + s * 0.78, s * 0.14, s * 0.14), cor)
+			ci.draw_colored_polygon(PackedVector2Array([
+				p + Vector2(s * 0.56, s * 0.26), p + Vector2(s * 0.34, s * 0.50), p + Vector2(s * 0.48, s * 0.50),
+				p + Vector2(s * 0.42, s * 0.68), p + Vector2(s * 0.68, s * 0.42), p + Vector2(s * 0.54, s * 0.42),
+			]), cor)
 		"alerta":
 			ci.draw_colored_polygon(PackedVector2Array([
 				p + Vector2(s * 0.5, s * 0.04), p + Vector2(s * 0.98, s * 0.94), p + Vector2(s * 0.02, s * 0.94)]), cor)

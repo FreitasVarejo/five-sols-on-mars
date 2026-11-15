@@ -8,6 +8,12 @@ Uso (da raiz do repo):
 Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
 Mesma câmera em todos os estados. A geometria também é a mesma, com uma única exceção
 permitida: a persiana da janela, que só o estado `abrigo` fecha. O estado muda luz e emissão.
+A persiana fica dentro do vão da janela, entre a moldura de aço e o vidro, com a largura exata
+do vão: a moldura e o montante central a tapam e continuam visíveis por cima dela. Há o estado
+extra `abrigo_aberto`: a mesma luz e emissão do `abrigo`, sem a persiana e com o vidro em alpha 0.
+Ele não entra no padrão de `--estados` (renderize com `--estados abrigo,abrigo_aberto`);
+scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como a camada da
+persiana.
 
 A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG (menos no
 `abrigo`, onde a persiana o cobre) e o Godot põe a vista de Marte atrás, por composição. A vista
@@ -38,6 +44,8 @@ RAIZ = Path(__file__).resolve().parents[2]
 CACHE = RAIZ / "arte" / "blender" / ".render"
 
 ESTADOS = ["normal", "tempestade", "abrigo", "modo_seguranca"]
+# Fora do padrão de --estados: só se pede por nome. Usa a luz do abrigo, sem a persiana.
+ESTADOS_EXTRA = ["abrigo_aberto"]
 
 # Apollo, AdamCYounis — https://lospec.com/palette-list/apollo
 APOLLO = (
@@ -366,8 +374,9 @@ def construir():
     pitch = (jz1 - jz0) / N_PERSIANA
     for k in range(N_PERSIANA):
         mat_s = faixa if k in (0, N_PERSIANA - 1) else blindagem
-        PERSIANA.append(caixa(f"persiana_{k}", (0.0, F - 0.115, jz0 + (k + 0.5) * pitch),
-                              (jl + 0.04, 0.03, pitch + 0.004), mat_s, next(i)))
+        # dentro do vão: atrás da moldura (F-0,10 a F), na frente do vidro (F-0,02), na largura dele
+        PERSIANA.append(caixa(f"persiana_{k}", (0.0, F - 0.06, jz0 + (k + 0.5) * pitch),
+                              (jl, 0.03, pitch + 0.004), mat_s, next(i)))
 
     # bancada baixa e, atrás dela, a rampa: duas faces inclinadas, cada uma virada (em guinada)
     # para o olho, como um console que envolve quem olha. Cada tela fica rente à sua face, e assim
@@ -533,7 +542,7 @@ def aplicar_estado(estado, luzes):
             luz_teto=(vermelho, 25), luz_console=(azul, 0), luz_porta=(verde, 0),
             alarme=(vermelho, 4), luz_alarme=(vermelho, 15), luminaria=(vermelho, 0.5),
             telas=0.0, janela=0.4, botoes=0.0, lampada_porta=(vermelho, 2), mundo=0.005),
-    }[estado]
+    }["abrigo" if estado == "abrigo_aberto" else estado]
 
     def luz(nome, cor_energia):
         luzes[nome].color, luzes[nome].energy = cor_energia
@@ -554,7 +563,7 @@ def aplicar_estado(estado, luzes):
             emissao(m, COR_BOTAO[n], E["botoes"])
     emissao(MATS["janela"], None, E["janela"])
     for ob in PERSIANA:                  # única diferença de geometria entre estados
-        ob.hide_render = estado != "abrigo"
+        ob.hide_render = estado != "abrigo"  # (abrigo_aberto também a esconde)
     bpy.context.scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = E["mundo"]
 
 
@@ -712,7 +721,7 @@ def contorno(p):
 
 def pixel_art(p, borda, estado):
     """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo)."""
-    if estado == "abrigo":
+    if estado in ("abrigo", "abrigo_aberto"):
         verde_ok = True
     else:
         verde_ok = np.isin(p["indice"], [INDICE[n] for n in OBJETOS_VERDES if n in INDICE])
