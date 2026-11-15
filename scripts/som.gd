@@ -33,7 +33,13 @@ const SONS := {
 	"estufa_melhorou": preload("res://assets/sons/estufa_melhorou.ogg"),
 	"estufa_piorou": preload("res://assets/sons/estufa_piorou.ogg"),
 	"estufa_ploc": preload("res://assets/sons/estufa_ploc.ogg"),
+	"squeak": preload("res://assets/sons/squeak.ogg"),  # o pato de borracha da sala (squeak(), chamado pela main.gd)
 }
+
+## O pitch de cada squeak é sorteado em 1 ± PITCH_SQUEAK, e dois toques seguidos diferem de pelo menos
+## PASSO_PITCH_SQUEAK (para cinco toques rápidos soarem diferentes).
+const PITCH_SQUEAK := 0.10
+const PASSO_PITCH_SQUEAK := 0.03
 
 ## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).
 const CLIQUE_DA_ACAO := {
@@ -52,9 +58,14 @@ const CLIQUE_DA_ACAO := {
 ## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.
 var historico: Array = []
 var total := 0
+## Os squeaks: o pitch de cada um (os últimos MAX_HISTORICO) e, depois de cada toque, quantos squeaks
+## estavam tocando ao mesmo tempo (o jogo quer sempre 1: o toque durante o som o reinicia).
+var pitches_squeak: Array = []
+var simultaneos_squeak: Array = []
 
 var _tocador: AudioStreamPlayer
 var _playback: AudioStreamPlaybackPolyphonic
+var _ids_squeak: Array = []  # os squeaks que ainda podem estar tocando (ids do playback polifônico)
 
 
 ## Aplica o volume geral ao barramento SFX e devolve o índice dele. O barramento vem do
@@ -119,6 +130,52 @@ func tocar(nome: String) -> void:
 	if _playback != null:
 		# O barramento vai na chamada: no Web (modo sample) o som ignora o barramento do player e iria ao Master.
 		_playback.play_stream(SONS[nome], 0.0, 0.0, 1.0, AudioServer.PLAYBACK_TYPE_DEFAULT, BARRAMENTO)
+
+
+## O pitch de um squeak, a partir de um sorteio `u` de 0 a 1: de 1 - PITCH_SQUEAK a 1 + PITCH_SQUEAK.
+static func pitch_do_squeak(u: float) -> float:
+	return 1.0 + (clampf(u, 0.0, 1.0) * 2.0 - 1.0) * PITCH_SQUEAK
+
+
+## O pitch do próximo squeak: sorteado, e a pelo menos PASSO_PITCH_SQUEAK do anterior (`ultimo`, 0 se não
+## houve). `sorteio` devolve números de 0 a 1 (os testes passam o deles); depois de 16 tentativas, vale o último.
+static func proximo_pitch(ultimo: float, sorteio: Callable) -> float:
+	var pitch := pitch_do_squeak(sorteio.call())
+	var tentativas := 0
+	while ultimo > 0.0 and absf(pitch - ultimo) < PASSO_PITCH_SQUEAK and tentativas < 16:
+		pitch = pitch_do_squeak(sorteio.call())
+		tentativas += 1
+	return pitch
+
+
+## O squeak do pato: pitch sorteado, e só um por vez. Se o anterior ainda toca, o toque o corta e começa
+## outro, com outro pitch.
+func squeak() -> void:
+	var ultimo: float = pitches_squeak[-1] if not pitches_squeak.is_empty() else 0.0
+	var pitch := proximo_pitch(ultimo, randf)
+	if _playback != null:
+		for id in _ids_squeak:
+			if _playback.is_stream_playing(id):
+				_playback.stop_stream(id)
+		_ids_squeak.clear()
+	total += 1
+	historico.append("squeak")
+	if historico.size() > MAX_HISTORICO:
+		historico.pop_front()
+	pitches_squeak.append(pitch)
+	if pitches_squeak.size() > MAX_HISTORICO:
+		pitches_squeak.pop_front()
+	var tocando := 0
+	if _playback != null:
+		# Mesmo barramento explícito do tocar(): no Web (modo sample) o som ignora o do player.
+		var id := _playback.play_stream(SONS["squeak"], 0.0, 0.0, pitch, AudioServer.PLAYBACK_TYPE_DEFAULT, BARRAMENTO)
+		_ids_squeak.append(id)
+		for outro in _ids_squeak:
+			if _playback.is_stream_playing(outro):
+				tocando += 1
+	simultaneos_squeak.append(tocando)
+	if simultaneos_squeak.size() > MAX_HISTORICO:
+		simultaneos_squeak.pop_front()
 
 
 ## O clique da ação, se ela faz som.
