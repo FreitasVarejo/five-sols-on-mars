@@ -750,10 +750,10 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
 		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando(),
-		_tela, _quadro_da_abertura(), TranslationServer.get_locale(), _terminal.card_id]
+		_tela, _quadro_da_abertura(), TranslationServer.get_locale(), _terminal.card_id, JSON.stringify(_terminal.rolagem_fontes())]
 	# Os retângulos da sobreposição andam com a rolagem da abertura: a sonda os relê a cada mudança.
 	if _sobreposicao != null:
 		chave += JSON.stringify(_ui_da_sobreposicao())
@@ -805,7 +805,7 @@ func _sonda_teste() -> void:
 		"estrelas": m.estrelas(),
 		"terminal_aberto": _terminal.aberto,
 		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),
-			"duracao": _terminal.duracao},
+			"duracao": _terminal.duracao, "fontes": _terminal.rolagem_fontes()},
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "card": _terminal.card_id, "relogio_parado": _terminal.segura_o_relogio(), "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},

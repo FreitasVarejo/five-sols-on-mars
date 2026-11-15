@@ -142,6 +142,8 @@ FONTE_PAINEL_FONTE,"The Planetary Society, citing JPL; dates: NASA/JPL and Guzew
 FONTE_ATRASO_FATO,A message from Earth to Mars takes 3 to 22 min.,Uma mensagem da Terra a Marte leva de 3 a 22 min.
 FONTE_ATRASO_FONTE,NASA.,NASA.
 FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estão em unidades do simulador.
+CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt)."
+CREDITOS_README,Full list in the README.,Lista completa no README.
 CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the generator made no oxygen. Next time, save power in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, guarde energia na bateria."
 CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Terminal, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Terminal, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
