@@ -293,6 +293,11 @@ func _cliques_so_quando_a_acao_acontece() -> void:
 	t._acionar("aba_fontes")
 	t._acionar("tarefa_chemcam")
 	_igual(som.historico, ["clique_navegar", "clique_navegar", "clique_navegar", "clique_navegar"], "navegar no plano")
+	# Marcar o ChemCam pela primeira vez abriu os slides da Terra: os dois botões deles navegam (tests/test_slides.gd).
+	_igual(t.card_id, "slides", "marcar o ChemCam abriu os slides")
+	t._acionar("slides_proximo")
+	t._acionar("slides_fim")
+	_igual(som.historico.slice(4), ["clique_navegar", "clique_navegar"], "os botões dos slides navegam")
 	som.historico.clear()
 	# O botão do terminal só tem o sobe e desce.
 	t._acionar("terminal")
@@ -768,6 +773,7 @@ func _turno_nas_cameras(quebrado: bool, na_arvore: bool = false) -> Array:
 	m.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": quebrado})
 	var som := Som.new()
 	var t: Control = Terminal.new()
+	t._vistos["slides_gerador"] = true  # os slides do gerador têm teste próprio (test_slides.gd): aqui a peça começa direto
 	t.som = som
 	t.iniciar(m, {})
 	_fechar_fila(t)
@@ -1056,6 +1062,7 @@ func _peca_conclui_abrigo_e_reinicio() -> void:
 	ms.montar_sol(2, {"E": 6.0, "O": 0.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
 	var som_s := Som.new()
 	var ts: Control = Terminal.new()
+	ts._vistos["slides_gerador"] = true  # os slides do gerador têm teste próprio (test_slides.gd): aqui a peça começa direto
 	ts.som = som_s
 	ts.iniciar(ms, {})
 	_fechar_fila(ts)
@@ -1083,6 +1090,7 @@ func _peca_conclui_abrigo_e_reinicio() -> void:
 	m2.modos = 3
 	var som2 := Som.new()
 	var t2: Control = Terminal.new()
+	t2._vistos["slides_gerador"] = true  # os slides do gerador têm teste próprio (test_slides.gd): aqui a peça começa direto
 	t2.som = som2
 	t2.iniciar(m2, {})
 	_fechar_fila(t2)
@@ -1104,6 +1112,7 @@ func _peca_conclui_abrigo_e_reinicio() -> void:
 	var m3 := Missao.new(1, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
 	m3.montar_sol(2, {"E": 12.0, "O": 12.0, "M": 12.0, "P": 1.0, "gerador_quebrado": true})
 	var t3: Control = Terminal.new()
+	t3._vistos["slides_gerador"] = true  # os slides do gerador têm teste próprio (test_slides.gd): aqui a peça começa direto
 	t3.iniciar(m3, {})
 	_fechar_fila(t3)
 	t3._acionar("confirmar")
@@ -1548,7 +1557,8 @@ func _aba_fontes_cabe() -> void:
 				"%s: o abrigo traz os dois números (4 na fonte, 5 no jogo)" % rotulo)
 			var rolagem: Dictionary = t.rolagem_fontes()
 			_igual(rolagem["ligada"], true, "%s: com o abrigo a lista rola" % rotulo)
-			_verdade(rolagem["maximo"] > 0.0 and rolagem["maximo"] <= 24.0, "%s: passa por poucos px (%f)" % [rotulo, rolagem["maximo"]])
+			# até 30 px: a linha das fotos nos créditos acrescentou uma linha de texto ao inglês (eram 24)
+			_verdade(rolagem["maximo"] > 0.0 and rolagem["maximo"] <= 30.0, "%s: passa por poucos px (%f)" % [rotulo, rolagem["maximo"]])
 			var c: Control = t._coluna
 			_verdade(c.visible, "%s: o filho da rolagem está à vista" % rotulo)
 			var recorte := Rect2(rolagem["recorte"][0], rolagem["recorte"][1], rolagem["recorte"][2], rolagem["recorte"][3])

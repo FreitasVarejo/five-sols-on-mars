@@ -108,7 +108,11 @@ func _tudo() -> void:
 	root.push_input(_botao(_centro(ui["cam_moxie"]), true), true)
 	root.push_input(_botao(_centro(ui["cam_moxie"]), false), true)
 	_igual(t._visor.camera_atual(), "moxie", "o clique no mapa chega ao visor")
-	_igual(m.tarefas["gerador"], "rodando", "a câmera do MOXIE inicia o conserto")
+	# Na primeira vez os slides da Terra vêm antes (tests/test_slides.gd): o conserto começa com "Consertar".
+	_igual(t.card_id, "slides", "a câmera do MOXIE abre os slides na primeira vez")
+	t._acionar("slides_proximo")
+	t._acionar("slides_fim")
+	_igual(m.tarefas["gerador"], "rodando", "Consertar inicia o conserto")
 	_igual(_main._cliques, cliques, "a sala não recebeu o clique")
 	await _quadros(2)
 	var mg: Dictionary = _main._terminal.minigame()

@@ -45,6 +45,11 @@ extends Control
 ## a ação só roda se ela confirmar. O relógio fica parado e a sala não se clica enquanto ele está aberto. Vale
 ## uma vez por carregamento da página, por ação: a flag mora em `_vistos`, que a missão não toca (o reinício
 ## do sol restaura a missão, não o terminal).
+## Slides da Terra (pedir_slides): na primeira vez que a criança marca uma tarefa de ciência no plano, ou abre o
+## conserto do gerador no turno, abre um card azul de dois slides (o porquê da ação em texto, depois a foto da peça
+## real e uma legenda), desenhado no meio da tela por cima do Painel, no alto ou embaixo. O relógio fica parado
+## com ele aberto e a ação do gerador só começa quando ele fecha. Vale uma vez por tarefa por carregamento da
+## página (a flag mora em `_vistos`, como a do card de confirmação).
 ## A aba câmeras é o visor (scripts/cameras/visor_cameras.gd), filho deste nó, por cima da aba. Ele só
 ## aparece com a aba na tela, o terminal parado no alto, sem card e sem escurecer. Escolher a câmera de
 ## uma tarefa de POR_PECA (missao.gd) pendente começa a tarefa e põe a peça dela (ChemCam, gerador) na
@@ -136,6 +141,20 @@ const CARD_TURNO_FUNDO := 322.0
 const CARD_CONF_LARGURA := 300.0
 const CARD_CONF_X_MIN := 52.0
 const CARD_CONF_X_MAX := 588.0
+# Os slides da Terra: a tarefa -> o que cada um mostra. `icones` é o slide 1 (o recurso do jogo), `fotos` o slide 2
+# (as fotos da NASA reduzidas por scripts/reduzir_foto.py, lado a lado, num espaço de 200 px) e `fim` o botão do slide 2.
+const SLIDES := {
+	"chemcam": {"icones": ["energia", "ciencia"], "fotos": [preload("res://assets/fotos/chemcam.png")], "fim": "SLIDES_ENTENDI"},
+	"amostra": {"icones": ["energia", "ciencia"], "fotos": [preload("res://assets/fotos/amostra.png"),
+		preload("res://assets/fotos/amostra_2.png")], "fim": "SLIDES_ENTENDI"},
+	"planta": {"icones": ["energia", "ciencia"], "fotos": [preload("res://assets/fotos/planta.png"),
+		preload("res://assets/fotos/planta_2.png")], "fim": "SLIDES_ENTENDI"},
+	"gerador": {"icones": ["oxigenio"], "fotos": [preload("res://assets/fotos/gerador.png")], "fim": "SLIDES_CONSERTAR"},
+}
+const SLIDES_CARD := Rect2(137, 32, 440, 264)  # no meio da tela do Painel, como o card do aviso
+const SLIDES_ZONA_W := 200.0                   # a coluna da esquerda: os ícones ou as fotos
+const SLIDES_BOTAO := Vector2(110, 36)
+const SLIDES_TAMANHOS := [13, 12, 11]          # o texto começa no maior e desce até caber
 # O card entra pela borda esquerda: anda esta distância (px) até o lugar (movimento do primo, movimento_aviso.gd).
 const CARD_DISTANCIA := 400.0
 
@@ -203,6 +222,9 @@ var _alarmou := false       # o alarme já tocou nesta travessia do limiar de ab
 var _segura_turno := false  # o card do primeiro turno ainda não fechou: o relógio não corre
 var _confirma_id := ""      # a ação do card de confirmação aberto ("" = nenhum); card_id é "confirmacao"
 var _confirma_acao := Callable()  # o que roda se a criança confirmar
+var _slides_tarefa := ""    # a tarefa cujos slides estão na tela ("" = nenhum); card_id é "slides"
+var _slides_pag := 0        # 0 = o porquê da ação, 1 = a foto da peça
+var _slides_ao_fechar := Callable()  # o que roda quando a criança fecha o slide 2 (o conserto do gerador)
 var _visor: VisorCameras    # o corpo da aba câmeras
 var _visor_chave := ""      # "sol|poeira" da última configuração do visor
 var _visor_pend := {}       # as últimas pendências enviadas ao visor
@@ -385,22 +407,25 @@ var card_aberto: bool:
 
 ## O card da tela está à vista? Os do plano, com o terminal no alto; o do primeiro turno, com ele embaixo.
 func _card_visivel() -> bool:
+	if card_id == "slides":
+		return true  # no alto ou embaixo, em qualquer fase
 	if _card_sobre_a_sala():
 		return _pos <= 0.0
 	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
 
 
-## O card da tela é dos que ficam sobre a sala, com o terminal embaixo (o do primeiro turno e o de confirmação)?
+## O card da tela é dos que ficam sobre a sala, com o terminal embaixo (o do primeiro turno e o de confirmação, e
+## o dos slides quando o Painel está embaixo)?
 func _card_sobre_a_sala() -> bool:
-	return card_id == "turno" or card_id == "confirmacao"
+	return card_id == "turno" or card_id == "confirmacao" or (card_id == "slides" and _pos <= 0.0)
 
 
 ## O relógio do turno espera? Do "Confirmar plano" do sol 1 da missão fixa até o card do primeiro turno fechar
-## (uma vez por sessão), e enquanto um card de confirmação está aberto. A main não avança a missão enquanto isto vale.
+## (uma vez por sessão), e enquanto um card de confirmação ou os slides de uma tarefa estão abertos. A main não avança a missão enquanto isto vale.
 func segura_o_relogio() -> bool:
 	if missao == null:
 		return false
-	if _segura_turno or card_id == "confirmacao":
+	if _segura_turno or card_id == "confirmacao" or card_id == "slides":
 		return true
 	# Já no quadro em que a missão entrou no turno, antes de o terminal ver a troca de fase.
 	return missao.fase == "turno" and _fase_logica != "turno" and _tem_card_de_turno()
@@ -423,6 +448,8 @@ func _mostrar_na_tela(f: String) -> void:
 	_zerar_rolagem()
 	_confirma_id = ""
 	_confirma_acao = Callable()
+	_slides_tarefa = ""
+	_slides_ao_fechar = Callable()
 	_inicio = com_inicio and TelaInicial.vale_na_fase(f)
 	_fila = _cards_do_plano() if f == "plano" else []
 	card_id = ""
@@ -499,6 +526,46 @@ func pedir_confirmacao(id: String, ao_confirmar: Callable) -> bool:
 	card_id = "confirmacao"
 	queue_redraw()
 	return true
+
+
+## Pede os slides da Terra de uma tarefa (SLIDES), para quem chama. Abre o card azul de dois slides por cima do Painel
+## (no alto ou embaixo), com o relógio parado; `ao_fechar` roda quando a criança fecha o slide 2 (o conserto do gerador
+## só começa aí; para a ciência, que já está marcada, vai vazio). Devolve true se o card abriu (quem chama não age: a
+## ação espera os slides) e false se a criança já viu os slides dessa tarefa neste carregamento da página (quem chama age
+## direto). Se outro card está aberto devolve true sem abrir e sem marcar como visto: os slides ficam para a próxima.
+## O pedido repetido, com os mesmos slides na tela, também devolve true.
+func pedir_slides(tarefa: String, ao_fechar: Callable = Callable()) -> bool:
+	var chave := "slides_" + tarefa
+	if card_id == "slides" and tarefa == _slides_tarefa:
+		return true  # um segundo pedido dos mesmos slides, com eles na tela: a ação segue esperando
+	if not SLIDES.has(tarefa) or _vistos.has(chave):
+		return false
+	if card_aberto:
+		return true
+	_vistos[chave] = true
+	_slides_tarefa = tarefa
+	_slides_pag = 0
+	_slides_ao_fechar = ao_fechar
+	card_id = "slides"
+	queue_redraw()
+	return true
+
+
+## Os slides na tela agora: {} sem eles, ou {"tarefa", "pagina"} (0 ou 1). A sonda e os testes leem.
+func slides_na_tela() -> Dictionary:
+	if card_id != "slides":
+		return {}
+	return {"tarefa": _slides_tarefa, "pagina": _slides_pag}
+
+
+## Fecha os slides e devolve o que eles guardavam para rodar (vazio se não havia).
+func _fechar_slides() -> Callable:
+	var acao := _slides_ao_fechar
+	_slides_tarefa = ""
+	_slides_pag = 0
+	_slides_ao_fechar = Callable()
+	card_id = ""
+	return acao
 
 
 ## Fecha o card de confirmação e devolve o que ele guardava para rodar (vazio se não havia).
@@ -640,7 +707,11 @@ func _botao_em(p: Vector2) -> String:
 ## Faz a ação `nome` e, se ela aconteceu de fato, toca o clique do peso dela (som.gd). O botão TERMINAL
 ## não faz clique: tem o som de subir e descer.
 func _acionar(nome: String) -> void:
-	if card_aberto and nome != "fechar_card" and not (card_id == "confirmacao" and nome in ["card_confirmar", "card_cancelar"]):
+	if card_id == "slides" or nome.begins_with("slides_"):
+		# Com os slides na tela só os botões deles valem; e os botões deles só valem com eles na tela.
+		if card_id != "slides" or not (nome in ["slides_proximo", "slides_fim"]):
+			return
+	elif card_aberto and nome != "fechar_card" and not (card_id == "confirmacao" and nome in ["card_confirmar", "card_cancelar"]):
 		return
 	var fez := true
 	match nome:
@@ -656,6 +727,19 @@ func _acionar(nome: String) -> void:
 				acao.call()
 		"card_cancelar":
 			_fechar_confirmacao()
+		"slides_proximo":
+			fez = _slides_pag == 0
+			if fez:
+				_slides_pag = 1
+				nome = "fechar_card"  # o som do clique: navegar
+		"slides_fim":
+			fez = _slides_pag == 1
+			if fez:
+				var depois := _fechar_slides()
+				nome = "fechar_card"
+				if depois.is_valid():
+					nome = ""  # o conserto toca o clique dele (confirmar)
+					depois.call()
 		"voltar_plano":
 			aba = ""
 			_zerar_rolagem()
@@ -674,7 +758,11 @@ func _acionar(nome: String) -> void:
 		"o2_mais":
 			fez = missao.mudar_q(1)
 		"tarefa_chemcam", "tarefa_amostra", "tarefa_planta":
-			fez = missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
+			var marcada := nome.trim_prefix("tarefa_")
+			fez = missao.alternar_tarefa(marcada)
+			# Marcar pela primeira vez abre os slides da Terra; a marcação vale, e desmarcar não os abre.
+			if fez and marcada in missao.plano_tarefas:
+				pedir_slides(marcada)
 		"confirmar":
 			fez = missao.confirmar_plano()
 		"ir_chemcam", "ir_gerador":
@@ -773,7 +861,8 @@ func _atualizar_visor() -> void:
 
 ## A criança escolheu uma câmera. A tarefa dela pendente, sem outra rodando, no turno e fora do abrigo,
 ## começa e a peça entra na vista. Se a tarefa já roda, só se mostra a peça que está lá. Outra tarefa
-## rodando (a amostra ou a planta, na vista de perto): nada começa, o marcador fica.
+## rodando (a amostra ou a planta, na vista de perto): nada começa, o marcador fica. O gerador, na primeira vez,
+## abre antes os slides da Terra (pedir_slides) e só começa quando a criança os fecha, com "Consertar".
 func _ao_escolher_camera(cam: String) -> void:
 	for tarefa: String in PECAS:
 		if CAMERA_DA_TAREFA[tarefa] != cam:
@@ -781,11 +870,19 @@ func _ao_escolher_camera(cam: String) -> void:
 		if missao.tarefa_rodando == tarefa:
 			if _visor.peca(cam) == null:
 				_hospedar_peca(tarefa)  # rodando sem peça (não deveria): só então se cria
-		elif missao.iniciar_tarefa(tarefa):
-			_hospedar_peca(tarefa)
-			if som != null:
-				som.clique(SOM_DE_INICIAR[tarefa])
+		elif tarefa == "gerador" and _pode_ir_a_camera(tarefa) and pedir_slides(tarefa, _comecar_peca.bind(tarefa)):
+			pass  # os slides abriram (ou outro card pede a vez): o conserto espera
+		else:
+			_comecar_peca(tarefa)
 		return
+
+
+## Começa a tarefa e põe a peça dela na vista, com o clique de começar.
+func _comecar_peca(tarefa: String) -> void:
+	if missao.iniciar_tarefa(tarefa):
+		_hospedar_peca(tarefa)
+		if som != null:
+			som.clique(SOM_DE_INICIAR[tarefa])
 
 
 func _hospedar_peca(tarefa: String) -> void:
@@ -1034,6 +1131,13 @@ func _draw() -> void:
 	elif card and card_id == "confirmacao":
 		_travado = false
 		_desenhar_card_confirmacao()
+	elif card and card_id == "slides":
+		# Os slides com o Painel embaixo: sobre a sala, que fica um pouco escurecida.
+		draw_rect(TELA, Color(Desenho.NOITE, 0.55))
+		_travado = not _card_entrou()
+		draw_set_transform_matrix(MovimentoAviso.transformacao(_t_do_card(), _pivo_do_card(Rect2()), CARD_DISTANCIA))
+		_desenhar_card_slides()
+		draw_set_transform(Vector2.ZERO)
 	if alerta_sobre_o_terminal():
 		draw_set_transform(Vector2(MovimentoAviso.tremor(_alerta_t), 0.0))
 		_desenhar_alerta()
@@ -1062,7 +1166,7 @@ func _desenhar_alerta() -> void:
 func _avancar_avisos(delta: float) -> bool:
 	var mexe := false
 	# O card conta a entrada quando chega à vista: com o terminal já no alto, ou o do turno, embaixo.
-	if _card_visivel() and (_pos >= 1.0 or card_id == "turno"):
+	if _card_visivel() and (_pos >= 1.0 or card_id == "turno" or card_id == "slides"):
 		if _card_anim_id != card_id:
 			_card_anim_id = card_id
 			_card_t = 0.0
@@ -1127,6 +1231,8 @@ func _pivo_do_card(alvo: Rect2) -> Vector2:
 			return CARD.get_center()
 		"turno":
 			return Vector2(320.0, CARD_TURNO_FUNDO - 50.0)
+		"slides":
+			return SLIDES_CARD.get_center()
 	var x := CARD_X_DIREITA if alvo.get_center().x < 360.0 else CARD_X_ESQUERDA
 	return Vector2(x + CARD_LARGURA / 2.0, clampf(alvo.get_center().y, Y_CORPO + 40.0, Y_FIM - 40.0))
 
@@ -1452,6 +1558,8 @@ func _nota(x: float, y: float, w: float, texto: String, cor: Color, negrito: boo
 func _desenhar_card(alvo: Rect2) -> void:
 	if card_id == "aviso":
 		_desenhar_card_aviso()
+	elif card_id == "slides":
+		_desenhar_card_slides()
 	else:
 		_desenhar_card_ao_lado(alvo)
 
@@ -1491,6 +1599,84 @@ func _desenhar_card_aviso() -> void:
 	Desenho.icone(self, "terra", Rect2(x, rodape + 2, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
 	_t(tr("ENVIADO_DA_TERRA") % missao.atraso_min, x + 16, rodape, 11, Desenho.TEXTO_ESCURO, larg_rodape - 16)
 	_botao("fechar_card", Rect2(r.end.x - 14 - 120, r.end.y - 12 - 36, 120, 36), tr("FECHAR"), "", true, 13, false, true)
+
+
+## Os slides da Terra: o card azul no meio da tela, com a coluna da esquerda (os ícones do recurso no slide 1, as
+## fotos no slide 2), o texto à direita e, embaixo, o rótulo "enviado da Terra", os pontos da página e o botão verde.
+## Os dois slides têm o mesmo tamanho. O texto começa em 13 px e desce até caber.
+func _desenhar_card_slides() -> void:
+	var d: Dictionary = SLIDES[_slides_tarefa]
+	var r := SLIDES_CARD
+	draw_rect(r, Desenho.AZUL)
+	var rodape_y := r.end.y - 12.0 - SLIDES_BOTAO.y
+	var zona := Rect2(r.position.x + 12.0, r.position.y + 12.0, SLIDES_ZONA_W, rodape_y - 10.0 - (r.position.y + 12.0))
+	if _slides_pag == 0:
+		_slides_icones(zona, d["icones"])
+	else:
+		_slides_fotos(zona, d["fotos"])
+	var xt := zona.end.x + 14.0
+	var larg := r.end.x - 12.0 - xt
+	var texto := tr("SLIDES_%s_%d" % [_slides_tarefa.to_upper(), _slides_pag + 1])
+	var frases := Abertura.frases(texto)
+	var tam: int = SLIDES_TAMANHOS[-1]
+	for t: int in SLIDES_TAMANHOS:
+		tam = t
+		var altura := 0.0
+		for frase: String in frases:
+			altura += Desenho.altura_texto(frase, t, larg, true) + 4.0
+		if altura <= zona.size.y:
+			break
+	var yy := zona.position.y
+	for frase: String in frases:
+		yy += _t(frase, xt, yy, tam, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
+	# O rodapé: o "enviado da Terra" à esquerda, os pontos da página e o botão à direita.
+	var x := r.position.x + 12.0
+	var y_meio := rodape_y + SLIDES_BOTAO.y / 2.0
+	Desenho.icone(self, "terra", Rect2(x, y_meio - 6.0, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
+	_t(tr("ENVIADO_DA_TERRA") % missao.atraso_min, x + 16.0, y_meio - Desenho.fonte().get_height(11) / 2.0, 11, Desenho.TEXTO_ESCURO)
+	var botao := Rect2(r.end.x - 12.0 - SLIDES_BOTAO.x, rodape_y, SLIDES_BOTAO.x, SLIDES_BOTAO.y)
+	for i in 2:
+		var c := Vector2(botao.position.x - 24.0 + i * 12.0, y_meio)
+		draw_circle(c, 3.0, Desenho.TEXTO_ESCURO)
+		if i != _slides_pag:
+			draw_circle(c, 1.6, Desenho.AZUL)  # a página que não está na tela é um anel
+	if _slides_pag == 0:
+		_botao("slides_proximo", botao, tr("SLIDES_PROXIMO"), "", true, 13, false, true)
+	else:
+		_botao("slides_fim", botao, tr(d["fim"]), "", true, 13, false, true)
+
+
+## Slide 1: o recurso do jogo, em ícone e nome, sobre um quadro escuro (ali as cores dos recursos têm contraste).
+## Energia → ciência na ciência; o O₂ sozinho no gerador.
+func _slides_icones(zona: Rect2, icones: Array) -> void:
+	draw_rect(zona, Desenho.NOITE)
+	var lado := 48.0
+	var n := icones.size()
+	var passo := 72.0 if n > 1 else 0.0
+	var x0 := zona.get_center().x - (n - 1) * passo / 2.0
+	var y := zona.get_center().y - 28.0
+	for i in n:
+		var nome: String = icones[i]
+		var cx := x0 + i * passo
+		Desenho.icone(self, nome, Rect2(cx - lado / 2.0, y, lado, lado), Desenho.cor_recurso(nome), Desenho.NOITE)
+		var rotulo := tr(nome.to_upper())
+		_t(rotulo, cx - 40.0, y + lado + 6.0, 12, Desenho.TEXTO, 80.0, HORIZONTAL_ALIGNMENT_CENTER, true)
+	if n > 1:
+		var xs := zona.get_center().x
+		var ys := y + lado / 2.0
+		draw_line(Vector2(xs - 9.0, ys), Vector2(xs + 5.0, ys), Desenho.TEXTO, 2.0)
+		draw_colored_polygon(PackedVector2Array([Vector2(xs + 10.0, ys), Vector2(xs + 3.0, ys - 5.0), Vector2(xs + 3.0, ys + 5.0)]), Desenho.TEXTO)
+
+
+## Slide 2: as fotos reduzidas, lado a lado (4 px entre elas), no alto da coluna e com uma moldura escura de 1 px.
+## A textura é desenhada no tamanho dela, sem esticar nem suavizar.
+func _slides_fotos(zona: Rect2, fotos: Array) -> void:
+	var x := zona.position.x
+	for foto: Texture2D in fotos:
+		var p := Vector2(x, zona.position.y + roundf((zona.size.y - foto.get_height()) / 2.0))
+		draw_rect(Rect2(p, foto.get_size()).grow(1.0), Desenho.TEXTO_ESCURO, false, 1.0)
+		draw_texture(foto, p)
+		x += foto.get_width() + 4.0
 
 
 ## A frase do dado do build, datada ("Dados do DONKI de 14/11/2026: 25 chegadas previstas a Marte em 60 dias. A
