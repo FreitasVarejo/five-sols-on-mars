@@ -432,13 +432,16 @@ func _contorno_na_tela(r: Rect2) -> PackedVector2Array:
 func _ao_clicar(nome: String) -> void:
 	_cliques += 1
 	_ultimo_clique = nome
+	var fez := false
 	match nome:
 		"abrigo":
-			_missao.abrigar()
+			fez = _missao.abrigar()
 		"estufa":
-			_missao.iniciar_tarefa("planta")
+			fez = _missao.iniciar_tarefa("planta")
 		"glovebox":
-			_missao.iniciar_tarefa("amostra")
+			fez = _missao.iniciar_tarefa("amostra")
+	if fez:
+		_som.clique(nome)
 	_sonda_teste()
 
 

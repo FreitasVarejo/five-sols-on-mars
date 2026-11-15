@@ -22,6 +22,9 @@ func _init() -> void:
 	_inverte_no_meio()
 	_confirmar_plano_desce_com_o_plano()
 	_fim_do_turno_sobe_depois_do_escurecimento()
+	_cliques_so_quando_a_acao_acontece()
+	_desligar_no_meio_do_turno()
+	_desligar_pelo_relogio()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -194,5 +197,117 @@ func _fim_do_turno_sobe_depois_do_escurecimento() -> void:
 	_igual(t.aba_na_tela(), "diario", "sobe com o diário do fim do sol")
 	_rodar(t, m, t.duracao + 0.1)
 	_igual(t.posicao(), 1.0, "no alto")
+	som.free()
+	t.free()
+
+
+func _cliques_so_quando_a_acao_acontece() -> void:
+	var c := _montar({"turno_s": 30.0})
+	var t: Control = c[0]
+	var m: Missao = c[1]
+	var som: Som = c[2]
+	# No plano: o mais e as teclas navegam; tarefa liga e desliga.
+	t._acionar("o2_mais")
+	t._acionar("aba_fontes")
+	t._acionar("aba_fontes")
+	t._acionar("tarefa_chemcam")
+	_igual(som.historico, ["clique_navegar", "clique_navegar", "clique_navegar", "clique_navegar"], "navegar no plano")
+	som.historico.clear()
+	# O botão do terminal só tem o sobe e desce.
+	t._acionar("terminal")
+	t._acionar("terminal")
+	_igual(som.historico, ["terminal_desce", "terminal_sobe"], "o botão TERMINAL não faz clique")
+	som.historico.clear()
+	# Com o card da Terra aberto, só o Fechar vale: o resto não faz som.
+	t.card_aberto = true
+	t._acionar("o2_mais")
+	t._acionar("confirmar")
+	_igual(som.historico, [], "bloqueado pelo card: sem som")
+	_igual(m.fase, "plano", "o card barrou o confirmar")
+	t._acionar("fechar_card")
+	_igual(som.historico, ["clique_navegar"], "fechar o card navega")
+	som.historico.clear()
+	# O2 menos sem O2 no plano não acontece.
+	m.plano_q = 0
+	t._acionar("o2_menos")
+	_igual(som.historico, [], "ação que não acontece não faz som")
+	# Confirmar é do peso de confirmar, e o sol segue.
+	t._acionar("confirmar")
+	_rodar(t, m, QUADRO * 2.0)
+	_igual(som.historico, ["clique_confirmar", "terminal_desce"], "confirmar: clique e a descida")
+	som.historico.clear()
+	# No turno, a tecla desabilitada (diário) não faz nada.
+	_rodar(t, m, t.duracao * 1.5)
+	t._acionar("aba_diario")
+	_igual(som.historico, [], "tecla desabilitada: sem som")
+	t._acionar("aba_cameras")
+	_igual(som.historico, ["clique_navegar"], "tecla habilitada navega")
+	som.free()
+	t.free()
+
+
+## Joga o turno até a missão sair dele (o terminal anda junto).
+func _ate_sair_do_turno(t: Control, m: Missao) -> void:
+	var guarda := 0
+	while m.fase == "turno" and guarda < 4000:
+		_rodar(t, m, 0.05)
+		guarda += 1
+
+
+func _desligar_no_meio_do_turno() -> void:
+	# Margem 4 exposta ao pico: a margem ao vivo zera e o modo de segurança entra no meio do turno.
+	var m := Missao.new(21, {"sol_solar": 3, "sol_poeira": 5, "sol_quebra": 2})
+	m.montar_sol(3, {"E": 6.0, "O": 4.0, "M": 4.0, "P": 1.0, "gerador_quebrado": false})
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	t._acionar("fechar_card")  # o sol 3 abre com o aviso da Terra
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)
+	som.historico.clear()
+	_ate_sair_do_turno(t, m)
+	_igual(m.fase, "seguranca", "entrou no modo de segurança no meio do turno")
+	_igual(m.modos, 1, "uma entrada")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(som.historico, ["desligar", "terminal_sobe"], "meio do turno: desligar na hora, junto com a subida")
+	_igual(t._fade_estado, "", "sem escurecimento no meio do turno")
+	_rodar(t, m, 2.0)
+	_igual(som.historico, ["desligar", "terminal_sobe"], "o desligar não repete enquanto fica no modo de segurança")
+	som.free()
+	t.free()
+
+
+func _desligar_pelo_relogio() -> void:
+	# O2 1 sem produzir: a falha vem no fim do turno, com o escurecimento.
+	var m := Missao.new(1, {"sol_solar": 3, "turno_s": 4.0})
+	m.montar_sol(1, {"E": 6.0, "O": 1.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)
+	som.historico.clear()
+	_ate_sair_do_turno(t, m)
+	_igual(m.fase, "seguranca", "entrou no modo de segurança no fim do turno")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(t._fade_estado, "escurecendo", "escurecendo")
+	_igual(som.historico, ["desligar"], "relógio: o desligar toca no começo do escurecimento, sem subir ainda")
+	_rodar(t, m, Terminal.ESCURECER_S + 0.05)
+	_igual(som.historico, ["desligar", "terminal_sobe"], "depois do escurecimento, a subida")
+	# Reiniciar o sol não conta como entrada; entrar de novo toca de novo.
+	som.historico.clear()
+	t._acionar("reiniciar")
+	_igual(m.fase, "plano", "reiniciou")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(som.historico, ["clique_confirmar"], "reiniciar toca o clique e não o desligar")
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)
+	som.historico.clear()
+	_ate_sair_do_turno(t, m)
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(m.modos, 2, "segunda entrada")
+	_igual(som.historico, ["desligar"], "cada entrada toca o desligar uma vez")
 	som.free()
 	t.free()

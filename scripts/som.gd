@@ -6,6 +6,9 @@ extends Node
 ##
 ## O mudo fica guardado no navegador (localStorage, só no Web). Fora do Web, ou se o acesso falhar,
 ## o jogo segue sem mudo guardado: vale só na sessão.
+##
+## Cada clique tem um peso (navegar, confirmar, abrigo), escolhido pelo nome da ação do terminal ou da
+## sala (clique_da_acao). O botão do terminal, as setas e o mudo não fazem clique.
 
 const BARRAMENTO := &"SFX"
 const VOLUME_GERAL_DB := 0.0   # o único botão de volume do jogo; a persiana tem o -4 dB dela por cima
@@ -19,6 +22,19 @@ const SONS := {
 	"terminal_sobe": preload("res://assets/sons/terminal_sobe.ogg"),
 	"terminal_desce": preload("res://assets/sons/terminal_desce.ogg"),
 	"desligar": preload("res://assets/sons/desligar.ogg"),
+}
+
+## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).
+const CLIQUE_DA_ACAO := {
+	"aba_cameras": "clique_navegar", "aba_tarefas": "clique_navegar", "aba_diario": "clique_navegar",
+	"aba_fontes": "clique_navegar", "voltar_plano": "clique_navegar", "fechar_card": "clique_navegar",
+	"o2_menos": "clique_navegar", "o2_mais": "clique_navegar", "tarefa_chemcam": "clique_navegar",
+	"tarefa_amostra": "clique_navegar", "tarefa_planta": "clique_navegar",
+	"confirmar": "clique_confirmar", "enviar": "clique_confirmar", "iniciar_chemcam": "clique_confirmar",
+	"consertar_gerador": "clique_confirmar", "reiniciar": "clique_confirmar", "seguir": "clique_confirmar",
+	"jogar_de_novo": "clique_confirmar", "estufa": "clique_confirmar", "glovebox": "clique_confirmar",
+	"abrigo": "clique_abrigo",
+	"encerrar_sol": "clique_confirmar",  # provisório: o botão sai do terminal quando a porta entrar
 }
 
 ## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.
@@ -40,6 +56,11 @@ static func garantir_barramento() -> int:
 		AudioServer.set_bus_send(i, &"Master")
 	AudioServer.set_bus_volume_db(i, VOLUME_GERAL_DB)
 	return i
+
+
+## O clique da ação `acao` ("" se a ação não faz som).
+static func clique_da_acao(acao: String) -> String:
+	return CLIQUE_DA_ACAO.get(acao, "")
 
 
 ## O texto guardado no navegador vira o mudo: só "1" liga.
@@ -83,6 +104,13 @@ func tocar(nome: String) -> void:
 		historico.pop_front()
 	if _playback != null:
 		_playback.play_stream(SONS[nome])
+
+
+## O clique da ação, se ela faz som.
+func clique(acao: String) -> void:
+	var nome := clique_da_acao(acao)
+	if nome != "":
+		tocar(nome)
 
 
 # --- localStorage (só Web) --------------------------------------------------------

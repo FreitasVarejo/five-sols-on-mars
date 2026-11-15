@@ -13,6 +13,7 @@ func _init() -> void:
 	_barramento()
 	_mudo()
 	_tocar()
+	_peso_dos_cliques()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -60,4 +61,28 @@ func _tocar() -> void:
 	_igual(som.total, 2, "contagem")
 	for nome: String in Som.SONS:
 		_igual(Som.SONS[nome] is AudioStream, true, "som carregado: " + nome)
+	som.free()
+
+
+func _peso_dos_cliques() -> void:
+	var navegar := ["aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes", "voltar_plano", "fechar_card",
+		"o2_menos", "o2_mais", "tarefa_chemcam", "tarefa_amostra", "tarefa_planta"]
+	var confirmar := ["confirmar", "enviar", "iniciar_chemcam", "consertar_gerador", "reiniciar", "seguir",
+		"jogar_de_novo", "estufa", "glovebox"]
+	for acao: String in navegar:
+		_igual(Som.clique_da_acao(acao), "clique_navegar", "navegar: " + acao)
+	for acao: String in confirmar:
+		_igual(Som.clique_da_acao(acao), "clique_confirmar", "confirmar: " + acao)
+	_igual(Som.clique_da_acao("abrigo"), "clique_abrigo", "o botão do abrigo na sala")
+	# Sem clique: o botão do terminal (tem o sobe e desce), as setas e o mudo.
+	for acao: String in ["terminal", "seta_esq", "seta_dir", "mudo", "", "não_existe"]:
+		_igual(Som.clique_da_acao(acao), "", "sem clique: " + acao)
+	# Todo clique do mapa existe como som.
+	for acao: String in Som.CLIQUE_DA_ACAO:
+		_igual(Som.SONS.has(Som.CLIQUE_DA_ACAO[acao]), true, "o som de " + acao + " existe")
+	var som := Som.new()
+	som.clique("o2_mais")
+	som.clique("terminal")
+	som.clique("abrigo")
+	_igual(som.historico, ["clique_navegar", "clique_abrigo"], "clique() toca só o que faz som")
 	som.free()

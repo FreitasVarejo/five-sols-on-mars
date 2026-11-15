@@ -95,6 +95,7 @@ var card_aberto := false    # o card da Terra por cima do plano
 var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
 
 var _fase_logica := "plano"
+var _modos_vistos := 0      # quantas entradas no modo de segurança o terminal já viu (cada uma toca o desligar)
 var _fase_tela := "plano"   # a fase que o terminal desenha (ver o cabeçalho)
 var _pos := 1.0             # 0 = abaixado, 1 = no alto; anda até `aberto` em `duracao` s
 var _fade := 0.0
@@ -111,6 +112,7 @@ func iniciar(m: Missao, dado_donki: Dictionary) -> void:
 	missao = m
 	donki = dado_donki
 	_fase_logica = m.fase
+	_modos_vistos = m.modos
 	_mostrar_fase(m.fase)
 	aberto = _abre_na_fase(m.fase)
 	_pos = 1.0 if aberto else 0.0
@@ -237,6 +239,11 @@ func _animar(delta: float) -> void:
 func _process(delta: float) -> void:
 	if missao == null:
 		return
+	# Cada entrada no modo de segurança toca o desligar uma vez, no mesmo quadro em que o terminal a vê:
+	# com o relógio, é o começo do escurecimento; no meio do turno, a hora da entrada.
+	if missao.modos > _modos_vistos and som != null:
+		som.tocar("desligar")
+	_modos_vistos = missao.modos
 	if missao.fase != _fase_logica:
 		_ao_mudar_de_fase(_fase_logica, missao.fase)
 	match _fade_estado:
@@ -303,9 +310,12 @@ func _botao_em(p: Vector2) -> String:
 	return ""
 
 
+## Faz a ação `nome` e, se ela aconteceu de fato, toca o clique do peso dela (som.gd). O botão TERMINAL
+## não faz clique: tem o som de subir e descer.
 func _acionar(nome: String) -> void:
 	if card_aberto and nome != "fechar_card":
 		return
+	var fez := true
 	match nome:
 		"terminal":
 			_definir_aberto(not aberto)
@@ -314,40 +324,43 @@ func _acionar(nome: String) -> void:
 		"voltar_plano":
 			aba = ""
 		"aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes":
-			_apertar_tecla(nome.trim_prefix("aba_"))
+			fez = _apertar_tecla(nome.trim_prefix("aba_"))
 		"o2_menos":
-			missao.mudar_q(-1)
+			fez = missao.mudar_q(-1)
 		"o2_mais":
-			missao.mudar_q(1)
+			fez = missao.mudar_q(1)
 		"tarefa_chemcam", "tarefa_amostra", "tarefa_planta":
-			missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
+			fez = missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
 		"confirmar":
-			missao.confirmar_plano()
+			fez = missao.confirmar_plano()
 		"iniciar_chemcam":
-			missao.iniciar_tarefa("chemcam")
+			fez = missao.iniciar_tarefa("chemcam")
 		"consertar_gerador":
-			missao.iniciar_tarefa("gerador")
+			fez = missao.iniciar_tarefa("gerador")
 		"encerrar_sol":
-			missao.encerrar_sol()
+			fez = missao.encerrar_sol()
 		"enviar":
-			missao.enviar_a_terra()
+			fez = missao.enviar_a_terra()
 		"reiniciar":
-			missao.reiniciar_sol()
+			fez = missao.reiniciar_sol()
 		"seguir":
-			missao.seguir_em_seguranca()
+			fez = missao.seguir_em_seguranca()
 		"jogar_de_novo":
-			missao.jogar_de_novo()
+			fez = missao.jogar_de_novo()
+	if fez and som != null:
+		som.clique(nome)
 	queue_redraw()
 
 
 ## Apertar a tecla da aba na tela volta à tela própria da fase; apertar outra abre a aba dela.
 ## A aba que a própria fase mostra (tarefas no turno, diário no fim do sol) fica como "".
-func _apertar_tecla(nome: String) -> void:
+func _apertar_tecla(nome: String) -> bool:
 	if not _aba_habilitada(nome):
-		return
+		return false
 	aba = "" if aba_na_tela() == nome else nome
 	if aba == _aba_da_fase(_fase_tela):
 		aba = ""
+	return true
 
 
 # --- desenho: peças ------------------------------------------------------------
