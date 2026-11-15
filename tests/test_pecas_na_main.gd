@@ -73,7 +73,8 @@ func _tudo() -> void:
 	root.add_child(_main)
 	await _quadros(2)
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
 	if _main.tela_atual() == "pagina":
 		_main.sobreposicao().avancar(1.0)

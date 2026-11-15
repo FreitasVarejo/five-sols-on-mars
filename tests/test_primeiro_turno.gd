@@ -65,7 +65,8 @@ func _tudo() -> void:
 	await process_frame
 	await process_frame
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
 	_igual(_main.tela_atual(), "pagina", "depois da abertura vem a página do diário do sol 1")
 	if _main.tela_atual() == "pagina":

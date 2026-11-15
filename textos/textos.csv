@@ -186,6 +186,19 @@ ABERTURA_FIM_B,Send science home.,Mande ciência para casa.
 ABERTURA_FIM_BOTAO,Start mission,Começar a missão
 ABERTURA_PULAR,Skip,Pular
 JOGAR,Play,Jogar
+VIAGEM_TITULO,Trip to Mars,Viagem para Marte
+VIAGEM_POUSO,Landing confirmed!,Pouso confirmado!
+VIAGEM_DIA,"Day %d of 254 · like Curiosity, landed in Gale","Dia %d de 254 · como o Curiosity, que pousou em Gale"
+VIAGEM_REGISTRO,Mission log,Registro da missão
+VIAGEM_PROGRESSO,Earth to Mars,Da Terra a Marte
+VIAGEM_PULAR,Skip,Pular
+VIAGEM_P1,Engines ignite,Ignição dos motores
+VIAGEM_P2,Stages separate,Separação de estágios
+VIAGEM_P3,Transfer orbit to Mars,Órbita de transferência
+VIAGEM_P4,Midcourse correction,Correção de rota
+VIAGEM_P5,Approaching Mars,Aproximação de Marte
+VIAGEM_P6,Atmosphere entry,Entrada na atmosfera
+VIAGEM_P7,Parachutes open,Paraquedas abertos
 SOL1_CARD_O2,Give energy to the oxygen machine here.,Dê energia à máquina de oxigênio aqui.
 SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos da Terra ficam aqui. Cada um dá ciência.
 SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."

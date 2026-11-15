@@ -1,6 +1,6 @@
 extends SceneTree
 ## Teste headless da tela inicial (scripts/inicio.gd) e do começo do jogo na main (main.gd): tela inicial ->
-## abertura -> plano do sol 1. A escolha de idioma e o "Jogar", os alvos, o que fica parado por baixo
+## viagem -> abertura -> plano do sol 1. A escolha de idioma e o "Jogar", os alvos, o que fica parado por baixo
 ## enquanto uma sobreposição está na tela, o fluxo com o botão final e com o "Pular", e o "Free play" que
 ## nunca volta à tela inicial.
 ## Roda com: godot --headless --path . --script tests/test_inicio.gd
@@ -8,6 +8,7 @@ extends SceneTree
 
 const Inicio := preload("res://scripts/inicio.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
+const Viagem := preload("res://scripts/abertura/viagem.gd")
 const Main := preload("res://scripts/main.gd")
 
 var falhas := 0
@@ -154,9 +155,18 @@ func _fluxo_com_o_botao_final() -> void:
 	_igual(m._tela_oxigenio.nome, "Oxigênio", "a tela de oxigênio da sala segue o idioma")
 	m.sobreposicao().acionar("idioma_en")
 	_igual(m._tela_energia.nome, "Energy", "volta ao inglês")
-	# Jogar -> abertura.
+	# Jogar -> viagem -> abertura.
 	m.sobreposicao().acionar("jogar")
-	_igual(m.tela_atual(), "abertura", "Jogar leva à abertura")
+	_igual(m.tela_atual(), "viagem", "Jogar leva à viagem")
+	_verdade(m.sobreposicao() is Viagem, "a sobreposição é a viagem")
+	_igual(m._terminal.is_processing_input(), false, "o terminal segue sem entrada na viagem")
+	_igual(m._ui_da_tela().has("pular"), false, "a viagem só lista o pular depois de 1,5 s")
+	var viagem: Viagem = m.sobreposicao()
+	viagem.avancar(2.0)
+	_verdade(m._ui_da_tela().has("pular"), "a sonda lista o pular da viagem")
+	_igual(m._cliques, 0, "a viagem não clica a sala")
+	viagem.avancar(Viagem.DURACAO + Viagem.POUSO_S)
+	_igual(m.tela_atual(), "abertura", "o fim da viagem leva à abertura")
 	_verdade(m.sobreposicao() is Abertura, "a sobreposição é a abertura")
 	_igual(m._terminal.is_processing_input(), false, "o terminal segue sem entrada na abertura")
 	_verdade(m._ui_da_tela().has("pular"), "a sonda lista o pular")
@@ -190,6 +200,18 @@ func _fluxo_com_o_pular() -> void:
 	TranslationServer.set_locale("en")
 	var m: Control = await _nova_main()
 	m.sobreposicao().acionar("jogar")
+	# O Pular da viagem leva à abertura; o da abertura, ao jogo.
+	var viagem: Viagem = m.sobreposicao()
+	var antes: Vector2 = viagem.rect_pular().get_center()
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = antes
+	viagem._gui_input(ev)
+	_igual(m.tela_atual(), "viagem", "o Pular da viagem antes de 1,5 s não vale")
+	viagem.avancar(2.0)
+	viagem._gui_input(ev)
+	_igual(m.tela_atual(), "abertura", "o Pular da viagem leva à abertura")
 	var abertura: Abertura = m.sobreposicao()
 	var pular := abertura.rect_pular().get_center()
 	var e := InputEventMouseButton.new()
@@ -217,7 +239,8 @@ func _free_play_nao_passa_pela_tela_inicial() -> void:
 	TranslationServer.set_locale("en")
 	var m: Control = await _nova_main()
 	m.sobreposicao().acionar("jogar")
-	m.sobreposicao().concluida.emit()
+	m.sobreposicao().concluida.emit()  # a viagem
+	m.sobreposicao().concluida.emit()  # a abertura
 	await process_frame
 	m.sobreposicao().avancar(1.0)
 	m.sobreposicao().acionar("continuar")
@@ -228,7 +251,7 @@ func _free_play_nao_passa_pela_tela_inicial() -> void:
 	_verdade(missao.jogar_de_novo(), "o 'Free play' recomeça")
 	await process_frame
 	await process_frame
-	_igual(m.tela_atual(), "jogo", "o Free play vai direto ao plano, sem tela inicial nem abertura")
+	_igual(m.tela_atual(), "jogo", "o Free play vai direto ao plano, sem tela inicial, viagem nem abertura")
 	_verdade(m.sobreposicao() == null, "sem sobreposição no Free play")
 	_igual(missao.fase, "plano", "plano")
 	_verdade(missao.livre, "em modo livre")
