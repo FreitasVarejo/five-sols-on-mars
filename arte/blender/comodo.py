@@ -15,9 +15,18 @@ Ele não entra no padrão de `--estados` (renderize com `--estados abrigo,abrigo
 scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como a camada da
 persiana.
 
+Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
+em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
+própria (luvas, tubo de amostra, alface); o console tem teclado, gaveteiro e caneca, e o pilar da
+Terra, antena de prato e fone. Na imagem, cada face plana de cada objeto resolve em dois tons
+(o dela e a sombra), um filtro de maioria tira o pixel solto, e o verde, o azul e o rosa da
+paleta só aparecem nos objetos que têm esse sentido no jogo (pixel_art).
+
 A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG (menos no
 `abrigo`, onde a persiana o cobre) e o Godot põe a vista de Marte atrás, por composição. A vista
-vem do exterior.py, que usa a mesma câmera (OLHO, PANORAMA) deste script.
+vem do exterior.py, que usa a mesma câmera (OLHO, PANORAMA) deste script. O vidro não ilumina a
+sala, e o traço dele e as faces internas da moldura saem em neutro escuro (COR_AROS_JANELA): o
+Godot escurece a vista no pôr do Sol e à noite.
 
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
 calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa, glovebox e
@@ -41,7 +50,7 @@ import bmesh
 import bpy
 import numpy as np
 import OpenImageIO as oiio
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 RAIZ = Path(__file__).resolve().parents[2]
 CACHE = RAIZ / "arte" / "blender" / ".render"
@@ -283,9 +292,15 @@ TELA_TAMANHO = (1.02, 0.40)
 JANELA_OBJS = ("janela_moldura_topo", "janela_moldura_base", "janela_moldura_esq",
                "janela_moldura_dir", "janela_moldura_montante", "janela")
 
+# trechos (metros) da calha e da faixa de parede acima dela: na frente em x, nos lados em y
+TRECHOS_FRENTE = ((-2.6, -1.95), (-1.95, -1.3), (-1.3, -0.65), (-0.65, 0.0), (0.0, 0.65),
+                  (0.65, 1.3), (1.3, 1.95), (1.95, 2.6))
+TRECHOS_LADO = ((-1.0, 0.0), (0.0, 0.75), (0.75, 1.5), (1.5, 2.2))
+
 COR_TELA_APAGADA = "202e37"          # cor única das telas em branco (Apollo)
 TELAS_APAGADAS = ("energia_tela", "oxigenio_tela", "radiacao_tela", "comunicacao_tela")
 AZUL_TERRA = "73bed3"                # azul é só do que vem da Terra (moldura da tela de comunicação)
+COR_AROS_JANELA = "151d28"           # traço do vidro e faces internas da moldura, em todo estado
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
 
 
@@ -297,15 +312,289 @@ def botao(nome, cor):
     return mb
 
 
+def mat(nome, hexa, emite=False):
+    """Material pelo nome, criado na primeira vez. `emite`: cor chapada de emissão, igual em
+    todos os estados (o miolo das câmaras de ciência, como as telas)."""
+    if nome not in MATS:
+        if emite:
+            tela_apagada(nome, hexa)
+        else:
+            material(nome, hexrgb(hexa))
+    return MATS[nome]
+
+
+def disco(nome, centro, rx, rz, espessura, mat_, indice, eixo, giro=0.0, segs=20):
+    """Elipse de rx por rz (metros), com espessura, de face para `eixo`; `giro` (graus) a gira no
+    próprio plano, no sentido anti-horário de quem olha. rz é a medida que fica em pé."""
+    me = bpy.data.meshes.new(nome)
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=1.0, radius2=1.0,
+                          depth=espessura)
+    for v in bm.verts:
+        v.co.x *= rx
+        v.co.y *= rz
+    bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0),
+                     matrix=Matrix.Rotation(math.radians(giro), 3, "Z"))
+    bm.to_mesh(me)
+    bm.free()
+    ob = _objeto(nome, me, mat_, indice)
+    ob.location = centro
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = Vector(eixo).to_track_quat("Z", "Y")
+    return ob
+
+
+def apontar(ob, eixo):
+    """Gira o objeto para o eixo z local seguir `eixo`."""
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = Vector(eixo).normalized().to_track_quat("Z", "Y")
+    return ob
+
+
+def _faixas_de_parede(i, nome, eixo, plano, trechos, z0, z1, recuo, mat_):
+    """Placas encostadas na parede, uma por trecho, cada uma com índice próprio (a junta sai
+    do contorno). eixo 'x': parede da frente (trechos em x); 'y': paredes laterais (em y).
+    plano: a coordenada da face da parede; recuo: espessura da placa, para dentro da sala."""
+    lado = 1 if plano > 0 else -1
+    for k, (a0, a1) in enumerate(trechos):
+        meio, larg = (a0 + a1) / 2, a1 - a0
+        c = plano - lado * recuo / 2
+        if eixo == "x":
+            caixa(f"{nome}{k}", (meio, c, (z0 + z1) / 2), (larg, recuo, z1 - z0), mat_, next(i))
+        else:
+            caixa(f"{nome}{k}", (c, meio, (z0 + z1) / 2), (recuo, larg, z1 - z0), mat_, next(i))
+
+
+def _paredes(i, W, F):
+    """Casco com cara de módulo: placas de 1,5 cm com juntas na metade de cima e na faixa acima
+    da calha, meia-parede um tom mais escura embaixo, friso entre as duas, rodapé e o teto em
+    placas. Tudo entra em RECUO (prefixos `parede_` e `teto_`): o traço entre essas peças é
+    meio-tom. Nada encosta na janela nem na porta.
+    Um só grupo de detalhe médio em parede livre: a grade de ventilação entre a janela e a
+    glovebox, no alto, longe dos clicáveis."""
+    placa = mat("parede_placa", "8a9f9e")
+    baixa = mat("parede_baixa", "5f7778")
+    rodape = mat("parede_rodape", "394a50")
+    friso = MATS["nervura"]
+    zc = (0.86, 1.97)          # placas de cima: do friso até a calha
+    zb = (0.13, 0.845)         # meia-parede: do rodapé até o friso
+    frente_cima = ((-W, -2.0), (-2.0, -1.40), (1.40, 2.0), (2.0, W))
+    frente_baixo = ((-W, -1.8), (-1.8, -0.9), (-0.9, 0.0), (0.0, 0.9), (0.9, 1.8), (1.8, W))
+    esq = ((1.07, 2.0), (2.0, F))       # a porta vai até y 1,07
+    dir_ = ((0.0, 1.0), (1.0, 2.0), (2.0, F))
+    _faixas_de_parede(i, "parede_placa_f", "x", F, frente_cima, *zc, 0.015, placa)
+    _faixas_de_parede(i, "parede_placa_e", "y", -W, esq, *zc, 0.015, placa)
+    _faixas_de_parede(i, "parede_placa_d", "y", W, dir_, *zc, 0.015, placa)
+    _faixas_de_parede(i, "parede_alta_f", "x", F, TRECHOS_FRENTE, 2.11, 2.4, 0.015, placa)
+    _faixas_de_parede(i, "parede_alta_e", "y", -W, TRECHOS_LADO, 2.11, 2.4, 0.015, placa)
+    _faixas_de_parede(i, "parede_alta_d", "y", W, TRECHOS_LADO, 2.11, 2.4, 0.015, placa)
+    _faixas_de_parede(i, "parede_baixa_f", "x", F, frente_baixo, *zb, 0.02, baixa)
+    _faixas_de_parede(i, "parede_baixa_e", "y", -W, esq, *zb, 0.02, baixa)
+    _faixas_de_parede(i, "parede_baixa_d", "y", W, dir_, *zb, 0.02, baixa)
+    for nome, z0, z1, recuo, m in (("parede_friso", 0.845, 0.86, 0.035, friso),
+                                   ("parede_rodape", 0.0, 0.13, 0.035, rodape)):
+        _faixas_de_parede(i, f"{nome}_f", "x", F, ((-W, W),), z0, z1, recuo, m)
+        _faixas_de_parede(i, f"{nome}_e", "y", -W, ((1.07, F),), z0, z1, recuo, m)
+        _faixas_de_parede(i, f"{nome}_d", "y", W, ((-1.0, F),), z0, z1, recuo, m)
+
+    # teto em placas de 1 cm, cada uma com índice próprio: o teto só aparece nos cantos de cima,
+    # e cada placa resolve num tom, em degraus, em vez de uma mancha só
+    teto = mat("teto_placa", "a8b5b2")
+    xs, ys = (-W, -1.3, 0.0, 1.3, W), (-1.0, 0.0, 0.75, 1.5, F)
+    for a in range(4):
+        for b in range(4):
+            caixa(f"teto_placa{a}{b}", ((xs[a] + xs[a + 1]) / 2, (ys[b] + ys[b + 1]) / 2, 2.395),
+                  (xs[a + 1] - xs[a], ys[b + 1] - ys[b], 0.01), teto, next(i))
+
+    # grade de ventilação: aro e ripas largas (passo de ~10 px no panorama, nunca 1 px)
+    gx, gz, gl, ga = 1.70, 1.66, 0.36, 0.30
+    caixa("parede_grade", (gx, F - 0.025, gz), (gl, 0.02, ga), MATS["nervura"], next(i))
+    for k in range(4):
+        caixa(f"parede_grade_ripa{k}", (gx, F - 0.04, gz - 0.10 + k * 0.066),
+              (gl - 0.06, 0.02, 0.034), rodape, next(i))
+
+
+def _antena(i, t):
+    """Antena em cima do pilar da Terra: um prato pequeno inclinado para cima e para o olho,
+    com o alimentador na frente (só enfeite; o ícone da Terra vem na tela, pelo Godot)."""
+    claro = mat("metal_claro", "c7cfcc")
+    escuro = mat("metal_escuro", "394a50")
+    t.caixa("comunicacao_suporte_antena", 0.10, 0.0, 1.775, 0.16, 0.14, 0.07, escuro, next(i))
+    cilindro("comunicacao_mastro", t.pos(0.10, 0.0, 1.85), 0.022, 0.10, escuro, next(i), segs=12)
+    olho = Vector((-t.f[0], -t.f[1], 0.0))
+    lado = Vector((t.u[0], t.u[1], 0.0))
+    eixo = (Vector((0, 0, 1)) * 0.8 + olho * 0.55 - lado * 0.35).normalized()
+    centro = Vector(t.pos(0.10, 0.0, 1.92))
+    me = bpy.data.meshes.new("comunicacao_prato")
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=False, segments=24, radius1=0.03, radius2=0.12,
+                          depth=0.045)
+    bm.to_mesh(me)
+    bm.free()
+    prato = _objeto("comunicacao_prato", me, claro, next(i))
+    prato.location = centro
+    apontar(prato, eixo)
+    haste = cilindro("comunicacao_alimentador", tuple(centro + eixo * 0.07), 0.011, 0.11,
+                     escuro, next(i), segs=8)
+    apontar(haste, eixo)
+    ponta = caixa("comunicacao_corneta", tuple(centro + eixo * 0.13), (0.04, 0.04, 0.03),
+                  escuro, next(i))
+    apontar(ponta, eixo)
+
+
+def _fone(i, t):
+    """Toque humano: um fone de ouvido pendurado num gancho do pilar da Terra, embaixo da tela."""
+    escuro = mat("metal_escuro", "394a50")
+    almofada = mat("almofada", "202e37")
+    ac, zc, d = 0.0, 0.88, 0.16
+    t.caixa("fone_gancho", ac, d, zc + 0.10, 0.05, 0.03, 0.03, escuro, next(i))
+    ix = next(i)
+    r = 0.075
+    for k in range(7):                       # o arco de cima, em gomos
+        th = math.radians(180 * k / 6)
+        caixa(f"fone_arco{k}", t.pos(ac + r * math.cos(th), d + 0.005, zc + r * math.sin(th)),
+              (0.035, 0.02, 0.02), escuro, ix, rot=(0, -math.degrees(th) - 90, t.yaw))
+    for k, s in enumerate((-1, 1)):
+        t.cil(f"fone_concha{k}", ac + s * r, d + 0.012, zc - 0.02, 0.045, 0.025, almofada,
+              next(i), segs=16)
+
+
+def _glovebox(i, g):
+    """Miolo da glovebox: a câmara (fundo e chão mais escuros que o vidro, que fica como uma
+    borda clara), a barra de luz neutra, as bocas das luvas com anel e punho, as duas luvas
+    erguidas por dentro, o tubo de amostra num suporte, cantoneiras e a faixa de comandos."""
+    fundo = mat("glovebox_fundo", "25562e", emite=True)
+    chao = mat("glovebox_chao", "19332d", emite=True)
+    luz = mat("luz_interna", "ebede9", emite=True)
+    # o que fica dentro da câmara é iluminado pela barra de luz dela, não pela sala: emissão
+    # chapada, igual em todos os estados (como o vidro), e a glovebox se lê no escuro também
+    luva = mat("luva", "819796", emite=True)
+    borracha = mat("borracha", "394a50")
+    escuro = MATS["moldura"]
+    cantoneira = mat("cantoneira", "819796")
+    tecla = mat("tecla", "a8b5b2")
+    tubo = mat("tubo", "c7cfcc", emite=True)
+    amostra = mat("amostra", "ad7757", emite=True)         # regolito de Marte
+    tampa = mat("tampa_tubo", "202e37", emite=True)
+    suporte = mat("suporte_tubo", "151d28", emite=True)
+    olho = (-g.f[0], -g.f[1], 0.0)
+
+    # o vidro (glovebox_vidro) tem a face em d = 0,23: o miolo fica logo à frente dela
+    g.caixa("glovebox_fundo", 0, 0.2315, 1.17, 0.60, 0.002, 0.44, fundo, next(i))
+    g.caixa("glovebox_chao", 0, 0.2325, 0.985, 0.60, 0.002, 0.07, chao, next(i))
+    g.caixa("glovebox_luz", 0, 0.2335, 1.37, 0.50, 0.002, 0.03, luz, next(i))
+
+    for k, s in enumerate((-1, 1)):
+        a = s * 0.18
+        # luva: manga que sai da boca, mão (luva de forno) e polegar para dentro
+        ix = next(i)
+        g.caixa(f"glovebox_manga{k}", a, 0.235, 1.09, 0.09, 0.002, 0.18, luva, ix)
+        disco(f"glovebox_mao{k}", g.pos(a + s * 0.005, 0.236, 1.195), 0.056, 0.058, 0.002, luva,
+              ix, olho)
+        disco(f"glovebox_polegar{k}", g.pos(a - s * 0.055, 0.236, 1.21), 0.02, 0.042, 0.002,
+              luva, ix, olho, giro=s * 35)
+        # boca: aro de aço (glovebox_aro, nas regiões), anel, punho de borracha e o furo
+        g.cil(f"glovebox_anel{k}", a, 0.258, 0.99, 0.100, 0.03, cantoneira, next(i))
+        g.cil(f"glovebox_punho{k}", a, 0.27, 0.99, 0.082, 0.03, borracha, next(i))
+        g.cil(f"glovebox_boca{k}", a, 0.282, 0.99, 0.052, 0.03, escuro, next(i))
+
+    # tubo de amostra deitado num suporte, acima das mãos
+    g.caixa("glovebox_suporte", 0, 0.237, 1.235, 0.24, 0.002, 0.02, suporte, next(i))
+    # um índice por peça: com índice comum, as facetas de mesma normal do vidro e da amostra
+    # viravam uma face só no tons_por_face e as cores se misturavam
+    for nome, da, raio, comp, m in (("glovebox_tubo", 0.0, 0.045, 0.34, tubo),
+                                    ("glovebox_liquido", -0.06, 0.047, 0.15, amostra),
+                                    ("glovebox_tampa", 0.18, 0.05, 0.05, tampa)):
+        cilindro(nome, g.pos(da, 0.29, 1.29), raio, comp, m, next(i), rot=(0, 90, g.yaw),
+                 segs=16)
+
+    # cantoneiras nos cantos da moldura e a faixa de comandos na base
+    for k, (a, z) in enumerate(((-0.36, 0.835), (0.36, 0.835), (-0.36, 1.465), (0.36, 1.465))):
+        g.caixa(f"glovebox_cantoneira{k}", a, 0.222, z, 0.05, 0.006, 0.04, cantoneira, next(i))
+    g.caixa("glovebox_comandos", 0, 0.205, 0.66, 0.48, 0.012, 0.13, MATS["painel_console"],
+            next(i))
+    for k, a in enumerate((-0.165, -0.055, 0.055, 0.165)):
+        g.caixa(f"glovebox_tecla{k}", a, 0.214, 0.66, 0.07, 0.012, 0.05, tecla, next(i))
+
+
+def _estufa(i, e, pz):
+    """Miolo da estufa: câmara de cultivo com fundo escuro, bandeja de solo, uma alface (roseta
+    de folhas) como protagonista e um broto ao lado, sob a barra de LED rosa (estufa_luz). Embaixo,
+    a porta do armário com puxador."""
+    # como na glovebox, o miolo tem luz própria (a do LED): emissão chapada em todos os estados
+    fundo = mat("estufa_fundo", "19332d", emite=True)
+    bandeja = mat("bandeja", "577277", emite=True)
+    solo = mat("solo", "7a4841", emite=True)
+    escura = mat("folha_escura", "468232", emite=True)
+    folha = mat("folha", "75a743", emite=True)
+    clara = mat("folha_clara", "a8ca58", emite=True)
+    olho = (-e.f[0], -e.f[1], 0.0)
+
+    e.caixa("estufa_fundo", 0, 0.247, pz, 0.40, 0.002, 0.50, fundo, next(i))
+    e.caixa("estufa_bandeja", 0, 0.252, 0.955, 0.40, 0.006, 0.05, bandeja, next(i))
+    e.caixa("estufa_solo", 0, 0.251, 1.0, 0.36, 0.006, 0.045, solo, next(i))
+
+    ac, zb = -0.04, 1.005
+    # (camada, a, z, rx, rz, giro): de trás para a frente, do escuro para o claro
+    folhas = (
+        (escura, -0.10, 0.08, 0.075, 0.042, -28), (escura, 0.10, 0.08, 0.075, 0.042, 28),
+        (escura, 0.0, 0.13, 0.05, 0.07, 0),
+        (folha, -0.07, 0.055, 0.065, 0.04, -15), (folha, 0.07, 0.055, 0.065, 0.04, 15),
+        (folha, 0.0, 0.08, 0.05, 0.055, 0),
+        (clara, 0.0, 0.05, 0.035, 0.032, 0),
+    )
+    for k, (m, a, z, rx, rz, giro) in enumerate(folhas):
+        disco(f"estufa_folha{k}", e.pos(ac + a, 0.256 + 0.003 * k, zb + z), rx, rz, 0.003, m,
+              next(i), olho, giro=giro)
+    # broto ao lado
+    ab = 0.15
+    e.caixa("estufa_broto_caule", ab, 0.256, zb + 0.03, 0.016, 0.003, 0.06, folha, next(i))
+    for k, s in enumerate((-1, 1)):
+        disco(f"estufa_broto{k}", e.pos(ab + s * 0.025, 0.258, zb + 0.065), 0.028, 0.014, 0.003,
+              folha, next(i), olho, giro=s * 25)
+
+    porta = mat("porta_armario", "a8b5b2")
+    e.caixa("estufa_armario", 0, 0.205, 0.46, 0.56, 0.01, 0.72, porta, next(i))
+    e.caixa("estufa_puxador", 0, 0.215, 0.76, 0.18, 0.025, 0.03, MATS["painel_console"], next(i))
+
+
+def _console(i):
+    """Bancada: gaveteiro na ponta direita, entre a bancada e a base da glovebox; um teclado na
+    ponta esquerda e a caneca na direita (toque humano). O meio da bancada fica fora do quadro."""
+    console = MATS["console"]
+    claro = mat("console_claro", "577277")
+    escuro = MATS["painel_console"]
+    caixa("console_gaveteiro", (1.54, 1.99, 0.31), (0.32, 0.38, 0.62), console, next(i))
+    for k, z in enumerate((0.45, 0.17)):
+        caixa(f"console_gaveta{k}", (1.54, 1.795, z), (0.28, 0.012, 0.25), claro, next(i))
+        caixa(f"console_puxador{k}", (1.54, 1.785, z + 0.07), (0.12, 0.012, 0.025), escuro,
+              next(i))
+    k = Painel(-1.08, 1.42)
+    k.caixa("console_teclado", 0, 0, BANCADA_Z + 0.015, 0.40, 0.16, 0.03, escuro, next(i))
+    for n in range(5):
+        k.caixa(f"console_tecla{n}", -0.14 + n * 0.07, 0.03, BANCADA_Z + 0.035, 0.05, 0.05,
+                0.012, mat("tecla_teclado", "819796"), next(i))
+    caneca = mat("caneca", "c7cfcc")
+    cx, cy = 1.15, 1.36
+    cilindro("caneca", (cx, cy, BANCADA_Z + 0.05), 0.042, 0.10, caneca, next(i), rot=(0, 0, 0),
+             segs=16)
+    cilindro("caneca_cafe", (cx, cy, BANCADA_Z + 0.0975), 0.034, 0.006, mat("cafe", "4d2b32"),
+             next(i), segs=16)
+    caixa("caneca_alca", (cx + 0.05, cy, BANCADA_Z + 0.055), (0.02, 0.012, 0.05), caneca, next(i))
+
+
 def construir():
-    """Gray-box do módulo de comando. Unidades em metros; o olho fica em OLHO.
+    """Módulo de comando, pronto para o render. Unidades em metros; o olho fica em OLHO.
 
     Esquerda (x<320 no panorama): porta, suporte de vida com a tela de radiação e a alavanca
-    do abrigo; na parede da frente, a tela de comunicação com a Terra (apagada, moldura azul).
+    do abrigo; na parede da frente, a tela de comunicação com a Terra (apagada, moldura azul),
+    com a antena em cima e um fone pendurado embaixo.
     Centro (320-960): a janela larga para Marte e, abaixo dela, a rampa com as telas de energia
-    e oxigênio e a bancada. Direita (>960): a parede da ciência de dentro, com a glovebox e a
-    estufa lado a lado, em destaque.
+    e oxigênio e a bancada (teclado, caneca e gaveteiro nas pontas). Direita (>960): a parede da
+    ciência de dentro, com a glovebox e a estufa lado a lado, em destaque.
     Todo botão clicável fica entre x 60 e 1220 (ZONA_LIVRE_X), fora das setas de pan do jogo.
+    Este corpo monta o casco, a janela, as telas, a porta e os objetos das regiões; o resto vem
+    das funções por área: _paredes, _antena, _fone, _glovebox, _estufa e _console.
     """
     W = 2.6       # meia largura (paredes laterais em x = ±W)
     F = 2.2       # parede da frente em y = F
@@ -329,8 +618,6 @@ def construir():
     caixa_c = material("caixa_ciencia", hexrgb("c7cfcc"))
     blindagem = material("blindagem", hexrgb("577277"))
     vidro_estufa = tela_apagada("vidro_estufa", "25562e")
-    solo = material("solo", hexrgb("7a4841"))
-    folha = material("folha", hexrgb("75a743"))
     luz_cultivo = tela_apagada("luz_cultivo", "df84a5")
 
     i = iter(range(1, 400))
@@ -348,14 +635,21 @@ def construir():
         caixa(f"nervura_e{y}", (-W + 0.04, y, hn / 2), (0.08, 0.12, hn), nervura, next(i))
         caixa(f"nervura_d{y}", (W - 0.04, y, hn / 2), (0.08, 0.12, hn), nervura, next(i))
 
-    # calha de cabos: linha reta longa em todas as paredes, a 2,05 m
-    caixa("calha_frente", (0, F - 0.1, 2.05), (2 * W, 0.2, 0.12), nervura, next(i))
-    caixa("calha_esq", (-W + 0.1, 1, 2.05), (0.2, 4, 0.12), nervura, next(i))
-    caixa("calha_dir", (W - 0.1, 1, 2.05), (0.2, 4, 0.12), nervura, next(i))
+    # calha de cabos: linha reta longa em todas as paredes, a 2,05 m, em trechos (cada trecho com
+    # índice próprio resolve num tom; inteira, a luz que cai ao longo dela virava uma cunha)
+    for k, (a0, a1) in enumerate(TRECHOS_FRENTE):
+        caixa(f"calha_frente{k}", ((a0 + a1) / 2, F - 0.1, 2.05), (a1 - a0, 0.2, 0.12), nervura,
+              next(i))
+    for k, (a0, a1) in enumerate(TRECHOS_LADO):
+        for nome, x in (("esq", -W + 0.1), ("dir", W - 0.1)):
+            caixa(f"calha_{nome}{k}", (x, (a0 + a1) / 2, 2.05), (0.2, a1 - a0, 0.12), nervura,
+                  next(i))
 
     # luminárias no teto
     for y in (0.6, 1.6):
         caixa(f"luminaria_{y}", (0, y, H - 0.03), (1.6, 0.25, 0.06), luminaria, next(i))
+
+    _paredes(i, W, F)
 
     # ---- centro, de cima para baixo: a janela larga para Marte, a rampa com as telas de
     # energia e oxigênio e a bancada. A janela vai de 1,00 a 1,84 m: o horizonte (altura do
@@ -373,7 +667,11 @@ def construir():
             ("dir", (jl + borda) / 2, jc, borda, jz1 - jz0),
             ("montante", 0.0, jc, 0.10, jz1 - jz0)):
         caixa(f"janela_moldura_{nome}", (cx, F - 0.05, cz), (larg, 0.10, alt), moldura, ix_moldura)
-    caixa("janela", (0.0, F - 0.02, jc), (jl, 0.01, jz1 - jz0), janela, next(i))
+    vidro = caixa("janela", (0.0, F - 0.02, jc), (jl, 0.01, jz1 - jz0), janela, next(i))
+    # a emissão do vidro só serve à câmera: não ilumina nem tinge a sala (a luz que entra pela
+    # janela é a do Godot, que escurece a vista no pôr do Sol e à noite)
+    vidro.visible_diffuse = vidro.visible_glossy = vidro.visible_transmission = False
+    vidro.visible_volume_scatter = False
     pitch = (jz1 - jz0) / N_PERSIANA
     for k in range(N_PERSIANA):
         mat_s = faixa if k in (0, N_PERSIANA - 1) else blindagem
@@ -437,9 +735,8 @@ def construir():
     t.caixa("comunicacao_corpo", 0, 0, 0.90, 0.60, 0.30, 1.68, console, next(i))
     t.caixa("comunicacao_moldura", 0, 0.17, 1.25, 0.52, 0.04, 0.40, MATS["moldura_terra"], next(i))
     t.caixa("comunicacao_tela", 0, 0.195, 1.25, 0.46, 0.01, 0.34, ecra, next(i))
-    # antena de prato em cima do pilar (só enfeite; o ícone da Terra vem na tela, pelo Godot)
-    t.cil("comunicacao_mastro", 0, 0.0, 1.80, 0.025, 0.16, blindagem, next(i))
-    t.cil("comunicacao_prato", 0, 0.05, 1.92, 0.11, 0.04, nervura, next(i))
+    _antena(i, t)
+    _fone(i, t)
 
     # ---- direita: a parede da ciência de dentro, com a estufa (cultivar planta) e a glovebox
     # (selar a amostra), lado a lado e voltadas para o olho. São os dois objetos maiores e mais
@@ -447,26 +744,14 @@ def construir():
     # (o vidro e a planta). Tudo clicável fica entre x 60 e 1220 do panorama (as setas de pan
     # cobrem as pontas) e na faixa y 120..250.
     vidro_gb = tela_apagada("vidro_glovebox", "468232")
-    luva = material("luva", hexrgb("819796"))
-    tubo = material("tubo", hexrgb("ebede9"))
-    tampa = material("tampa_tubo", hexrgb("c65197"))
 
     g = Painel(2.087, 1.466)
     g.caixa("glovebox_base", 0, 0, 0.40, 0.70, 0.40, 0.80, console, next(i))
     g.caixa("glovebox_moldura", 0, 0.05, 1.15, 0.78, 0.34, 0.68, caixa_c, next(i))
     g.caixa("glovebox_vidro", 0, 0.225, 1.17, 0.68, 0.01, 0.52, vidro_gb, next(i))
-    for k, da in enumerate((-0.18, 0.18)):                  # as duas luvas: aro, borracha, boca
+    for k, da in enumerate((-0.18, 0.18)):                  # as bocas das luvas: o aro de aço
         g.cil(f"glovebox_aro{k}", da, 0.24, 0.99, 0.115, 0.03, moldura, next(i))
-        g.cil(f"glovebox_luva{k}", da, 0.26, 0.99, 0.085, 0.03, luva, next(i))
-        g.cil(f"glovebox_boca{k}", da, 0.28, 0.99, 0.050, 0.03, painel, next(i))
-    # o tubo de amostra, deitado num suporte dentro da câmara: vidro, faixa rosa e tampa escura
-    g.caixa("glovebox_suporte", 0, 0.24, 1.17, 0.40, 0.02, 0.03, moldura, next(i))
-    ix_tubo = next(i)
-    for nome, da, raio, comp, mat in (("glovebox_tubo", 0.0, 0.040, 0.34, tubo),
-                                      ("glovebox_liquido", -0.07, 0.044, 0.13, tampa),
-                                      ("glovebox_tampa", 0.19, 0.046, 0.05, painel)):
-        cilindro(nome, g.pos(da, 0.265, 1.245), raio, comp, mat, ix_tubo, rot=(0, 90, g.yaw),
-                 segs=16)
+    _glovebox(i, g)
 
     e = Painel(2.315, 0.66)
     e.caixa("estufa_corpo", 0, 0, 0.88, 0.66, 0.40, 1.76, caixa_c, next(i))
@@ -474,12 +759,9 @@ def construir():
     e.caixa("estufa_moldura", 0, 0.22, pz, 0.54, 0.04, 0.66, moldura, next(i))
     e.caixa("estufa_vidro", 0, 0.24, pz, 0.46, 0.01, 0.58, vidro_estufa, next(i))
     e.caixa("estufa_luz", 0, 0.25, pz + 0.255, 0.40, 0.02, 0.05, luz_cultivo, next(i))
-    e.caixa("estufa_solo", 0, 0.26, pz - 0.23, 0.40, 0.04, 0.09, solo, next(i))
-    e.caixa("estufa_caule", 0, 0.26, pz - 0.04, 0.045, 0.03, 0.34, folha, next(i))
-    for k, (da, dz, giro) in enumerate(((-0.10, pz + 0.05, 25), (0.10, pz - 0.03, -25),
-                                         (0.0, pz + 0.15, 0))):
-        caixa(f"estufa_folha{k}", e.pos(da, 0.26, dz), (0.15, 0.03, 0.075), folha, next(i),
-              rot=(0, giro, e.yaw))
+    _estufa(i, e, pz)
+
+    _console(i)
 
     # alarmes nos cantos de cima da frente
     for x in (-2.3, 2.3):
@@ -487,7 +769,9 @@ def construir():
 
     # luzes (energia e cor mudam por estado)
     luzes = {}
-    for nome, loc, tam in (("luz_teto", (0, 1.1, H - 0.1), (1.6, 1.2)),):
+    # luz do teto larga e recuada da parede da frente: a parede recebe luz quase por igual, sem
+    # foco no alto (o foco virava mancha no tons_por_face)
+    for nome, loc, tam in (("luz_teto", (0, 0.7, H - 0.1), (3.0, 1.4)),):
         ld = bpy.data.lights.new(nome, "AREA")
         ld.shape = "RECTANGLE"
         ld.size, ld.size_y = tam
@@ -525,24 +809,23 @@ def aplicar_estado(estado, luzes):
     ambar = hexrgb("de9e41")
     vermelho = hexrgb("cf573c")
     verde = hexrgb("75a743")
-    azul = hexrgb("73bed3")
 
     # (cor, energia W) por luz; (cor, força) por emissão
     E = {
         "normal": dict(
-            luz_teto=(branco, 150), luz_console=(azul, 25), luz_porta=(verde, 0),
+            luz_teto=(branco, 150), luz_console=25, luz_porta=(verde, 0),
             alarme=(vermelho, 0), luz_alarme=(vermelho, 0), luminaria=(branco, 6),
             telas=1.0, janela=1.2, botoes=0.8, lampada_porta=(verde, 0.5), mundo=0.02),
         "tempestade": dict(
-            luz_teto=(ambar, 90), luz_console=(azul, 25), luz_porta=(verde, 0),
+            luz_teto=(ambar, 90), luz_console=25, luz_porta=(verde, 0),
             alarme=(vermelho, 12), luz_alarme=(vermelho, 60), luminaria=(ambar, 2),
             telas=1.0, janela=0.25, botoes=1.0, lampada_porta=(ambar, 3), mundo=0.01),
         "abrigo": dict(
-            luz_teto=(branco, 40), luz_console=(azul, 15), luz_porta=(verde, 80),
+            luz_teto=(branco, 30), luz_console=10, luz_porta=(verde, 80),
             alarme=(vermelho, 0), luz_alarme=(vermelho, 0), luminaria=(branco, 1),
             telas=0.7, janela=0.6, botoes=0.8, lampada_porta=(verde, 8), mundo=0.01),
         "modo_seguranca": dict(
-            luz_teto=(vermelho, 25), luz_console=(azul, 0), luz_porta=(verde, 0),
+            luz_teto=(vermelho, 25), luz_console=0, luz_porta=(verde, 0),
             alarme=(vermelho, 4), luz_alarme=(vermelho, 15), luminaria=(vermelho, 0.5),
             telas=0.0, janela=0.4, botoes=0.0, lampada_porta=(vermelho, 2), mundo=0.005),
     }["abrigo" if estado == "abrigo_aberto" else estado]
@@ -551,7 +834,8 @@ def aplicar_estado(estado, luzes):
         luzes[nome].color, luzes[nome].energy = cor_energia
 
     luz("luz_teto", E["luz_teto"])
-    luz("luz_console", E["luz_console"])
+    # a luz do console é neutra: leva a cor da luz do teto, sem tingir a parede de azul
+    luz("luz_console", (E["luz_teto"][0], E["luz_console"]))
     luz("luz_porta", E["luz_porta"])
     for n in luzes:
         if n.startswith("luz_alarme"):
@@ -684,20 +968,116 @@ PALETA_LAB = srgb_para_oklab(PALETA_SRGB / 255.0)
 # Verde é sinal (abrigo, painel ok): a rampa verde da Apollo só vale nos objetos verdes
 # e no estado abrigo, para a mistura de luz âmbar com parede cinza não virar verde.
 VERDES = np.array([6, 7, 8, 9, 10, 11])
-OBJETOS_VERDES = ("porta_lampada", "estufa_vidro", "estufa_caule", "estufa_folha0",
-                  "estufa_folha1", "estufa_folha2", "glovebox_vidro")
+OBJETOS_VERDES = ("porta_lampada", "estufa_vidro", "estufa_fundo",
+                  *(f"estufa_folha{k}" for k in range(7)),
+                  "estufa_broto_caule", "estufa_broto0", "estufa_broto1",
+                  "glovebox_vidro", "glovebox_fundo", "glovebox_chao")
+# Superfícies que recuam (casco, painéis, juntas): o traço entre duas delas é meio-tom.
+RECUO = ("parede", "piso", "teto", "nervura", "calha")
+FATOR_JUNTA = 0.6
 
 
-def quantizar(lin, verde_ok=True):
+# Azul é só do que vem da Terra: a rampa azul da Apollo vale só na moldura da tela de
+# comunicação, para luz fria em parede cinza não virar azul. Violeta e rosa são de outros
+# recursos no jogo: a rampa só vale na barra de LED da estufa.
+AZUIS = np.arange(0, 6)
+ROSAS = np.arange(30, 36)
+OBJETOS_AZUIS = ("comunicacao_moldura",)
+OBJETOS_ROSAS = ("estufa_luz",)
+
+
+def quantizar(lin, verde_ok=True, azul_ok=True, rosa_ok=True):
     """Linear -> índice da cor mais próxima da paleta em OKLab.
 
-    verde_ok: bool ou máscara por pixel de onde a rampa verde pode ser usada.
+    verde_ok, azul_ok, rosa_ok: bool ou máscara por pixel de onde a rampa verde, a azul e a
+    violeta/rosa podem ser usadas.
     """
     lab = lin_para_oklab(np.clip(lin, 0, 1))
     d = ((lab[..., None, :] - PALETA_LAB[None, None]) ** 2).sum(-1)
-    q = d.argmin(-1)
-    d[..., VERDES] = np.inf
-    return np.where(verde_ok, q, d.argmin(-1))
+    for rampa, ok in ((AZUIS, azul_ok), (ROSAS, rosa_ok), (VERDES, verde_ok)):
+        sem = d.copy()
+        sem[..., rampa] = np.inf
+        d = np.where(np.asarray(ok)[..., None], d, sem)
+    return d.argmin(-1)
+
+
+# ---- tons limpos: cada face plana de cada objeto resolve em dois tons
+
+VIZINHOS4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
+VIZINHOS8 = VIZINHOS4 + ((1, 1), (1, -1), (-1, 1), (-1, -1))
+TOM_SOMBRA = 0.60                    # razão da luz suavizada sobre a mediana da face
+PASSOS_SUAVE = 24                    # difusão da luz dentro da face, em passos de 1 px
+
+
+def faces_planas(p):
+    """Rótulo por pixel: mesmo objeto e mesma normal, ou seja, a mesma face plana."""
+    n = np.rint(p["normal"] * 200).astype(np.int64)
+    chave = np.stack([p["indice"], n[..., 0], n[..., 1], n[..., 2]], -1).reshape(-1, 4)
+    _, rot = np.unique(chave, axis=0, return_inverse=True)
+    return rot.reshape(p["indice"].shape)
+
+
+def _mediana_por_grupo(valores, grupo):
+    """Mediana de cada canal de `valores` (N, C) por grupo (N,), devolvida por pixel."""
+    out = np.empty_like(valores)
+    for c in range(valores.shape[1]):
+        ordem = np.lexsort((valores[:, c], grupo))
+        g = grupo[ordem]
+        inicio = np.r_[0, np.nonzero(np.diff(g))[0] + 1]
+        conta = np.diff(np.r_[inicio, len(g)])
+        med = valores[ordem, c][inicio + conta // 2]
+        out[:, c] = med[np.searchsorted(g[inicio], grupo)]
+    return out
+
+
+def tons_por_face(cor, rot):
+    """Troca o gradiente e o ruído do render por dois tons chapados por face: o da face e a sombra.
+
+    A luz de cada pixel (a luminância, suavizada só dentro da própria face) é comparada com a
+    mediana da face: abaixo de TOM_SOMBRA é sombra, o resto é o tom da face. Cada (face, faixa)
+    leva a mediana das cores do render nela. Assim a fronteira entre tons vem da sombra de um
+    objeto, e não da rampa suave da luz que a quantização transformava em manchas.
+    """
+    h, w = rot.shape
+    lum = cor @ np.array([0.2126, 0.7152, 0.0722])
+    iguais = [np.roll(rot, d, (0, 1)) == rot for d in VIZINHOS4]
+    s = lum.copy()
+    for _ in range(PASSOS_SUAVE):
+        soma, conta = s.copy(), np.ones_like(s)
+        for d, m in zip(VIZINHOS4, iguais):
+            soma += np.where(m, np.roll(s, d, (0, 1)), 0.0)
+            conta += m
+        s = soma / conta
+    plano = rot.reshape(-1)
+    med = _mediana_por_grupo(s.reshape(-1, 1), plano)[:, 0]
+    razao = s.reshape(-1) / np.maximum(med, 1e-6)
+    sombra = (razao < TOM_SOMBRA).astype(np.int64)
+    return _mediana_por_grupo(cor.reshape(-1, 3), plano * 2 + sombra).reshape(h, w, 3)
+
+
+def limpar_orfaos(q, rot, fora, alvo, mesma_min=3, validos_min=3, passos=3):
+    """Filtro de maioria: um pixel de `alvo` com menos de `mesma_min` vizinhos (de 8) da mesma
+    cor, entre os vizinhos do mesmo rótulo `rot` que não estão em `fora`, toma a cor mais comum
+    entre eles (se houver pelo menos `validos_min`).
+
+    Dentro da face (rot = face, fora = contorno, alvo = o resto) some o pixel solto e a linha de
+    1 px entre dois tons. No contorno (rot = contorno, fora = o resto, alvo = contorno) a cor do
+    traço fica igual ao longo da linha, sem mudar o lugar do traço.
+    """
+    for _ in range(passos):
+        viz = np.stack([np.where(np.roll(rot, d, (0, 1)) == rot,
+                                 np.where(np.roll(fora, d, (0, 1)), -1, np.roll(q, d, (0, 1))), -1)
+                        for d in VIZINHOS8], -1)
+        validos = (viz >= 0).sum(-1)
+        mesma = (viz == q[..., None]).sum(-1)
+        votos = (viz[..., :, None] == viz[..., None, :]).sum(-1)
+        votos = np.where(viz >= 0, votos, 0)
+        maioria = np.take_along_axis(viz, votos.argmax(-1)[..., None], -1)[..., 0]
+        trocar = alvo & (mesma < mesma_min) & (validos >= validos_min) & (maioria >= 0)
+        if not trocar.any():
+            break
+        q = np.where(trocar, maioria, q)
+    return q
 
 
 def contorno(p):
@@ -722,22 +1102,53 @@ def contorno(p):
     return borda
 
 
+def _ids(prefixos):
+    return [v for n, v in INDICE.items() if n.startswith(prefixos)]
+
+
 def pixel_art(p, borda, estado):
-    """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo)."""
+    """Devolve o RGBA do panorama; o vidro da janela sai com alpha 0 (menos no abrigo).
+
+    Passos: tons chapados por face (tons_por_face), quantização na Apollo com o verde, o azul e o
+    rosa restritos aos seus objetos, filtro de maioria contra pixel solto (limpar_orfaos) e o
+    contorno de 1 px por cima, com a cor do traço igualada ao longo da linha.
+    """
     if estado in ("abrigo", "abrigo_aberto"):
         verde_ok = True
     else:
         verde_ok = np.isin(p["indice"], [INDICE[n] for n in OBJETOS_VERDES if n in INDICE])
-    q = quantizar(p["cor"], verde_ok)
-    # traço: a cor da paleta mais próxima de 25 % do brilho do pixel por baixo
-    escura = quantizar(PALETA_LAB_LIN[q] * 0.25, verde_ok)
+    azul_ok = np.isin(p["indice"], [INDICE[n] for n in OBJETOS_AZUIS])
+    rosa_ok = np.isin(p["indice"], [INDICE[n] for n in OBJETOS_ROSAS])
+    rot = faces_planas(p)
+    q = quantizar(tons_por_face(p["cor"], rot), verde_ok, azul_ok, rosa_ok)
+    q = limpar_orfaos(q, rot, borda, ~borda)
+    # traço: a cor da paleta mais próxima de 25 % do brilho do pixel por baixo; entre duas
+    # superfícies que recuam (junta de painel, quina da sala), meio-tom, para não competir
+    # com o traço dos objetos
+    recuo = np.isin(p["indice"], _ids(RECUO))
+    junta = recuo.copy()
+    for d in VIZINHOS4:
+        junta &= np.roll(recuo, d, (0, 1))
+    fator = np.where(junta, FATOR_JUNTA, 0.25)[..., None]
+    escura = quantizar(PALETA_LAB_LIN[q] * fator, verde_ok, azul_ok, rosa_ok)
     q = np.where(borda, escura, q)
+    igualado = limpar_orfaos(q, borda.astype(np.int8), ~borda, borda, mesma_min=1, validos_min=2)
+    # a cor que vem do vizinho respeita as mesmas restrições de verde, azul e rosa
+    pode = np.ones(q.shape, bool)
+    for rampa, ok in ((VERDES, verde_ok), (AZUIS, azul_ok), (ROSAS, rosa_ok)):
+        pode &= ~np.isin(igualado, rampa) | ok
+    q = np.where(pode, igualado, q)
     rgb = PALETA_SRGB[q].copy()
     # telas em branco: cor única por dentro (o contorno de 1 px fica), para o Godot
     # desenhar as barras por cima sem ruído do render
     cor_tela = PALETA_SRGB[APOLLO.index(COR_TELA_APAGADA)]
     for nome in TELAS_APAGADAS:
         rgb[(p["indice"] == INDICE[nome]) & ~borda] = cor_tela
+    # em volta do vidro, neutro escuro em todos os estados: o traço do vidro e as faces internas
+    # da moldura (as que não olham para o olho). A vista atrás escurece à noite no Godot, e um
+    # aro laranja ali pareceria erro.
+    interna = (p["indice"] == INDICE["janela_moldura_topo"]) & (p["normal"][..., 1] > -0.9)
+    rgb[interna | ((p["indice"] == INDICE["janela"]) & borda)] = PALETA_SRGB[APOLLO.index(COR_AROS_JANELA)]
     # vidro da janela: alpha 0, e o Godot põe a vista de Marte atrás. No abrigo a persiana tapa
     # o vidro, e o que sobrar dele (frestas) fica opaco.
     alfa = np.full(rgb.shape[:2], 255, np.uint8)
