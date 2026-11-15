@@ -38,7 +38,9 @@ func _tudo() -> void:
 	_linha_do_abrigo_fecha_o_terminal_e_pede_o_pan()
 	_pan_ate_o_botao_do_abrigo()
 	_da_noite_para_a_seguranca()
+	_fila_de_cards()
 	await _frase_com_o_contexto()
+	await _cards_ao_lado_do_controle()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -66,10 +68,22 @@ func _montar(opcoes: Dictionary = {}) -> Array:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
-	# O plano do sol 1 já abre com o card do aviso da tempestade solar (agenda fixa: tempestade no
-	# sol 2, aviso desde o sol 1). Estes testes são do terminal sem card, então ele começa fechado.
-	t.card_aberto = false
+	# O plano do sol 1 já abre com a fila de cards: o aviso da tempestade solar (agenda fixa: aviso desde o
+	# sol 1) e os três do sol 1. Estes testes são do terminal sem card: a fila é fechada de uma vez, com o
+	# som dos cliques de fechar apagado (o terminal começa sem som, como antes).
+	_igual(_fechar_fila(t), 4, "o plano do sol 1 abre com quatro cards: o aviso e os três do sol 1")
+	som.historico.clear()
+	som.total = 0
 	return [t, m, som]
+
+
+## Fecha a fila de cards inteira, um "Fechar" por vez, e devolve quantos fechou.
+func _fechar_fila(t: Control) -> int:
+	var n := 0
+	while t.card_aberto and n < 20:
+		t._acionar("fechar_card")
+		n += 1
+	return n
 
 
 ## Roda `s` segundos de quadros: a missão avança e o terminal anda.
@@ -258,8 +272,9 @@ func _cliques_so_quando_a_acao_acontece() -> void:
 	t._acionar("terminal")
 	_igual(som.historico, ["terminal_desce", "terminal_sobe"], "o botão TERMINAL não faz clique")
 	som.historico.clear()
-	# Com o card da Terra aberto, só o Fechar vale: o resto não faz som.
-	t.card_aberto = true
+	# Com o card da Terra aberto (o aviso, que reabre com o plano), só o Fechar vale: o resto não faz som.
+	t._mostrar_na_tela("plano")
+	_verdade(t.card_aberto, "o plano reaberto traz o aviso")
 	t._acionar("o2_mais")
 	t._acionar("confirmar")
 	_igual(som.historico, [], "bloqueado pelo card: sem som")
@@ -286,6 +301,74 @@ func _cliques_so_quando_a_acao_acontece() -> void:
 	t.free()
 
 
+## A fila de cards do plano: a ordem no sol 1 (aviso, O2, ciência, confirmar), só "Fechar" age enquanto há
+## card, os do sol 1 não voltam no reinício do sol 1 nem no freeplay, e o aviso volta no reinício.
+func _fila_de_cards() -> void:
+	var m := Missao.new(1, {"sol_solar": 3, "turno_s": 4.0})
+	m.montar_sol(1, {"E": 6.0, "O": 1.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+	var som := Som.new()
+	var t: Control = Terminal.new()
+	t.som = som
+	t.iniciar(m, {})
+	_verdade(t.card_aberto, "o plano do sol 1 abre com card")
+	var ordem: Array = []
+	var q0 := m.plano_q
+	while t.card_aberto and ordem.size() < 10:
+		ordem.append(t.card_id)
+		# Enquanto há card, nada do plano age: só o "Fechar".
+		for nome in ["o2_mais", "o2_menos", "tarefa_chemcam", "tarefa_amostra", "aba_fontes", "terminal", "confirmar", "reiniciar"]:
+			t._acionar(nome)
+		_igual(m.plano_q, q0, "card %s: o2 não mudou" % t.card_id)
+		_igual(m.plano_tarefas.size(), 0, "card %s: nenhuma tarefa ligada" % t.card_id)
+		_igual(m.fase, "plano", "card %s: a missão segue no plano" % t.card_id)
+		_igual(t.aba_na_tela(), "plano", "card %s: a aba não mudou" % t.card_id)
+		_igual(t.aberto, true, "card %s: o terminal não desceu" % t.card_id)
+		t._acionar("fechar_card")
+	_igual(ordem, ["aviso", "sol1_o2", "sol1_ciencia", "sol1_confirmar"], "a ordem da fila no sol 1")
+	_igual(t.card_id, "", "a fila acabou")
+	# Reinício do sol 1 (o2 1 sem produzir cai em segurança): volta só o aviso.
+	t._acionar("confirmar")
+	_rodar(t, m, t.duracao * 1.5)
+	_ate_sair_do_turno(t, m)
+	_igual(m.fase, "seguranca", "o sol 1 caiu em segurança")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(t.card_aberto, false, "a tela de segurança não leva card")
+	t._acionar("reiniciar")
+	_igual(m.fase, "plano", "reiniciou o sol 1")
+	_rodar(t, m, QUADRO * 3.0)
+	_igual(t.card_id, "aviso", "o aviso volta no reinício")
+	_igual(_fechar_fila(t), 1, "no reinício do sol 1 só o aviso (os três do sol 1 não voltam)")
+	som.free()
+	t.free()
+	# Freeplay: o sol 1 não leva os cards do sol 1, só o aviso.
+	var l := Missao.new(3, {"livre": true})
+	var t2: Control = Terminal.new()
+	t2.som = Som.new()
+	t2.iniciar(l, {})
+	_verdade(l.livre, "freeplay")
+	var ordem_livre: Array = []
+	while t2.card_aberto and ordem_livre.size() < 10:
+		ordem_livre.append(t2.card_id)
+		t2._acionar("fechar_card")
+	_igual(ordem_livre, ["aviso"], "no freeplay, só o aviso no plano do sol 1")
+	t2.som.free()
+	t2.free()
+	# O mesmo terminal que viu os cards do sol 1 na missão fixa e depois entra no freeplay: sem repetir.
+	var f := Missao.new(1, {"freeplay_aberto": true})
+	var t3: Control = Terminal.new()
+	t3.som = Som.new()
+	t3.iniciar(f, {})
+	_igual(_fechar_fila(t3), 4, "a missão fixa abre com os quatro cards")
+	f.fase = "relatorio"
+	t3._process(QUADRO)
+	_verdade(f.jogar_de_novo(), "jogar de novo abre o freeplay")
+	t3._process(QUADRO)
+	_igual(t3.fase_ui, "plano", "o plano do freeplay")
+	_igual(_fechar_fila(t3), 1 if f.aviso_ativo() else 0, "no freeplay do mesmo terminal, só o aviso (os do sol 1 não repetem)")
+	t3.som.free()
+	t3.free()
+
+
 ## Joga o turno até a missão sair dele (o terminal anda junto).
 func _ate_sair_do_turno(t: Control, m: Missao) -> void:
 	var guarda := 0
@@ -302,7 +385,7 @@ func _desligar_no_meio_do_turno() -> void:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
-	t._acionar("fechar_card")  # o sol 3 abre com o aviso da Terra
+	_igual(_fechar_fila(t), 1, "o sol 3 abre só com o aviso da Terra")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()
@@ -326,7 +409,7 @@ func _desligar_pelo_relogio() -> void:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
-	t._acionar("fechar_card")  # o sol 1 abre com o aviso da Terra
+	_igual(_fechar_fila(t), 4, "o sol 1 abre com o aviso da Terra e os três cards do sol 1")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()
@@ -343,7 +426,7 @@ func _desligar_pelo_relogio() -> void:
 	_igual(m.fase, "plano", "reiniciou")
 	_rodar(t, m, QUADRO * 3.0)
 	_igual(som.historico, ["clique_confirmar"], "reiniciar toca o clique e não o desligar")
-	t._acionar("fechar_card")  # o plano reiniciado abre com o aviso de novo
+	_igual(_fechar_fila(t), 1, "o plano reiniciado abre só com o aviso de novo (os do sol 1 não voltam)")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()
@@ -364,7 +447,7 @@ func _turno_de_tempestade() -> Array:
 	var t: Control = Terminal.new()
 	t.som = som
 	t.iniciar(m, {})
-	t._acionar("fechar_card")
+	_igual(_fechar_fila(t), 1, "o sol 3 abre só com o aviso da Terra")
 	t._acionar("confirmar")
 	_rodar(t, m, t.duracao * 1.5)
 	som.historico.clear()
@@ -561,6 +644,47 @@ func _da_noite_para_a_seguranca() -> void:
 	_igual(m.fase, "fim_do_sol", "a segurança do sol 4 também segue")
 	som.free()
 	t.free()
+
+
+## Cada card do sol 1 é desenhado ao lado do controle que nomeia, sem cobri-lo: o "Fechar" dele (que está
+## dentro do card) fica na outra coluna, e só ele se clica. Nos dois idiomas.
+func _cards_ao_lado_do_controle() -> void:
+	var idioma := TranslationServer.get_locale()
+	var alvos := {"sol1_o2": "o2", "sol1_ciencia": "ciencia", "sol1_confirmar": "confirmar"}
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		var m := Missao.new(1)
+		var t: Control = Terminal.new()
+		t.gravar_textos = true
+		t.iniciar(m, {})
+		root.add_child(t)
+		await process_frame
+		await process_frame
+		_igual(t.card_id, "aviso", "%s: o aviso abre primeiro" % loc)
+		_igual(t.ui().keys(), ["fechar_card"], "%s: com o aviso, só o Fechar se clica" % loc)
+		t._acionar("fechar_card")
+		for id: String in ["sol1_o2", "sol1_ciencia", "sol1_confirmar"]:
+			await process_frame
+			await process_frame
+			_igual(t.card_id, id, "%s: o card %s abre na ordem" % [loc, id])
+			var alvo: Rect2 = t._alvos[alvos[id]]
+			_verdade(alvo.size.x >= 24.0 and alvo.size.y >= 24.0, "%s: o controle %s foi registrado" % [loc, alvos[id]])
+			_igual(t.ui().keys(), ["fechar_card"], "%s: card %s: só o Fechar se clica" % [loc, id])
+			var fechar := Rect2(t.ui()["fechar_card"][0], t.ui()["fechar_card"][1], t.ui()["fechar_card"][2], t.ui()["fechar_card"][3])
+			_verdade(not fechar.intersects(alvo), "%s: o card %s não cobre o controle (Fechar %s, controle %s)" % [loc, id, str(fechar), str(alvo)])
+			_verdade(fechar.size.x >= 24.0 and fechar.size.y >= 24.0, "%s: o Fechar é um alvo de 24x24 ou mais" % loc)
+			# O card tem o texto do idioma, uma frase por linha, e cabe na tela do terminal.
+			var tem_texto := false
+			for linha in t.textos():
+				if t.tr(Terminal.CARD_TEXTO[id]).begins_with(linha[0]) and linha[0] != "":
+					tem_texto = true
+			_verdade(tem_texto, "%s: o card %s desenha o texto" % [loc, id])
+			_verdade(Rect2(0, 0, 640, 360).encloses(fechar), "%s: o card %s cabe na tela" % [loc, id])
+			t._acionar("fechar_card")
+		_igual(t.card_id, "", "%s: a fila acabou" % loc)
+		root.remove_child(t)
+		t.free()
+	TranslationServer.set_locale(idioma)
 
 
 ## O texto da tela traz a frase da barra e a do contexto; o quadro do caso real cabe até o botão, no

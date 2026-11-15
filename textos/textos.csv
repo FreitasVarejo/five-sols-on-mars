@@ -169,3 +169,6 @@ ABERTURA_FIM_B,Send science home.,Mande ciência para casa.
 ABERTURA_FIM_BOTAO,Start mission,Começar a missão
 ABERTURA_PULAR,Skip,Pular
 JOGAR,Play,Jogar
+SOL1_CARD_O2,Give energy to the oxygen machine here.,Dê energia à máquina de oxigênio aqui.
+SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos da Terra ficam aqui. Cada um dá ciência.
+SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
