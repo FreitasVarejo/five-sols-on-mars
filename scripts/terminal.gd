@@ -43,7 +43,7 @@ const DadosDonki := preload("res://scripts/dados_donki.gd")
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
 
-const DURACAO_PADRAO := 0.4
+const DURACAO_PADRAO := 0.3  # escolhida de ouvido pelo dono (14/11), entre 0,25, 0,4 e 0,6
 const DURACAO_MIN := 0.15
 const DURACAO_MAX := 1.5
 const BOTAO := Rect2(260, 328, 120, 28)

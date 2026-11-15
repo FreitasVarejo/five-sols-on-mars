@@ -500,7 +500,7 @@ func _atualizar_depuracao() -> void:
 # --- parâmetros da URL (só Web) -------------------------------------------------
 
 ## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?terminal=<s> (duração
-## do terminal subir e descer, 0,15 a 1,5; padrão 0,4), ?semente=<int>,
+## do terminal subir e descer, 0,15 a 1,5; padrão 0,3), ?semente=<int>,
 ## ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):

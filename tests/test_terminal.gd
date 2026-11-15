@@ -65,16 +65,16 @@ func _rodar(t: Control, m: Missao, s: float) -> void:
 
 
 func _duracao_da_url() -> void:
-	_igual(Terminal.duracao_da_url(null), 0.4, "sem parâmetro: o padrão")
+	_igual(Terminal.duracao_da_url(null), 0.3, "sem parâmetro: o padrão")
 	_igual(Terminal.duracao_da_url("0.25"), 0.25, "0,25")
 	_igual(Terminal.duracao_da_url("0.4"), 0.4, "0,4")
 	_igual(Terminal.duracao_da_url("0.6"), 0.6, "0,6")
 	_igual(Terminal.duracao_da_url("0.15"), 0.15, "limite baixo")
 	_igual(Terminal.duracao_da_url("1.5"), 1.5, "limite alto")
-	_igual(Terminal.duracao_da_url("0.05"), 0.4, "abaixo da faixa: o padrão")
-	_igual(Terminal.duracao_da_url("9"), 0.4, "acima da faixa: o padrão")
-	_igual(Terminal.duracao_da_url("abc"), 0.4, "texto: o padrão")
-	_igual(Terminal.duracao_da_url("0"), 0.4, "zero: o padrão")
+	_igual(Terminal.duracao_da_url("0.05"), 0.3, "abaixo da faixa: o padrão")
+	_igual(Terminal.duracao_da_url("9"), 0.3, "acima da faixa: o padrão")
+	_igual(Terminal.duracao_da_url("abc"), 0.3, "texto: o padrão")
+	_igual(Terminal.duracao_da_url("0"), 0.3, "zero: o padrão")
 
 
 func _easing() -> void:
