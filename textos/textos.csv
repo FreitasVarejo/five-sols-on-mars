@@ -118,6 +118,11 @@ TEL_LIMPO,Clear,Limpo
 TEL_POEIRA,Dust,Poeira
 MAPA_NORTE,N,N
 DIARIO_VAZIO,No log yet,Nenhum diário ainda
+DIARIO_HISTORIA_1,First sol in Gale Crater. The sky is the color of rust.,Primeiro sol na cratera Gale. O céu tem cor de ferrugem.
+DIARIO_HISTORIA_2,Gale was a lake billions of years ago. The rocks still keep that story.,"A cratera Gale já foi um lago, bilhões de anos atrás. As rochas guardam essa história."
+DIARIO_HISTORIA_3,"Halfway through the mission. Dust gets into everything, even the boots.","Metade da missão. A poeira entra em tudo, até nas botas."
+DIARIO_HISTORIA_4,Only one sol left. Every result counts now.,Falta só um sol. Agora cada resultado conta.
+DIARIO_HISTORIA_5,Last sol. The ship is already a bright dot in the sky.,Último sol. A nave já é um pontinho no céu.
 FONTE_DONKI_FATO,Storm from the Sun: CME predicted at Mars on %s.,Tempestade do Sol: CME prevista em Marte em %s.
 FONTE_DONKI_FONTE,"NASA DONKI (CCMC), WSA-ENLIL.","NASA DONKI (CCMC), WSA-ENLIL."
 FONTE_DONKI_HIST_FATO,Storm from the Sun: CMEs predicted at Mars in May 2024.,Tempestade do Sol: CMEs previstas em Marte em maio de 2024.

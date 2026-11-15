@@ -7,6 +7,7 @@ extends SceneTree
 
 const Terminal := preload("res://scripts/terminal.gd")
 const Missao := preload("res://scripts/missao.gd")
+const Modelo := preload("res://scripts/modelo.gd")
 const Som := preload("res://scripts/som.gd")
 const HudTurno := preload("res://scripts/hud_turno.gd")
 const Desenho := preload("res://scripts/desenho.gd")
@@ -52,6 +53,8 @@ func _tudo() -> void:
 	await _card_do_aviso_cabe()
 	await _aba_fontes_cabe()
 	await _relatorio_cabe()
+	_historia_do_sol_no_diario()
+	_diario_cabe_no_pior_caso()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -1473,6 +1476,105 @@ func _relatorio_cabe() -> void:
 							and linha[1] > 14 + i * 123 and linha[1] < 14 + (i + 1) * 123:
 						_verdade(_rect_do_texto(linha).end.x <= 14 + i * 123 + 119 - 40, "%s: o +N do sol %d fica antes dos ícones" % [rotulo, i + 1])
 			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## Um sol jogado até o fim do sol (ou, se o estado cair em segurança, seguido em segurança): devolve o
+## terminal sobre a missão, com o registro do sol feito.
+func _terminal_no_fim_do_sol(sol_n: int, opcoes: Dictionary) -> Array:
+	opcoes["turno_s"] = 2.0
+	var m := Missao.new(1, opcoes)
+	m.montar_sol(sol_n, Modelo.estado_inicial())
+	m.confirmar_plano()
+	var guarda := 0
+	while m.fase == "turno" and guarda < 200:
+		m.abrigar()  # no sol da tempestade, para o sol não cair em segurança por radiação
+		m.avancar(0.1)
+		guarda += 1
+	if m.fase == "seguranca":
+		m.seguir_em_seguranca()
+	var t: Control = Terminal.new()
+	t.som = Som.new()
+	t.iniciar(m, {})
+	return [t, m]
+
+
+## O diário do sol N abre com a história N, em cinza suave, antes de "o que aconteceu"; no modo livre não
+## há história, e o primeiro item é o de sempre.
+func _historia_do_sol_no_diario() -> void:
+	var idioma := TranslationServer.get_locale()
+	var textos_hist := {
+		"en": [
+			"First sol in Gale Crater. The sky is the color of rust.",
+			"Gale was a lake billions of years ago. The rocks still keep that story.",
+			"Halfway through the mission. Dust gets into everything, even the boots.",
+			"Only one sol left. Every result counts now.",
+			"Last sol. The ship is already a bright dot in the sky.",
+		],
+		"pt": [
+			"Primeiro sol na cratera Gale. O céu tem cor de ferrugem.",
+			"A cratera Gale já foi um lago, bilhões de anos atrás. As rochas guardam essa história.",
+			"Metade da missão. A poeira entra em tudo, até nas botas.",
+			"Falta só um sol. Agora cada resultado conta.",
+			"Último sol. A nave já é um pontinho no céu.",
+		],
+	}
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for n in range(1, 6):
+			var rotulo := "%s, sol %d" % [loc, n]
+			var c := _terminal_no_fim_do_sol(n, {})
+			var t: Control = c[0]
+			var m: Missao = c[1]
+			_igual(m.registros.size(), 1, "%s: o sol deixou um registro" % rotulo)
+			var itens: Array = t._itens_diario(m.registros[0])
+			_igual(itens[0]["texto"], textos_hist[loc][n - 1], "%s: o primeiro item do diário é a história" % rotulo)
+			_igual(itens[0]["cor"], Desenho.TEXTO_SUAVE, "%s: a história é em cinza suave" % rotulo)
+			_verdade(itens[1]["texto"] != itens[0]["texto"], "%s: o segundo item é o que aconteceu" % rotulo)
+			t.som.free()
+			t.free()
+
+			# Modo livre: a mesma missão, sem história.
+			var cl := _terminal_no_fim_do_sol(n, {"livre": true})
+			var tl: Control = cl[0]
+			var ml: Missao = cl[1]
+			var itens_livre: Array = tl._itens_diario(ml.registros[0])
+			var achou := false
+			for it in itens_livre:
+				achou = achou or it["texto"] in textos_hist[loc]
+			_igual(achou, false, "%s, modo livre: sem história no diário" % rotulo)
+			_verdade(itens_livre[0].get("negrito", false), "%s, modo livre: o primeiro item é o que aconteceu" % rotulo)
+			tl.som.free()
+			tl.free()
+	TranslationServer.set_locale(idioma)
+
+
+## O pior caso da coluna esquerda do diário em cada sol da missão fixa (a única que mostra a história), em
+## português e em inglês: o que o sol traz de verdade (tempestade sem abrigo, poeira, gerador quebrado e a
+## mensagem da Terra, conforme a agenda) mais tarefas não feitas e energia perdida no teto. Tudo cabe entre o
+## topo da caixa e a base, ao menos com o 1 px a menos que `_pintar_itens` aplica. Largura e altura são as de
+## `_desenhar_diario`.
+func _diario_cabe_no_pior_caso() -> void:
+	var idioma := TranslationServer.get_locale()
+	var larg := 306.0 - 20.0
+	var altura := (Terminal.Y_FIM - 6.0) - (Terminal.Y_CORPO + 9.0)
+	for loc in ["pt", "en"]:
+		TranslationServer.set_locale(loc)
+		for n in range(1, 6):
+			var c := _terminal_no_fim_do_sol(n, {})
+			var t: Control = c[0]
+			var m: Missao = c[1]
+			var reg: Dictionary = m.registros[0].duplicate()
+			reg.merge({"seguranca": false, "tempestade": m.eh_sol_solar(), "abrigou": false, "dose": 12.0,
+				"f_exposto": 0.5, "poeira": m.eh_poeira(), "nao_feitas": ["chemcam", "amostra", "planta"],
+				"perdida_no_teto": 6.0, "gerador_quebrado": n >= m.sol_quebra, "consertou": false,
+				"aviso": m.aviso_ativo()}, true)
+			var itens: Array = t._itens_diario(reg)
+			var h: float = t._altura_itens(itens, larg, 0)
+			var h1: float = t._altura_itens(itens, larg, 1)
+			_verdade(h1 <= altura, "%s, sol %d: o pior caso cabe (%d px, ou %d com 1 px a menos, de %d)" % [loc, n, h, h1, altura])
+			t.som.free()
 			t.free()
 	TranslationServer.set_locale(idioma)
 
