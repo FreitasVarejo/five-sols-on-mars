@@ -6,14 +6,32 @@ Uso (da raiz do repo):
 (o `blender` do PATH é o Flatpak: passe o script por caminho absoluto.)
 
 Fonte da verdade: este script. Nenhum .blend é salvo nem lido.
-Mesma câmera em todos os estados. A geometria também é a mesma, com uma única exceção
-permitida: a persiana da janela, que só o estado `abrigo` fecha. O estado muda luz e emissão.
+Mesma câmera em todos os estados. A geometria também é a mesma, com duas exceções permitidas:
+a persiana da janela, que só o estado `abrigo` fecha, e a alavanca do abrigo, que fica embaixo
+em `abrigo` e `abrigo_aberto` e em cima nos outros estados (a placa, a fenda e o pino são os
+mesmos; muda só o braço, com o punho). O estado muda luz e emissão.
 A persiana fica dentro do vão da janela, entre a moldura de aço e o vidro, com a largura exata
 do vão: a moldura e o montante central a tapam e continuam visíveis por cima dela. Há o estado
 extra `abrigo_aberto`: a mesma luz e emissão do `abrigo`, sem a persiana e com o vidro em alpha 0.
-Ele não entra no padrão de `--estados` (renderize com `--estados abrigo,abrigo_aberto`);
+A alavanca está embaixo nos dois. Ele não entra no padrão de `--estados` (renderize com
+`--estados abrigo,abrigo_aberto`);
 scripts/gerar_persiana.py usa a diferença entre `abrigo` e `abrigo_aberto` como a camada da
 persiana.
+
+Os PNGs da sala com a alavanca (15/11) não são o render cru: são o render só na região de repintura
+da alavanca (x 154..271, y 131..257), colado sobre os PNGs anteriores por scripts/compor_sala.py,
+que leva a região, a tabela de cor do pilar e a prova de que fora dela os PNGs ficam idênticos. O
+render inteiro muda o tom do pilar na tempestade e uns pixels longe do objeto. Depois do render:
+`scripts/compor_sala.py --render <pasta do --saida> --regiao 154 131 272 258`, depois
+scripts/gerar_persiana.py. O `--saida` tem de ficar dentro do repo (o Blender é um Flatpak).
+O pato de borracha (15/11, `_pato`) entra do mesmo jeito, com a região de repintura x 848..891,
+y 192..221 (o pato, na quina direita do console, no tampo da rampa de oxigênio):
+`scripts/compor_sala.py --render <pasta> --regiao 848 192 892 222 --objeto pato_ --base <ref>
+--pilar parede_frente,janela_moldura_montante`, depois scripts/gerar_persiana.py e
+`scripts/compor_sala.py --persiana` com os mesmos argumentos (o fluxo completo está no docstring do
+compor_sala.py). Os pilares são as faces cujo tom o render inteiro muda perto dele.
+O pato não muda de um estado para outro: só a luz muda (nenhuma emissão). Ele é um botão do
+regioes.json (`botoes.pato`: o retângulo de todas as partes), clicável para o quack.
 
 Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
 em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
@@ -29,9 +47,9 @@ sala, e o traço dele e as faces internas da moldura saem em neutro escuro (COR_
 Godot escurece a vista no pôr do Sol e à noite.
 
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
-calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa, glovebox e
-porta (a porta do dormitório, na ponta esquerda: tocá-la encerra o sol). Telas: energia, oxigenio,
-radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o Godot). Desenho: porta_lampada,
+calculados pela projeção real da câmera sobre os vértices). Botões: abrigo (a alavanca: o retângulo
+da união das duas posições), estufa, glovebox e porta (a porta do dormitório, na ponta esquerda:
+tocá-la encerra o sol). Telas: energia, oxigenio, radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o Godot). Desenho: porta_lampada,
 a lâmpada verde da porta, para o Godot acendê-la ou apagá-la por cima do render (o indicador de
 "pode dormir"). Região de desenho é o retângulo do que o passe de índice mostra de fato (justo, sem
 a folga da projeção), porque o Godot a pinta por cima do render. O terminal não é render: é camada de tela no Godot.
@@ -316,6 +334,12 @@ COR_AROS_JANELA = "151d28"           # traço do vidro e faces internas da moldu
 PERSIANA = []                        # objetos da persiana; só o estado abrigo os renderiza
 GLOVEBOX_C = (2.087, 1.466)          # (x, y) do painel da glovebox e o da estufa, no chão
 ESTUFA_C = (2.315, 0.66)
+# Braço e punho da alavanca do abrigo, nas duas posições: só um par é renderizado por estado.
+# Embaixo (abrigo ativo) em `abrigo` e `abrigo_aberto`; em cima nos outros estados.
+ALAVANCA = {"cima": [], "baixo": []}
+ESTADOS_ABRIGADOS = ("abrigo", "abrigo_aberto")
+ALAVANCA_Z = 1.12                    # altura do pino, centro da placa
+ALAVANCA_CURSO = 0.17                # do pino ao centro do punho (a barra em T), para cima ou para baixo
 
 
 def botao(nome, cor):
@@ -597,6 +621,65 @@ def _console(i):
     caixa("caneca_alca", (cx + 0.05, cy, BANCADA_Z + 0.055), (0.02, 0.012, 0.05), caneca, next(i))
 
 
+# O pato de borracha da tripulação: um brinquedo amarelo na quina direita de cima do console, no tampo
+# da rampa da tela de oxigênio, ao lado da grade de ventilação (easter egg: o clique faz quack).
+# Objeto de cena, não UI: não acende e é o mesmo em todos os estados. Original, sem nada do FNAF.
+PATO_BASE = (1.22, 1.869, 0.975)     # onde o pato pousa: o tampo da rampa de oxigênio, perto da quina
+PATO_GIRO = 183.0                    # graus em torno de z; o bico aponta para a janela (esquerda) e um pouco para o olho
+PATO_ESCALA = 0.85
+PATO_OBJS = ("pato_corpo", "pato_cola", "pato_cabeca", "pato_bico", "pato_asa", "pato_olho0",
+             "pato_olho1")
+
+
+def elipsoide(nome, centro, raios, mat_, indice, rot=(0, 0, 0), segs=12, aneis=8):
+    """Elipsóide de faces planas (poucos polígonos: cada faceta vira um tom na pixel art)."""
+    me = bpy.data.meshes.new(nome)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=aneis, radius=1.0)
+    for v in bm.verts:
+        v.co.x *= raios[0]
+        v.co.y *= raios[1]
+        v.co.z *= raios[2]
+    bm.to_mesh(me)
+    bm.free()
+    ob = _objeto(nome, me, mat_, indice)
+    ob.location = centro
+    ob.rotation_euler = [math.radians(a) for a in rot]
+    for p in me.polygons:
+        p.use_smooth = False
+    return ob
+
+
+def _pato(i):
+    """Pato de borracha de perfil, bico para a direita: corpo, cola erguida, cabeça, bico, asa e olhos,
+    cada parte com índice próprio (o contorno separa uma da outra). Medidas em metros, no referencial
+    do pato (x para o bico, z para cima); PATO_BASE e PATO_GIRO o põem na sala."""
+    amarelo_pato = mat("pato_amarelo", "eaa91c")
+    laranja_pato = mat("pato_laranja", "ee5f1c")
+    preto_pato = mat("pato_olho", "151d28")
+    giro = Matrix.Rotation(math.radians(PATO_GIRO), 3, "Z")
+    base = Vector(PATO_BASE)
+
+    def no_mundo(p):
+        return tuple(base + giro @ (Vector(p) * PATO_ESCALA))
+
+    def parte(nome, centro, raios, mat_, inclina=0.0, segs=16, aneis=10):
+        # `inclina`: graus em torno do eixo y do pato (positivo ergue a frente)
+        rot = (giro @ Matrix.Rotation(math.radians(-inclina), 3, "Y")).to_euler()
+        ob = elipsoide(nome, no_mundo(centro), [r * PATO_ESCALA for r in raios], mat_, next(i),
+                       segs=segs, aneis=aneis)
+        ob.rotation_euler = rot
+        return ob
+
+    parte("pato_corpo", (0.0, 0.0, 0.050), (0.075, 0.058, 0.050), amarelo_pato)
+    parte("pato_cola", (-0.068, 0.0, 0.085), (0.032, 0.022, 0.020), amarelo_pato, inclina=-35.0, segs=12, aneis=8)
+    parte("pato_cabeca", (0.048, 0.0, 0.122), (0.040, 0.036, 0.040), amarelo_pato)
+    parte("pato_bico", (0.098, 0.0, 0.108), (0.034, 0.032, 0.018), laranja_pato, inclina=8.0, segs=12, aneis=8)
+    parte("pato_asa", (-0.012, 0.0, 0.056), (0.044, 0.062, 0.027), amarelo_pato, inclina=-10.0, segs=14, aneis=8)
+    for k, lado in enumerate((-1, 1)):
+        parte(f"pato_olho{k}", (0.070, lado * 0.030, 0.132), (0.008, 0.008, 0.008), preto_pato, segs=6, aneis=4)
+
+
 def construir():
     """Módulo de comando, pronto para o render. Unidades em metros; o olho fica em OLHO.
 
@@ -728,16 +811,30 @@ def construir():
     caixa("porta_lampada", (-W + 0.06, py, 2.2), (0.08, 0.3, 0.1), lampada_porta, next(i))
 
     # suporte de vida: coluna voltada para o olho, com a tela de radiação em cima
-    # e a alavanca (botão cogumelo) do abrigo embaixo
+    # e a alavanca do abrigo embaixo: placa de aro amarelo, fenda escura, pino cinza e, no braço de aço,
+    # o punho em T, uma barra vermelha (a cor do alerta que pede o abrigo) atravessada na ponta do braço
+    # e mais larga que a fenda, como o punho de incêndio de um avião. Em cima, o abrigo está desligado;
+    # embaixo, ativo. O braço sai do pino para a posição do estado: ver ALAVANCA e aplicar_estado.
     s = Painel(-2.14, 1.235)
     s.caixa("suporte_base", 0, 0, 0.06, 0.95, 0.42, 0.12, moldura, next(i))
     s.caixa("suporte_corpo", 0, 0, 1.05, 0.85, 0.30, 1.86, console, next(i))
     s.caixa("radiacao_moldura", 0, 0.17, 1.72, 0.80, 0.04, 0.50, moldura, next(i))
     s.caixa("radiacao_tela", 0, 0.195, 1.72, 0.72, 0.01, 0.42, ecra, next(i))
     botao("botao_abrigo", "cf573c")
-    s.cil("abrigo_aro", 0, 0.175, 1.10, 0.25, 0.05, amarelo, next(i))
-    s.cil("abrigo_anel", 0, 0.2, 1.10, 0.215, 0.05, moldura, next(i))
-    s.cil("abrigo_botao", 0, 0.25, 1.10, 0.17, 0.12, MATS["botao_abrigo"], next(i))
+    aco = mat("alavanca_aco", "a8b5b2")
+    pino = mat("alavanca_pino", "577277")
+    s.caixa("abrigo_aro", 0, 0.175, ALAVANCA_Z, 0.34, 0.05, 0.54, amarelo, next(i))
+    s.caixa("abrigo_fenda", 0, 0.20, ALAVANCA_Z, 0.14, 0.03, 0.48, moldura, next(i))
+    s.cil("abrigo_pino", 0, 0.23, ALAVANCA_Z, 0.03, 0.03, pino, next(i))
+    for pos, sinal in (("cima", 1), ("baixo", -1)):
+        zc = ALAVANCA_Z + sinal * ALAVANCA_CURSO
+        ALAVANCA[pos] += [
+            s.caixa(f"abrigo_braco_{pos}", 0, 0.225, ALAVANCA_Z + sinal * ALAVANCA_CURSO / 2,
+                    0.035, 0.03, ALAVANCA_CURSO, aco, next(i)),
+            # o T: 0,20 x 0,048 m, uns 33 x 8 px no panorama, 3 cm mais largo que a fenda de cada lado
+            s.caixa(f"abrigo_punho_{pos}", 0, 0.25, zc, 0.20, 0.035, 0.048, MATS["botao_abrigo"],
+                    next(i)),
+        ]
 
     # parede da frente, à esquerda: a tela de comunicação com a Terra, num pilar voltado para o
     # olho (como o suporte de vida) e encostado na parede da frente. O miolo fica apagado, na cor
@@ -776,6 +873,7 @@ def construir():
     _estufa(i, e, pz)
 
     _console(i)
+    _pato(i)
 
     # alarmes nos cantos de cima da frente
     for x in (-2.3, 2.3):
@@ -818,7 +916,8 @@ def construir():
 # ---------------------------------------------------------------- estados
 
 def aplicar_estado(estado, luzes):
-    """Só luz e emissão (e a persiana da janela, no abrigo). Nada de material base ou câmera."""
+    """Só luz e emissão, a persiana da janela (no abrigo) e a posição da alavanca do abrigo.
+    Nada de material base ou câmera."""
     branco = hexrgb("ebede9")
     ambar = hexrgb("de9e41")
     vermelho = hexrgb("cf573c")
@@ -863,8 +962,11 @@ def aplicar_estado(estado, luzes):
         elif n in COR_BOTAO:
             emissao(m, COR_BOTAO[n], E["botoes"])
     emissao(MATS["janela"], None, E["janela"])
-    for ob in PERSIANA:                  # única diferença de geometria entre estados
+    for ob in PERSIANA:                  # diferença de geometria entre estados (1 de 2)
         ob.hide_render = estado != "abrigo"  # (abrigo_aberto também a esconde)
+    for pos, obs in ALAVANCA.items():    # diferença de geometria entre estados (2 de 2)
+        for ob in obs:
+            ob.hide_render = (pos == "baixo") == (estado not in ESTADOS_ABRIGADOS)
     bpy.context.scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = E["mundo"]
 
 
@@ -1203,7 +1305,11 @@ REGIOES = {
     "oxigenio": ["oxigenio_tela"],
     "radiacao": ["radiacao_tela"],
     "comunicacao": ["comunicacao_tela"],
-    "abrigo": ["abrigo_aro", "abrigo_anel", "abrigo_botao"],
+    # a alavanca: a placa e as duas posições do braço com o punho (o retângulo é a união)
+    "abrigo": ["abrigo_aro", "abrigo_fenda", "abrigo_pino", "abrigo_braco_cima", "abrigo_punho_cima",
+               "abrigo_braco_baixo", "abrigo_punho_baixo"],
+    # o pato de borracha: o retângulo é a caixa de todas as partes (o easter egg do quack)
+    "pato": list(PATO_OBJS),
     "porta": ["porta_folha", "porta_moldura_topo", "porta_moldura_tras", "porta_moldura_frente"],
     "porta_lampada": ["porta_lampada"],
     "estufa": ["estufa_moldura", "estufa_vidro"],
@@ -1215,7 +1321,7 @@ TELAS = ("energia", "oxigenio", "radiacao", "comunicacao")
 # em 1 a 3 px): o json guarda o retângulo inscrito (o que o Godot pinta), não a caixa envolvente. O resto do
 # trapézio continua escuro pelo próprio PNG.
 MARGEM_TELA = 2   # px: o traço do contorno come 1 a 2 px da borda da tela no PNG (medido em normal.png)
-BOTOES = ("abrigo", "estufa", "glovebox")
+BOTOES = ("abrigo", "estufa", "glovebox", "pato")
 # A porta é botão, mas fica na ponta esquerda do panorama (x < 60), sob a seta de pan quando o pan está
 # em 0: não segue ZONA_LIVRE_X nem FAIXA_CLIQUE, que valem para os botões do meio da sala. O Godot
 # esconde a seta no limite do pan para a porta se alcançar.
@@ -1360,6 +1466,11 @@ def validar_regioes(reg):
     checa(g["x"] + g["w"] <= e["x"] or e["x"] + e["w"] <= g["x"],
           f"glovebox x {g['x']}..{g['x'] + g['w']} e estufa x {e['x']}..{e['x'] + e['w']} "
           f"não se sobrepõem")
+    r, o, g = reg["pato"], reg["oxigenio"], reg["glovebox"]
+    checa(o["x"] + o["w"] - 40 <= r["x"] and r["x"] + r["w"] <= g["x"],
+          f"pato: x {r['x']}..{r['x'] + r['w']} na quina direita do console (de {o['x'] + o['w'] - 40} até a glovebox, x {g['x']})")
+    checa(r["y"] + r["h"] <= o["y"] or r["x"] >= o["x"] + o["w"] or r["x"] + r["w"] <= o["x"],
+          f"pato: y {r['y']}..{r['y'] + r['h']} não se sobrepõe à tela de oxigênio (x {o['x']}..{o['x'] + o['w']}, y {o['y']})")
     r = reg["comunicacao"]
     checa(r["x"] + r["w"] <= 420, f"comunicacao: x {r['x']}..{r['x'] + r['w']} até x<=420 (limite tolerado)")
     checa(r["w"] >= 70 and r["h"] >= 50,
@@ -1603,23 +1714,32 @@ def main():
 
     (CACHE / "indices.json").write_text(json.dumps(INDICE, indent=1))
 
-    # a geometria não pode mudar entre estados, salvo a persiana dentro do retângulo da janela:
-    # profundidade, normal, índice e contorno idênticos fora dele (com 3 px de folga para o traço)
+    # a geometria não pode mudar entre estados, salvo a persiana dentro do retângulo da janela e a
+    # alavanca dentro do retângulo do abrigo: profundidade, normal, índice e contorno idênticos fora
+    # deles (com 3 px de folga para o traço)
+    def caixa_com_folga(r):
+        m = np.zeros((a.altura, a.largura), bool)
+        m[max(r["y"] - 3, 0):r["y"] + r["h"] + 3, max(r["x"] - 3, 0):r["x"] + r["w"] + 3] = True
+        return m
+
     j = reg["janela"]
-    dentro = np.zeros((a.altura, a.largura), bool)
-    dentro[max(j["y"] - 3, 0):j["y"] + j["h"] + 3, max(j["x"] - 3, 0):j["x"] + j["w"] + 3] = True
+    dentro = caixa_com_folga(j)
+    dentro_alavanca = caixa_com_folga(reg["abrigo"])
     base = estados[0]
     for e in estados[1:]:
         dz = np.abs(passes[e]["z"] - passes[base]["z"])
         dn = np.abs(passes[e]["normal"] - passes[base]["normal"]).max(-1)
         di = passes[e]["indice"] != passes[base]["indice"]
         db = contorno(passes[e]) != contorno(passes[base])
-        fora = ~dentro
-        print(f"[comodo] {base} x {e}: FORA da janela max|Δz|={dz[fora].max():.2e} "
+        fora = ~dentro & ~dentro_alavanca
+        print(f"[comodo] {base} x {e}: FORA da janela e da alavanca max|Δz|={dz[fora].max():.2e} "
               f"max|Δnormal|={dn[fora].max():.2e} px índice diferente={int(di[fora].sum())} "
               f"px contorno diferente={int(db[fora].sum())}")
-        print(f"[comodo] {base} x {e}: DENTRO da janela (única diferença permitida, a persiana) "
+        print(f"[comodo] {base} x {e}: DENTRO da janela (a persiana) "
               f"px índice diferente={int(di[dentro].sum())} px contorno diferente={int(db[dentro].sum())}")
+        print(f"[comodo] {base} x {e}: DENTRO do retângulo da alavanca "
+              f"px índice diferente={int(di[dentro_alavanca].sum())} "
+              f"px contorno diferente={int(db[dentro_alavanca].sum())}")
 
     # vidro da janela: alpha 0 onde a persiana está aberta, tudo opaco no abrigo
     vidro_ok = True

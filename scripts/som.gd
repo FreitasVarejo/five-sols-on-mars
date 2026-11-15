@@ -33,7 +33,13 @@ const SONS := {
 	"estufa_melhorou": preload("res://assets/sons/estufa_melhorou.ogg"),
 	"estufa_piorou": preload("res://assets/sons/estufa_piorou.ogg"),
 	"estufa_ploc": preload("res://assets/sons/estufa_ploc.ogg"),
+	"quack": preload("res://assets/sons/quack.ogg"),  # o pato de borracha da sala (quack(), chamado pela main.gd)
 }
+
+## O pitch de cada quack é sorteado em 1 ± PITCH_QUACK, e dois toques seguidos diferem de pelo menos
+## PASSO_PITCH_QUACK (para cinco toques rápidos soarem diferentes).
+const PITCH_QUACK := 0.10
+const PASSO_PITCH_QUACK := 0.03
 
 ## Ação -> clique. Ação que não está aqui não faz som (o botão do terminal, por exemplo).
 const CLIQUE_DA_ACAO := {
@@ -52,9 +58,14 @@ const CLIQUE_DA_ACAO := {
 ## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.
 var historico: Array = []
 var total := 0
+## Os quacks: o pitch de cada um (os últimos MAX_HISTORICO) e, depois de cada toque, quantos quacks
+## estavam tocando ao mesmo tempo (o jogo quer sempre 1: o toque durante o som o reinicia).
+var pitches_quack: Array = []
+var simultaneos_quack: Array = []
 
 var _tocador: AudioStreamPlayer
 var _playback: AudioStreamPlaybackPolyphonic
+var _ids_quack: Array = []  # os quacks que ainda podem estar tocando (ids do playback polifônico)
 
 
 ## Aplica o volume geral ao barramento SFX e devolve o índice dele. O barramento vem do
@@ -119,6 +130,52 @@ func tocar(nome: String) -> void:
 	if _playback != null:
 		# O barramento vai na chamada: no Web (modo sample) o som ignora o barramento do player e iria ao Master.
 		_playback.play_stream(SONS[nome], 0.0, 0.0, 1.0, AudioServer.PLAYBACK_TYPE_DEFAULT, BARRAMENTO)
+
+
+## O pitch de um quack, a partir de um sorteio `u` de 0 a 1: de 1 - PITCH_QUACK a 1 + PITCH_QUACK.
+static func pitch_do_quack(u: float) -> float:
+	return 1.0 + (clampf(u, 0.0, 1.0) * 2.0 - 1.0) * PITCH_QUACK
+
+
+## O pitch do próximo quack: sorteado, e a pelo menos PASSO_PITCH_QUACK do anterior (`ultimo`, 0 se não
+## houve). `sorteio` devolve números de 0 a 1 (os testes passam o deles); depois de 16 tentativas, vale o último.
+static func proximo_pitch(ultimo: float, sorteio: Callable) -> float:
+	var pitch := pitch_do_quack(sorteio.call())
+	var tentativas := 0
+	while ultimo > 0.0 and absf(pitch - ultimo) < PASSO_PITCH_QUACK and tentativas < 16:
+		pitch = pitch_do_quack(sorteio.call())
+		tentativas += 1
+	return pitch
+
+
+## O quack do pato: pitch sorteado, e só um por vez. Se o anterior ainda toca, o toque o corta e começa
+## outro, com outro pitch.
+func quack() -> void:
+	var ultimo: float = pitches_quack[-1] if not pitches_quack.is_empty() else 0.0
+	var pitch := proximo_pitch(ultimo, randf)
+	if _playback != null:
+		for id in _ids_quack:
+			if _playback.is_stream_playing(id):
+				_playback.stop_stream(id)
+		_ids_quack.clear()
+	total += 1
+	historico.append("quack")
+	if historico.size() > MAX_HISTORICO:
+		historico.pop_front()
+	pitches_quack.append(pitch)
+	if pitches_quack.size() > MAX_HISTORICO:
+		pitches_quack.pop_front()
+	var tocando := 0
+	if _playback != null:
+		# Mesmo barramento explícito do tocar(): no Web (modo sample) o som ignora o do player.
+		var id := _playback.play_stream(SONS["quack"], 0.0, 0.0, pitch, AudioServer.PLAYBACK_TYPE_DEFAULT, BARRAMENTO)
+		_ids_quack.append(id)
+		for outro in _ids_quack:
+			if _playback.is_stream_playing(outro):
+				tocando += 1
+	simultaneos_quack.append(tocando)
+	if simultaneos_quack.size() > MAX_HISTORICO:
+		simultaneos_quack.pop_front()
 
 
 ## O clique da ação, se ela faz som.
