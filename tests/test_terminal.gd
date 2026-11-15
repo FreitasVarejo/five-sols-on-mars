@@ -51,6 +51,7 @@ func _tudo() -> void:
 	await _cliques_chegam_ao_visor_e_a_peca()
 	await _toque_nao_deixa_hover()
 	await _frase_com_o_contexto()
+	await _aviso_sem_reserva()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
 	await _card_do_aviso_no_modo_livre()
@@ -2046,6 +2047,32 @@ func _diario_cabe_no_pior_caso() -> void:
 	TranslationServer.set_locale(idioma)
 
 
+## O plano que não deixa reserva para o aquecimento da noite mostra o aviso da bateria vazia; com reserva, não.
+func _aviso_sem_reserva() -> void:
+	var idioma := TranslationServer.get_locale()
+	for loc in ["pt", "en"]:
+		TranslationServer.set_locale(loc)
+		for gasta in [true, false]:
+			var m := Missao.new(1)
+			m.montar_sol(2, {"E": 3.0, "O": 6.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
+			if gasta:
+				while m.mudar_q(1):
+					pass
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, {})
+			root.add_child(t)
+			await process_frame
+			await process_frame
+			var desenhados: Array = []
+			for linha in t.textos():
+				desenhados.append(linha[0])
+			_igual(desenhados.has(t.tr("BATERIA_SEM_RESERVA")), gasta, "%s: aviso de bateria sem reserva (plano que gasta tudo: %s)" % [loc, gasta])
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
 ## A tela traz só a frase do contexto (ou a da barra, sem contexto); o quadro do caso real cabe até o botão, no
 ## pior caso de cada contexto, em português e em inglês.
 func _frase_com_o_contexto() -> void:
@@ -2073,12 +2100,16 @@ func _frase_com_o_contexto() -> void:
 			break
 		d.avancar(0.05)
 	casos["sem_abrigo"] = [d, "CAUSA_RADIACAO", "CAUSA_SEM_ABRIGO", "CASO_REAL_RADIACAO", "CASO_TEXTO_RADIACAO", "reiniciar"]
-	# Sem contexto: só a frase da barra, e o caso real é o da barra.
+	# O plano (oxigênio com algum plano que salvava, sem gerador quebrado): a frase do plano e o caso do oxigênio.
 	var e := Missao.new(1, {"sol_solar": 3})
 	e.montar_sol(1, {"E": 6.0, "O": 1.0, "M": 12.0, "P": 1.0, "gerador_quebrado": false})
 	e.confirmar_plano()
 	e.avancar(e.turno_s)
-	casos["vazio"] = [e, "CAUSA_OXIGENIO", "", "CASO_REAL_OXIGENIO", "CASO_TEXTO_OXIGENIO", "reiniciar"]
+	casos["plano"] = [e, "CAUSA_OXIGENIO", "CAUSA_PLANO", "CASO_REAL_OXIGENIO", "CASO_TEXTO_OXIGENIO", "reiniciar"]
+	# Sem contexto (poeira e radiação): só a frase da barra, e o caso real é o da barra.
+	var v := Missao.new(1)
+	v.montar_sol(3, {"E": 6.0, "O": 4.0, "M": 0.0, "P": 1.0, "gerador_quebrado": false})
+	casos["vazio"] = [v, "CAUSA_RADIACAO", "", "CASO_REAL_RADIACAO", "CASO_TEXTO_RADIACAO", "seguir"]
 	var idioma := TranslationServer.get_locale()
 	for loc in ["pt", "en"]:
 		TranslationServer.set_locale(loc)

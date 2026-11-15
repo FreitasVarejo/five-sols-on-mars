@@ -203,8 +203,12 @@ func para_dividir() -> float:
 	return Modelo.manha(st, eh_poeira())["para_dividir"]
 
 
+## A previsão do plano (Modelo.previsao) mais "sem_reserva": a bateria que o plano deixa não cobre o
+## aquecimento da noite seguinte (no último sol não há noite, é sempre false).
 func previsao() -> Dictionary:
-	return Modelo.previsao(st, eh_poeira(), plano_q, plano_tarefas.size())
+	var p: Dictionary = Modelo.previsao(st, eh_poeira(), plano_q, plano_tarefas.size())
+	p["sem_reserva"] = sol < Modelo.N.SOLS and p["bateria_apos_plano"] < Modelo.N.AQUEC - EPS
+	return p
 
 
 func plano_cabe(q: int, n: int) -> bool:
@@ -356,28 +360,32 @@ func estrelas() -> int:
 	return Modelo.estrelas(modos, ciencia_total())
 
 
-## A causa pelo contexto do sol que falhou, além da barra que zerou (spec, "Falha e relatório"):
-## "sem_abrigo" (a radiação veio do abrigo tardio), "gerador" (oxigênio com o gerador quebrado no começo
-## do sol e sem conserto, quando consertar salvava: falha no turno, com `tem_conserto`) ou "poeira"
-## (oxigênio ou energia num sol de poeira). "" quando não há contexto. Na tela antecipada (nenhum plano
-## salva, nem com o conserto), "aperte Consertar" não vale, e o gerador não entra.
+## A causa pelo contexto do sol que falhou, além da barra que zerou (spec, "Falha e relatório"), na ordem:
+## "sem_abrigo" (a radiação veio do abrigo tardio); "gerador" (oxigênio com o gerador quebrado no começo
+## do sol e sem conserto, quando consertar salvava: falha no turno, com `tem_conserto`); "plano" (oxigênio
+## e algum plano salvava: o gerador recebeu pouca energia, em qualquer sol); "poeira" (oxigênio ou energia
+## num sol de poeira em que nenhum plano salva: a falta vem dos sóis anteriores e do painel tapado).
+## "" quando não há contexto. Na tela antecipada (nenhum plano salva, nem com o conserto), "aperte
+## Consertar" não vale, e o gerador não entra.
 func causa_contexto() -> String:
 	if causa_sem_abrigo:
 		return "sem_abrigo"
 	if causa == "oxigenio" and tem_conserto and st_inicio.get("gerador_quebrado", false) and tarefas.get("gerador", "") != "feita":
 		return "gerador"
-	if eh_poeira() and (causa == "oxigenio" or causa == "energia"):
+	if causa == "oxigenio" and tem_conserto:
+		return "plano"
+	if eh_poeira() and not tem_conserto and (causa == "oxigenio" or causa == "energia"):
 		return "poeira"
 	return ""
 
 
 ## A chave (minúscula) do caso real da tela do modo de segurança: acompanha o contexto (poeira: o da
-## energia; gerador: o do oxigênio; sem abrigo: o da radiação); sem contexto, o da barra que zerou.
+## energia; gerador e plano: o do oxigênio; sem abrigo: o da radiação); sem contexto, o da barra que zerou.
 func caso_real() -> String:
 	match causa_contexto():
 		"poeira":
 			return "energia"
-		"gerador":
+		"gerador", "plano":
 			return "oxigenio"
 		"sem_abrigo":
 			return "radiacao"
@@ -568,6 +576,14 @@ func _fechar_turno() -> void:
 	acelerado = false
 	if not r["falhas"].is_empty():
 		_entrar_seguranca(r["falhas"], r["st"])
+		return
+	# Abrigo tardio no sol da tempestade solar: se a margem que sobra não cobre o fundo dos sóis que faltam,
+	# a falha é do abrigo (spec, "Falha e relatório"). Só quando o abrigo na hora cobria: sem exposição, ou
+	# com a margem já curta de antes, não é culpa do abrigo, e reiniciar o sol não salvaria.
+	var fundo_que_falta: float = (Modelo.N.SOLS - sol) * Modelo.N.DOSE_NORMAL
+	var margem_na_hora: float = st_inicio["M"] - Modelo.dose(true, 0.0)
+	if solar and t_exposto > 0.0 and r["st"]["M"] <= fundo_que_falta + EPS and margem_na_hora > fundo_que_falta + EPS:
+		_entrar_seguranca(["radiacao"], r["st"])
 		return
 	st_fim = r["st"]
 	ciencia_por_sol.append(feitas.size())
