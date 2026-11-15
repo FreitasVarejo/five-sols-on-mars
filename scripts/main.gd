@@ -27,6 +27,7 @@ const Estacoes := preload("res://scripts/estacoes.gd")
 const TelaComunicacao := preload("res://scripts/tela_comunicacao.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
+const Som := preload("res://scripts/som.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -58,6 +59,8 @@ const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
 @onready var _contornos: Control = $HUD/Contornos
 @onready var _hud_turno: Control = $HUD/HudTurno
 @onready var _terminal: Control = $Terminal
+@onready var _som: Som = $Som
+@onready var _botao_mudo: Control = $BotaoMudo
 
 var _botoes := {}  # nome -> Rect2 no panorama (o que se clica)
 var _regioes_telas := {}  # nome -> Rect2 no panorama (telas: só para os contornos de depuração)
@@ -93,6 +96,7 @@ func _ready() -> void:
 	_parametros = _parametros_da_url()
 	_sondar = _parametros.get("sonda") == "1"
 	_terminal.gravar_textos = _sondar
+	_botao_mudo.som = _som
 	_aplicar_stretch_da_url()
 	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
 	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
@@ -536,6 +540,7 @@ func _ui_da_tela() -> Dictionary:
 			var r := _rect_na_tela(_botoes[nome])
 			if r.size.x >= 4.0 and r.size.y >= 4.0:
 				ui[nome] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	ui.merge(_botao_mudo.ui())
 	for par in [["seta_esq", _seta_esq], ["seta_dir", _seta_dir]]:
 		if par[1].is_visible_in_tree() and not par[1].disabled:
 			var r: Rect2 = par[1].get_global_rect()
@@ -557,9 +562,9 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
-		_terminal.aba_na_tela(), _terminal.card_aberto]
+		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total]
 	var agora := Time.get_ticks_msec() / 1000.0
 	if chave != _sonda_chave or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
@@ -605,6 +610,7 @@ func _sonda_teste() -> void:
 		"terminal_aberto": _terminal.aberto,
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(),
+		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,

@@ -1,0 +1,102 @@
+extends Node
+## Som do jogo: o barramento SFX, o volume geral, o mudo e os sons do terminal e dos cliques.
+##
+## Todo player de som do jogo toca no barramento SFX (a persiana inclusive, que mantém o -4 dB
+## relativo dela). O volume geral é VOLUME_GERAL_DB, aplicado ao barramento; o mudo é o mute dele.
+##
+## O mudo fica guardado no navegador (localStorage, só no Web). Fora do Web, ou se o acesso falhar,
+## o jogo segue sem mudo guardado: vale só na sessão.
+
+const BARRAMENTO := &"SFX"
+const VOLUME_GERAL_DB := 0.0   # o único botão de volume do jogo; a persiana tem o -4 dB dela por cima
+const CHAVE_MUDO := "five-sols-on-mars.mudo"
+const MAX_HISTORICO := 40
+
+const SONS := {
+	"clique_navegar": preload("res://assets/sons/clique_navegar.ogg"),
+	"clique_confirmar": preload("res://assets/sons/clique_confirmar.ogg"),
+	"clique_abrigo": preload("res://assets/sons/clique_abrigo.ogg"),
+	"terminal_sobe": preload("res://assets/sons/terminal_sobe.ogg"),
+	"terminal_desce": preload("res://assets/sons/terminal_desce.ogg"),
+	"desligar": preload("res://assets/sons/desligar.ogg"),
+}
+
+## O que a sonda de teste lê: os nomes dos últimos sons pedidos (mesmo com o mudo ligado) e a contagem.
+var historico: Array = []
+var total := 0
+
+var _tocador: AudioStreamPlayer
+var _playback: AudioStreamPlaybackPolyphonic
+
+
+## Cria o barramento SFX se ainda não existe (é seguro chamar de novo) e aplica o volume geral.
+## Devolve o índice do barramento.
+static func garantir_barramento() -> int:
+	var i := AudioServer.get_bus_index(BARRAMENTO)
+	if i == -1:
+		AudioServer.add_bus()
+		i = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(i, BARRAMENTO)
+		AudioServer.set_bus_send(i, &"Master")
+	AudioServer.set_bus_volume_db(i, VOLUME_GERAL_DB)
+	return i
+
+
+## O texto guardado no navegador vira o mudo: só "1" liga.
+static func mudo_de_texto(texto: Variant) -> bool:
+	return str(texto) == "1"
+
+
+func _ready() -> void:
+	var i := garantir_barramento()
+	AudioServer.set_bus_mute(i, _ler_guardado())
+	_tocador = AudioStreamPlayer.new()
+	_tocador.bus = BARRAMENTO
+	_tocador.stream = AudioStreamPolyphonic.new()
+	_tocador.max_polyphony = 8
+	add_child(_tocador)
+	_tocador.play()
+	_playback = _tocador.get_stream_playback()
+
+
+func esta_mudo() -> bool:
+	var i := AudioServer.get_bus_index(BARRAMENTO)
+	return i != -1 and AudioServer.is_bus_mute(i)
+
+
+func definir_mudo(mudo: bool) -> void:
+	AudioServer.set_bus_mute(garantir_barramento(), mudo)
+	_guardar(mudo)
+
+
+func alternar_mudo() -> void:
+	definir_mudo(not esta_mudo())
+
+
+## Toca o som `nome` (uma chave de SONS) e o registra para a sonda.
+func tocar(nome: String) -> void:
+	if not SONS.has(nome):
+		return
+	total += 1
+	historico.append(nome)
+	if historico.size() > MAX_HISTORICO:
+		historico.pop_front()
+	if _playback != null:
+		_playback.play_stream(SONS[nome])
+
+
+# --- localStorage (só Web) --------------------------------------------------------
+
+static func _ler_guardado() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	var valor = JavaScriptBridge.eval(
+		"(function(){try{return window.localStorage.getItem('%s')}catch(e){return null}})()" % CHAVE_MUDO, true)
+	return mudo_de_texto(valor)
+
+
+static func _guardar(mudo: bool) -> void:
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval(
+		"(function(){try{window.localStorage.setItem('%s','%s')}catch(e){}})()" % [CHAVE_MUDO, "1" if mudo else "0"], true)

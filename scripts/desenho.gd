@@ -306,3 +306,15 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 				for k in 9:
 					arco.append(Vector2(xc + cos(k * PI / 8.0) * rx, p.y + s * yb + sin(k * PI / 8.0) * ry))
 				ci.draw_polyline(arco, cor, w)
+		"alto_falante", "alto_falante_mudo":
+			# Corpo e cone do alto-falante; com som, duas ondas; mudo, as ondas somem e um risco corta tudo.
+			ci.draw_rect(Rect2(p.x + s * 0.06, p.y + s * 0.36, s * 0.20, s * 0.28), cor)
+			ci.draw_colored_polygon(PackedVector2Array([
+				p + Vector2(s * 0.26, s * 0.36), p + Vector2(s * 0.56, s * 0.14), p + Vector2(s * 0.56, s * 0.86),
+				p + Vector2(s * 0.26, s * 0.64)]), cor)
+			if nome == "alto_falante":
+				ci.draw_arc(p + Vector2(s * 0.56, s * 0.5), s * 0.20, deg_to_rad(-50), deg_to_rad(50), 8, cor, w)
+				ci.draw_arc(p + Vector2(s * 0.56, s * 0.5), s * 0.38, deg_to_rad(-50), deg_to_rad(50), 8, cor, w)
+			else:
+				ci.draw_line(p + Vector2(s * 0.14, s * 0.92), p + Vector2(s * 0.94, s * 0.08), fundo, w * 3.0)
+				ci.draw_line(p + Vector2(s * 0.14, s * 0.92), p + Vector2(s * 0.94, s * 0.08), cor, maxf(2.0, w * 1.4))
