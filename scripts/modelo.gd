@@ -219,10 +219,16 @@ static func plano_cabe(st: Dictionary, poeira: bool, q: int, n_ciencia: int) -> 
 	return q * N.GEN_CUSTO + n_ciencia * N.CIENCIA_CUSTO <= m["para_dividir"] + EPS
 
 
-## Estrelas do relatório (regra de partida da calibração, [P]).
+## Estrelas do relatório (regra de partida do dono, 14/11; os limiares são do primo, [P]): 3 com nenhum modo
+## de segurança e ciência a partir de ciencia_para_3(); 2 com nenhum modo; 1 quando houve modo.
 static func estrelas(modos: int, ciencia: int) -> int:
-	if modos == 0 and ciencia >= N.ESTRELAS_PCT * N.TEORICO - EPS:
+	if modos > 0:
+		return 1
+	if ciencia >= ciencia_para_3():
 		return 3
-	if modos <= 2:
-		return 2
-	return 1
+	return 2
+
+
+## A menor ciência que dá 3 estrelas: ESTRELAS_PCT do TEORICO, para cima (60% de 7 = 4,2 -> 5).
+static func ciencia_para_3() -> int:
+	return ceili(N.ESTRELAS_PCT * N.TEORICO - EPS)

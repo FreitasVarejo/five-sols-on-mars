@@ -1009,13 +1009,10 @@ func _missao_do_relatorio(modos: int, ciencia: int) -> Missao:
 
 ## O relatório, nos dois idiomas e em três desfechos: tudo o que ele diz está na tela, nada abaixo de 12 px,
 ## nenhum texto se sobrepõe a outro nem ao botão, tudo em x 0 a 640 e y 0 a 320 (a faixa de baixo começa em
-## 328). O mesmo vale com o lugar reservado à 2.9 ocupado: a nota longa (já é o texto) e uma linha de 50 caracteres.
+## 328). A linha do que faltou para a estrela seguinte fica na caixa das estrelas, com o texto de cada desfecho.
 func _relatorio_cabe() -> void:
 	var idioma := TranslationServer.get_locale()
 	var tela := Rect2(0, 0, 640, 320)
-	# A linha da 2.9: a mais larga que cabe em 50 caracteres (dígitos são largos), e uma frase de verdade.
-	var faltou_larga := "12345678901234567890123456789012345678901234567890"
-	_igual(faltou_larga.length(), 50, "a linha reservada: 50 caracteres")
 	var casos := [[0, 7], [0, 4], [2, 0]]
 	for loc in ["en", "pt"]:
 		TranslationServer.set_locale(loc)
@@ -1032,9 +1029,12 @@ func _relatorio_cabe() -> void:
 			await process_frame
 			_igual(t.fase_ui, "relatorio", "%s: a fase" % rotulo)
 			var estrelas := m.estrelas()
+			var faltou_texto: String = {[0, 7]: t.tr("ESTRELAS_MAXIMO"), [0, 4]: t.tr("ESTRELAS_FALTA_CIENCIA") % 1,
+				[2, 0]: t.tr("ESTRELAS_FALTA_MODO")}[caso]
+			_igual(estrelas, {[0, 7]: 3, [0, 4]: 2, [2, 0]: 1}[caso], "%s: estrelas" % rotulo)
 			var esperados := [
 				t.tr("RELATORIO_NAVE"), t.tr("RELATORIO_TITULO"), t.tr("RELATORIO_SUB") % 5,
-				t.tr("N_DE_3_ESTRELAS") % estrelas, t.tr("ESTRELAS_NOTA"),
+				t.tr("N_DE_3_ESTRELAS") % estrelas, t.tr("ESTRELAS_NOTA"), faltou_texto,
 				t.tr("RELATORIO_CIENCIA_ENVIADA") % [ciencia, 7],
 				t.tr("MARGEM_FINAL"), t.tr("N_DE_12") % 9, t.tr("MODOS_SEGURANCA"), str(modos),
 				t.tr("RELATORIO_26_MESES"), t.tr("FONTE_ESCALA_FATO"),
@@ -1069,15 +1069,13 @@ func _relatorio_cabe() -> void:
 				_verdade(not r.intersects(botao), "%s: não pisa no botão (%s)" % [rotulo, linha[0].substr(0, 20)])
 				rects.append(r)
 				nomes.append(linha[0].substr(0, 20))
-			# Os dois textos da 2.9: a nota longa já está na tela (ESTRELAS_NOTA); a linha de 50 caracteres vai
-			# no lugar reservado.
-			var faltou := Terminal.REL_FALTOU
-			_verdade(Terminal.REL_ESTRELAS.encloses(faltou), "%s: o lugar reservado fica na caixa das estrelas" % rotulo)
-			_verdade(faltou.size.x >= Desenho.largura_texto(faltou_larga, 12) and faltou.size.y >= Desenho.fonte().get_height(12),
-				"%s: a linha de 50 caracteres cabe no lugar reservado (%d de %d px)" % [rotulo, Desenho.largura_texto(faltou_larga, 12), faltou.size.x])
-			_verdade(not faltou.intersects(botao), "%s: o lugar reservado não pisa no botão" % rotulo)
-			rects.append(Rect2(faltou.position, Vector2(Desenho.largura_texto(faltou_larga, 12), Desenho.fonte().get_height(12))))
-			nomes.append("faltou")
+			# A linha do que faltou: na caixa das estrelas, numa linha só (o rect dela já entrou na conta da sobreposição).
+			for linha in textos:
+				if linha[0] == faltou_texto:
+					var rf := _rect_do_texto(linha)
+					_verdade(Terminal.REL_ESTRELAS.encloses(rf), "%s: o que faltou fica na caixa das estrelas (%s)" % [rotulo, str(rf)])
+					_verdade(Desenho.largura_texto(faltou_texto, 12, true) <= Terminal.REL_FALTOU.size.x,
+						"%s: o que faltou cabe numa linha (%d de %d px)" % [rotulo, Desenho.largura_texto(faltou_texto, 12, true), Terminal.REL_FALTOU.size.x])
 			for i in rects.size():
 				for j in range(i + 1, rects.size()):
 					_verdade(not rects[i].intersects(rects[j]), "%s: sem sobreposição (%s %s, %s %s)" % [rotulo, nomes[i], str(rects[i]), nomes[j], str(rects[j])])

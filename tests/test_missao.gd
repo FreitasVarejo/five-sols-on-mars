@@ -1375,10 +1375,10 @@ func _jogar_missao(m, plano_do_sol: Callable, espera_a_lista: bool) -> Array:
 
 func _agenda_fixa() -> void:
 	var casos := [
-		# nome, ciência por sol, ciência, modos, sóis com modo (todos antecipados: a tela vem antes do plano)
-		["tudo", [3, 2, 2, 0, 2], 9, 1, [4]],
-		["equil", [3, 2, 0, 0, 0], 5, 0, []],
-		["cons", [0, 0, 0, 0, 0], 0, 2, [3, 4]],
+		# nome, ciência por sol, ciência, modos, sóis com modo (todos antecipados: a tela vem antes do plano), estrelas
+		["tudo", [3, 2, 2, 0, 2], 9, 1, [4], 1],
+		["equil", [3, 2, 0, 0, 0], 5, 0, [], 3],
+		["cons", [0, 0, 0, 0, 0], 0, 2, [3, 4], 1],
 	]
 	for c in casos:
 		var m = Missao.new(1)
@@ -1392,6 +1392,7 @@ func _agenda_fixa() -> void:
 		_igual(sois, c[4], "agenda fixa, %s: sóis dos modos de segurança" % id)
 		_igual(antecipados, c[4], "agenda fixa, %s: todo modo de segurança vem antes do plano" % id)
 		_igual(m.estrelas(), Modelo.estrelas(m.modos, m.ciencia_total()), "agenda fixa, %s: estrelas vêm do modelo" % id)
+		_igual(m.estrelas(), c[5], "agenda fixa, %s: estrelas" % id)
 	# "Tudo em ciência": o modo do sol 4 é sem conserto (a causa veio do sol 3, o oxigênio).
 	var t = Missao.new(1)
 	_jogar_missao(t, func(mm) -> Array: return _plano_da_estrategia("tudo", mm), false)

@@ -87,7 +87,10 @@ SEGUIR_NOTA,This sol passes with no science and counts 1 safe mode.,Este sol pas
 RELATORIO_TITULO,Mission report,Relatório da missão
 RELATORIO_SUB,%d sols at Gale crater,%d sóis na cratera Gale
 N_DE_3_ESTRELAS,%d of 3 stars,%d de 3 estrelas
-ESTRELAS_NOTA,Each safe mode counts against.,Cada modo de segurança conta contra.
+ESTRELAS_NOTA,3 stars: no safe mode and 5 or more science. 2 stars: no safe mode. 1 star: the base entered safe mode.,3 estrelas: nenhum modo de segurança e 5 ou mais de ciência. 2 estrelas: nenhum modo de segurança. 1 estrela: a base entrou em modo de segurança.
+ESTRELAS_FALTA_MODO,Next star: finish with no safe mode.,Próxima estrela: termine sem modo de segurança.
+ESTRELAS_FALTA_CIENCIA,Next star: send %d more science.,Próxima estrela: mande mais %d de ciência.
+ESTRELAS_MAXIMO,All 3 stars. Nothing was missing.,As 3 estrelas. Não faltou nada.
 N_PONTOS,%d points,%d pontos
 MARGEM_FINAL,Final margin,Margem final
 N_DE_12,%d of 12,%d de 12

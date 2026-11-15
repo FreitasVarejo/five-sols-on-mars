@@ -1507,6 +1507,15 @@ const REL_VERDADE_W := 372.0
 const REL_BOTAO := Rect2(394, 282, 232, 32)
 
 
+## O que faltou para a estrela seguinte (ou que não faltou nada), pela regra de Modelo.estrelas.
+func _estrelas_faltou(modos: int, ciencia: int) -> String:
+	if modos > 0:
+		return tr("ESTRELAS_FALTA_MODO")
+	if ciencia < Modelo.ciencia_para_3():
+		return tr("ESTRELAS_FALTA_CIENCIA") % (Modelo.ciencia_para_3() - ciencia)
+	return tr("ESTRELAS_MAXIMO")
+
+
 func _desenhar_relatorio() -> void:
 	var x := REL_X
 	var estrelas := missao.estrelas()
@@ -1547,6 +1556,8 @@ func _desenhar_relatorio() -> void:
 	_t(tr("N_DE_3_ESTRELAS") % estrelas, re.position.x + 99, re.position.y + 7, 14, Desenho.TEXTO, -1.0,
 		HORIZONTAL_ALIGNMENT_LEFT, true)
 	_t(tr("ESTRELAS_NOTA"), re.position.x + 8, re.position.y + 32, 12, Desenho.TEXTO_SUAVE, re.size.x - 16)
+	_t(_estrelas_faltou(missao.modos, missao.ciencia_total()), REL_FALTOU.position.x, REL_FALTOU.position.y, 12,
+		Desenho.TEXTO, REL_FALTOU.size.x, HORIZONTAL_ALIGNMENT_LEFT, true)
 
 	# A faixa dos 5 sóis, baixa: o sol, a ciência do sol e o que houve nele.
 	y = REL_Y_SOIS

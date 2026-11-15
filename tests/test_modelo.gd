@@ -246,8 +246,11 @@ func _dose_e_estrelas() -> void:
 	_igual(Modelo.estrelas(0, 4), 2, "estrelas: 0 modos, ciência 4")
 	_igual(Modelo.estrelas(0, 7), 3, "estrelas: 0 modos, ciência 7")
 	_igual(Modelo.estrelas(0, 14), 3, "estrelas: 0 modos, ciência 14")
-	_igual(Modelo.estrelas(1, 14), 2, "estrelas: 1 modo")
-	_igual(Modelo.estrelas(2, 0), 2, "estrelas: 2 modos")
+	_igual(Modelo.ciencia_para_3(), 5, "3 estrelas pedem ciência a partir de 5")
+	_igual(Modelo.estrelas(0, 0), 2, "estrelas: 0 modos, ciência 0")
+	_igual(Modelo.estrelas(1, 14), 1, "estrelas: 1 modo, mesmo com ciência alta")
+	_igual(Modelo.estrelas(1, 0), 1, "estrelas: 1 modo")
+	_igual(Modelo.estrelas(2, 0), 1, "estrelas: 2 modos")
 	_igual(Modelo.estrelas(3, 14), 1, "estrelas: 3 modos")
 
 
