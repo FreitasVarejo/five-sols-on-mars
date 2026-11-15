@@ -14,9 +14,10 @@ const N_LAMINAS := 10
 const DURACAO_PADRAO := 1.5
 const DURACAO_MIN := 0.5
 const DURACAO_MAX := 3.0
+const Som := preload("res://scripts/som.gd")
 const SOM_LAMINA := preload("res://assets/sons/persiana_lamina.ogg")
 const SOM_FECHO := preload("res://assets/sons/persiana_fecho.ogg")
-const VOLUME_DB := -4.0  # de todos os sons da persiana; o único botão de volume dela
+const VOLUME_DB := -4.0  # de todos os sons da persiana, em relação ao volume geral do barramento SFX (som.gd)
 const VOLUME_BATIDA_DB := -7.0  # das batidas por lâmina, em relação à trava e ao fecho
 const PITCH_MIN := 0.9
 const PITCH_MAX := 1.1
@@ -56,7 +57,9 @@ func configurar(panorama: TextureRect, anterior: TextureRect, duracao_s: float) 
 	duracao = duracao_s
 	_anterior.visible = false
 	_aplicar(0.0)
+	Som.garantir_barramento()
 	_tocador = AudioStreamPlayer.new()
+	_tocador.bus = Som.BARRAMENTO
 	_tocador.stream = AudioStreamPolyphonic.new()
 	_tocador.max_polyphony = 16
 	add_child(_tocador)
@@ -122,8 +125,9 @@ func laminas() -> int:
 
 
 func _tocar_batida() -> void:
-	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_DB + VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX))
+	_som.play_stream(SOM_LAMINA, 0.0, VOLUME_DB + VOLUME_BATIDA_DB, randf_range(PITCH_MIN, PITCH_MAX),
+		AudioServer.PLAYBACK_TYPE_DEFAULT, Som.BARRAMENTO)
 
 
 func _tocar_destaque(som: AudioStream) -> void:
-	_som.play_stream(som, 0.0, VOLUME_DB)
+	_som.play_stream(som, 0.0, VOLUME_DB, 1.0, AudioServer.PLAYBACK_TYPE_DEFAULT, Som.BARRAMENTO)

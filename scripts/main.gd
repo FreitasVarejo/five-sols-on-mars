@@ -25,8 +25,11 @@ const TelaBarra := preload("res://scripts/tela_barra.gd")
 const TelaRadiacao := preload("res://scripts/tela_radiacao.gd")
 const Estacoes := preload("res://scripts/estacoes.gd")
 const TelaComunicacao := preload("res://scripts/tela_comunicacao.gd")
+const IndicadorPorta := preload("res://scripts/indicador_porta.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
+const Som := preload("res://scripts/som.gd")
+const Terminal := preload("res://scripts/terminal.gd")
 const SONDA_PERIODO_S := 0.2  # no turno a sonda se atualiza pelo menos 5 vezes por segundo
 
 const PANORAMAS := {
@@ -58,6 +61,8 @@ const ESTACOES := {"planta": "estufa", "amostra": "glovebox"}
 @onready var _contornos: Control = $HUD/Contornos
 @onready var _hud_turno: Control = $HUD/HudTurno
 @onready var _terminal: Control = $Terminal
+@onready var _som: Som = $Som
+@onready var _botao_mudo: Control = $BotaoMudo
 
 var _botoes := {}  # nome -> Rect2 no panorama (o que se clica)
 var _regioes_telas := {}  # nome -> Rect2 no panorama (telas: só para os contornos de depuração)
@@ -67,6 +72,7 @@ var _tela_energia: Control
 var _tela_oxigenio: Control
 var _tela_radiacao: Control
 var _estacoes: Control
+var _indicador_porta: Control
 var _parametros := {}  # parâmetros da URL (só Web)
 var _sonda_chave := ""
 var _sonda_t := 0.0
@@ -93,6 +99,9 @@ func _ready() -> void:
 	_parametros = _parametros_da_url()
 	_sondar = _parametros.get("sonda") == "1"
 	_terminal.gravar_textos = _sondar
+	_botao_mudo.som = _som
+	_terminal.som = _som
+	_terminal.duracao = Terminal.duracao_da_url(_parametros.get("terminal"))
 	_aplicar_stretch_da_url()
 	# Inglês por padrão; ?lang=pt troca para português. O idioma do navegador não conta.
 	TranslationServer.set_locale("pt" if _parametros.get("lang") == "pt" else "en")
@@ -173,6 +182,14 @@ func _carregar_regioes() -> void:
 	comunicacao.size = rc.size
 	comunicacao.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_telas.add_child(comunicacao)
+
+	# A lâmpada da porta do dormitório e a lua de "pode dormir", na camada da sala.
+	_indicador_porta = IndicadorPorta.new()
+	_indicador_porta.size = _panorama.texture.get_size()
+	_indicador_porta.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_indicador_porta.porta = _botoes["porta"]
+	_indicador_porta.lampada = _rect(dados["desenho"]["porta_lampada"])
+	_telas.add_child(_indicador_porta)
 
 	# Andamento das tarefas nas estações.
 	_estacoes = Estacoes.new()
@@ -277,7 +294,7 @@ func _atualizar_sala() -> void:
 	if estado != _estado:
 		_definir_estado(estado)
 	_vista_janela.acompanhar(fase_ui, _missao.relogio(), _missao.turno_s, _missao.eh_poeira())
-	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto
+	_hud_turno.visible = fase_ui == "turno" and not _terminal.aberto and _terminal.posicao() <= 0.0
 	var estados := {}
 	var progresso := {}
 	var clicaveis := {}
@@ -288,10 +305,12 @@ func _atualizar_sala() -> void:
 				progresso[tarefa] = _missao.progresso_tarefa(tarefa)
 				clicaveis[tarefa] = _clicavel(ESTACOES[tarefa])
 	_estacoes.atualizar(estados, progresso, clicaveis)
+	_indicador_porta.atualizar(_missao.pode_encerrar_sol())
 
 
 ## O que dá para clicar agora na sala: o abrigo no turno; a estufa e a glovebox quando a tarefa
-## delas está escolhida, pendente, sem outra rodando e fora do abrigo.
+## delas está escolhida, pendente, sem outra rodando e fora do abrigo; a porta do dormitório quando dá
+## para encerrar o sol (a lista acabou e o medidor não pede atenção).
 func _clicavel(nome: String) -> bool:
 	if _missao.fase != "turno" or _terminal.fase_ui != "turno" or _terminal.tapa_a_sala():
 		return false
@@ -302,6 +321,8 @@ func _clicavel(nome: String) -> bool:
 			return _pode_iniciar("planta")
 		"glovebox":
 			return _pode_iniciar("amostra")
+		"porta":
+			return _missao.pode_encerrar_sol()
 	return false
 
 
@@ -425,13 +446,18 @@ func _contorno_na_tela(r: Rect2) -> PackedVector2Array:
 func _ao_clicar(nome: String) -> void:
 	_cliques += 1
 	_ultimo_clique = nome
+	var fez := false
 	match nome:
 		"abrigo":
-			_missao.abrigar()
+			fez = _missao.abrigar()
 		"estufa":
-			_missao.iniciar_tarefa("planta")
+			fez = _missao.iniciar_tarefa("planta")
 		"glovebox":
-			_missao.iniciar_tarefa("amostra")
+			fez = _missao.iniciar_tarefa("amostra")
+		"porta":
+			fez = _missao.encerrar_sol()
+	if fez:
+		_som.clique(nome)
 	_sonda_teste()
 
 
@@ -473,7 +499,8 @@ func _atualizar_depuracao() -> void:
 
 # --- parâmetros da URL (só Web) -------------------------------------------------
 
-## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?semente=<int>,
+## ?lang=pt, ?turno=<s>, ?tarefa=<s>, ?persiana=<s> (duração da persiana, 0,5 a 3,0), ?terminal=<s> (duração
+## do terminal subir e descer, 0,15 a 1,5; padrão 0,3), ?semente=<int>,
 ## ?sol_solar=3|4, ?sol_poeira=2..5, ?sol_quebra=2..5, ?stretch=viewport|canvas_items.
 func _parametros_da_url() -> Dictionary:
 	if not OS.has_feature("web"):
@@ -528,7 +555,7 @@ func _rect_na_tela(r: Rect2) -> Rect2:
 
 
 ## Tudo que se clica agora, nome -> [x, y, w, h] em px da tela de 640x360: o terminal e o que ele
-## mostra, mais a sala (abrigo, estufa, glovebox) e as setas, quando valem.
+## mostra, mais a sala (abrigo, estufa, glovebox, porta) e as setas, quando valem.
 func _ui_da_tela() -> Dictionary:
 	var ui: Dictionary = _terminal.ui()
 	for nome: String in _botoes:
@@ -536,6 +563,7 @@ func _ui_da_tela() -> Dictionary:
 			var r := _rect_na_tela(_botoes[nome])
 			if r.size.x >= 4.0 and r.size.y >= 4.0:
 				ui[nome] = [roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y)]
+	ui.merge(_botao_mudo.ui())
 	for par in [["seta_esq", _seta_esq], ["seta_dir", _seta_dir]]:
 		if par[1].is_visible_in_tree() and not par[1].disabled:
 			var r: Rect2 = par[1].get_global_rect()
@@ -557,11 +585,11 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
-		_terminal.aba_na_tela(), _terminal.card_aberto]
+		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando()]
 	var agora := Time.get_ticks_msec() / 1000.0
-	if chave != _sonda_chave or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
+	if chave != _sonda_chave or _terminal.animando() or (_missao.fase == "turno" and agora - _sonda_t >= SONDA_PERIODO_S):
 		_sonda_chave = chave
 		_sonda_teste()
 
@@ -603,11 +631,16 @@ func _sonda_teste() -> void:
 		"causa": m.causa if m.fase == "seguranca" else null,
 		"estrelas": m.estrelas(),
 		"terminal_aberto": _terminal.aberto,
+		"terminal": {"pos": _terminal.posicao(), "animando": _terminal.animando(), "tapa": _terminal.tapa_a_sala(),
+			"duracao": _terminal.duracao},
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(),
+		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico},
 		"ui": _ui_da_tela(),
 		"sol_poeira": m.sol_poeira, "sol_quebra": m.sol_quebra, "poeira": m.eh_poeira(),
 		"gerador_quebrado": m.st["gerador_quebrado"], "lista_acabou": m.lista_acabou(), "acelerado": m.acelerado,
+		"pode_dormir": m.pode_encerrar_sol(), "porta_clicavel": _clicavel("porta"),
+		"porta_acesa": _indicador_porta.aceso,
 	}
 	estado.merge(_sonda_graficos())
 	JavaScriptBridge.eval("window.fsom = %s;" % JSON.stringify(estado), true)

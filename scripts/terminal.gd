@@ -9,6 +9,18 @@ extends Control
 ## botão o abaixa. Aberto, o terminal ocupa a tela inteira (decisão do P0) e tapa o clique da sala.
 ## O botão só vale no plano e no turno; nas outras fases o terminal fica aberto e o botão apagado.
 ##
+## Toda mudança de `aberto` é uma animação: o terminal sobe de baixo para cima e desce de cima para
+## baixo, com som, também quando sobe ou desce sozinho (troca de fase). `aberto` é o alvo; a posição
+## visual é `_pos` (0 = abaixado, 1 = no alto) e anda até ele em `duracao` s. O botão TERMINAL apertado
+## no meio da animação inverte o sentido a partir do ponto em que está. Enquanto anima, a sala não
+## recebe clique e o conteúdo do terminal também não.
+##
+## Só o corpo de cada tecla e o da tela são pintados: a sala aparece nas frestas (bordas, vãos entre as
+## teclas e a faixa de baixo, em volta dos botões). A área útil da tela não muda.
+##
+## `fase_ui` é a fase que a sala vê (muda na hora). `_fase_tela` é a que o terminal desenha: ao descer
+## depois de uma troca de fase (confirmar o plano), ela fica a anterior até o terminal chegar embaixo.
+##
 ## Plano, turno e fim do sol levam 4 teclas na moldura (câmeras, tarefas, diário, fontes), à esquerda:
 ## cada uma abre uma aba, sem sub-aba. `aba` guarda a aba aberta; "" é a tela própria da fase
 ## (plano -> o plano; turno -> tarefas; fim_do_sol -> diário). Mudar de fase zera `aba`.
@@ -16,14 +28,14 @@ extends Control
 ##
 ## O card da Terra abre por cima do plano (card_aberto) e, enquanto aberto, só "Fechar" se clica.
 ##
-## No turno, "Encerrar o sol" (encerrar_sol) aparece quando Missao.pode_encerrar_sol(), com o terminal
-## aberto em qualquer aba ou abaixado, sempre no mesmo lugar: BOTAO_ENCERRAR, ao lado do botão
-## TERMINAL, na faixa da moldura abaixo da tela. "Consertar" (consertar_gerador) e
-## "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do terminal os substituem na próxima parte.
+## Encerrar o sol não é botão do terminal: é a porta do dormitório, na sala (main.gd).
+## "Consertar" (consertar_gerador) e "Iniciar" (iniciar_chemcam) são provisórios: as câmeras do
+## terminal os substituem na próxima parte.
 ##
 ## Cores [R]: verde só no que se clica; vermelho e amarelo só em alerta; azul só no que vem da Terra.
 
 const Missao := preload("res://scripts/missao.gd")
+const Som := preload("res://scripts/som.gd")
 const Modelo := preload("res://scripts/modelo.gd")
 const Desenho := preload("res://scripts/desenho.gd")
 const DadosDonki := preload("res://scripts/dados_donki.gd")
@@ -31,11 +43,10 @@ const DadosDonki := preload("res://scripts/dados_donki.gd")
 ## Avisa que acabou de desenhar (a sonda de teste lê ui() depois disso).
 signal desenhou
 
+const DURACAO_PADRAO := 0.3  # escolhida de ouvido pelo dono (14/11), entre 0,25, 0,4 e 0,6
+const DURACAO_MIN := 0.15
+const DURACAO_MAX := 1.5
 const BOTAO := Rect2(260, 328, 120, 28)
-# "Encerrar o sol", aberto ou abaixado o terminal: ao lado do botão TERMINAL, na faixa de baixo (a
-# moldura, abaixo da tela do terminal, que não cobre aba nenhuma), longe das setas do pan (meio das
-# bordas), do medidor, das barras e dos chips do HUD.
-const BOTAO_ENCERRAR := Rect2(388, 328, 164, 28)
 const TELA := Rect2(0, 0, 640, 360)
 const ESCURECER_S := 0.8   # fim do turno: escurece para um cinza neutro
 const CLAREAR_S := 0.5
@@ -43,10 +54,11 @@ const CLAREAR_S := 0.5
 # Moldura com as 4 teclas (plano, turno, fim do sol): as teclas à esquerda, a tela à direita.
 const TELA_COM_TECLAS := Rect2(80, 6, 554, 316)
 const TELA_CHEIA := Rect2(6, 6, 628, 316)
+# Os vãos de 12 a 14 px entre as teclas, e entre elas e a tela, deixam a sala aparecer (a tela não encolhe).
 const TECLA_X := 6.0
-const TECLA_W := 68.0
-const TECLA_H := 72.0
-const TECLAS_Y := [8.0, 86.0, 164.0, 242.0]
+const TECLA_W := 62.0
+const TECLA_H := 66.0
+const TECLAS_Y := [8.0, 88.0, 168.0, 248.0]
 const ABAS := ["cameras", "tarefas", "diario", "fontes"]
 const ICONES_ABA := {"cameras": "camera", "tarefas": "lista", "diario": "diario", "fontes": "fontes"}
 const ROTULOS_ABA := {"cameras": "ABA_CAMERAS", "tarefas": "ABA_TAREFAS", "diario": "ABA_DIARIO", "fontes": "ABA_FONTES"}
@@ -70,12 +82,17 @@ const PASSO_LINHA := 42.0      # altura de uma linha da lista de tarefas, com o 
 var missao: Missao
 var donki := {}
 var aberto := false
-var fase_ui := "plano"      # a fase que a tela mostra (atrasa o fim do turno, por causa do fade)
+var som: Som                # os sons de subir e descer (main.gd o liga)
+var duracao := DURACAO_PADRAO  # segundos para subir ou descer por inteiro (?terminal=<s>)
+var fase_ui := "plano"      # a fase que a sala vê (atrasa o fim do turno, por causa do fade)
 var aba := ""               # "" = a tela própria da fase; ou "cameras", "tarefas", "diario", "fontes"
 var card_aberto := false    # o card da Terra por cima do plano
 var gravar_textos := false  # só com a sonda de teste ligada (main.gd, ?sonda=1)
 
 var _fase_logica := "plano"
+var _modos_vistos := 0      # quantas entradas no modo de segurança o terminal já viu (cada uma toca o desligar)
+var _fase_tela := "plano"   # a fase que o terminal desenha (ver o cabeçalho)
+var _pos := 1.0             # 0 = abaixado, 1 = no alto; anda até `aberto` em `duracao` s
 var _fade := 0.0
 var _fade_estado := ""      # "", "escurecendo" ou "clareando"
 var _botoes := {}           # nome -> Rect2, só o que se clica agora
@@ -90,8 +107,10 @@ func iniciar(m: Missao, dado_donki: Dictionary) -> void:
 	missao = m
 	donki = dado_donki
 	_fase_logica = m.fase
+	_modos_vistos = m.modos
 	_mostrar_fase(m.fase)
 	aberto = _abre_na_fase(m.fase)
+	_pos = 1.0 if aberto else 0.0
 
 
 func _ready() -> void:
@@ -115,16 +134,39 @@ func textos() -> Array:
 
 ## A aba na tela: "plano", "cameras", "tarefas", "diario" ou "fontes"; "" nas fases sem teclas.
 func aba_na_tela() -> String:
-	if not _tem_teclas(fase_ui):
+	if not _tem_teclas(_fase_tela):
 		return ""
 	if aba != "":
 		return aba
-	return _aba_da_fase(fase_ui)
+	return _aba_da_fase(_fase_tela)
 
 
-## O terminal tapa a sala (pan parado, sem clique) enquanto estiver aberto ou em transição.
+## O terminal tapa a sala (pan parado, sem clique) enquanto estiver aberto, em animação (subindo ou
+## descendo) ou escurecendo.
 func tapa_a_sala() -> bool:
-	return aberto or _fade_estado == "escurecendo"
+	return aberto or _pos > 0.0 or _fade_estado == "escurecendo"
+
+
+## Duração pedida na URL (?terminal=<s>): vale de DURACAO_MIN a DURACAO_MAX; fora disso ou ausente, o padrão.
+static func duracao_da_url(valor: Variant) -> float:
+	var s := float(valor) if valor != null else 0.0
+	return s if s >= DURACAO_MIN and s <= DURACAO_MAX else DURACAO_PADRAO
+
+
+## Easing suave (entra e sai devagar) de um progresso linear de 0 a 1.
+static func suavizar(p: float) -> float:
+	var x := clampf(p, 0.0, 1.0)
+	return x * x * (3.0 - 2.0 * x)
+
+
+## O terminal está subindo ou descendo (ainda não chegou ao alvo)?
+func animando() -> bool:
+	return _pos != (1.0 if aberto else 0.0)
+
+
+## Posição visual do terminal, de 0 (abaixado) a 1 (no alto), já com o easing (a sonda de teste lê).
+func posicao() -> float:
+	return suavizar(_pos)
 
 
 static func _abre_na_fase(fase: String) -> bool:
@@ -147,37 +189,77 @@ static func _aba_da_fase(fase: String) -> String:
 
 ## No turno, só câmeras e tarefas valem: todo texto mora fora do turno.
 func _aba_habilitada(nome: String) -> bool:
-	return fase_ui != "turno" or nome == "cameras" or nome == "tarefas"
+	return _fase_tela != "turno" or nome == "cameras" or nome == "tarefas"
 
 
 func _card_visivel() -> bool:
-	return aberto and fase_ui == "plano" and card_aberto
+	return _pos > 0.0 and _fase_tela == "plano" and card_aberto
 
 
 ## A tela passa a mostrar a fase `f`: zera a aba e, no plano, abre o card se há aviso.
 func _mostrar_fase(f: String) -> void:
 	fase_ui = f
+	_mostrar_na_tela(f)
+
+
+## O terminal passa a desenhar a fase `f`: zera a aba e, no plano, abre o card se há aviso.
+func _mostrar_na_tela(f: String) -> void:
+	_fase_tela = f
 	aba = ""
 	card_aberto = f == "plano" and missao.aviso_ativo()
+
+
+## Muda o alvo do terminal (sobe ou desce) e toca o som do começo do movimento. Se `valor` já é o
+## alvo, não faz nada. Subir mostra a fase atual: o conteúdo que ficou para trás numa descida
+## interrompida não volta.
+func _definir_aberto(valor: bool) -> void:
+	if valor == aberto:
+		return
+	aberto = valor
+	if valor and _fase_tela != fase_ui:
+		_mostrar_na_tela(fase_ui)
+	if som != null:
+		som.tocar("terminal_sobe" if valor else "terminal_desce")
+
+
+## Anda a posição até o alvo; embaixo, o conteúdo atrasado de uma descida passa para a fase atual.
+## Devolve se algo mudou (a posição ou o conteúdo): o último passo, o que chega ao alvo, também se redesenha.
+func _animar(delta: float) -> bool:
+	var alvo := 1.0 if aberto else 0.0
+	var mudou := false
+	if _pos != alvo:
+		_pos = move_toward(_pos, alvo, minf(delta, 0.1) / duracao)
+		mudou = true
+	if _pos <= 0.0 and _fase_tela != fase_ui:
+		_mostrar_na_tela(fase_ui)
+		mudou = true
+	return mudou
 
 
 func _process(delta: float) -> void:
 	if missao == null:
 		return
+	# Cada entrada no modo de segurança toca o desligar uma vez, no mesmo quadro em que o terminal a vê:
+	# com o relógio, é o começo do escurecimento; no meio do turno, a hora da entrada.
+	if missao.modos > _modos_vistos and som != null:
+		som.tocar("desligar")
+	_modos_vistos = missao.modos
 	if missao.fase != _fase_logica:
 		_ao_mudar_de_fase(_fase_logica, missao.fase)
 	match _fade_estado:
 		"escurecendo":
 			_fade = minf(1.0, _fade + delta / ESCURECER_S)
 			if _fade >= 1.0:
+				# O escurecimento chegou ao máximo: o terminal sobe junto com o clarear.
 				_mostrar_fase(missao.fase)
-				aberto = _abre_na_fase(fase_ui)
+				_definir_aberto(_abre_na_fase(fase_ui))
 				_fade_estado = "clareando"
 		"clareando":
 			_fade = maxf(0.0, _fade - delta / CLAREAR_S)
 			if _fade <= 0.0:
 				_fade_estado = ""
-	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista
+	var animou := _animar(delta)
+	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
 
@@ -190,8 +272,12 @@ func _ao_mudar_de_fase(de: String, para: String) -> void:
 		_fade_estado = "escurecendo"
 		_fade = 0.0
 		return
-	_mostrar_fase(para)
-	aberto = _abre_na_fase(para)
+	fase_ui = para
+	var abre := _abre_na_fase(para)
+	# Subindo (ou com o terminal já embaixo) a tela já mostra a fase nova; descendo, só quando chegar.
+	if abre or _pos <= 0.0:
+		_mostrar_na_tela(para)
+	_definir_aberto(abre)
 	_fade_estado = ""
 	_fade = 0.0
 	queue_redraw()
@@ -224,51 +310,55 @@ func _botao_em(p: Vector2) -> String:
 	return ""
 
 
+## Faz a ação `nome` e, se ela aconteceu de fato, toca o clique do peso dela (som.gd). O botão TERMINAL
+## não faz clique: tem o som de subir e descer.
 func _acionar(nome: String) -> void:
 	if card_aberto and nome != "fechar_card":
 		return
+	var fez := true
 	match nome:
 		"terminal":
-			aberto = not aberto
+			_definir_aberto(not aberto)
 		"fechar_card":
 			card_aberto = false
 		"voltar_plano":
 			aba = ""
 		"aba_cameras", "aba_tarefas", "aba_diario", "aba_fontes":
-			_apertar_tecla(nome.trim_prefix("aba_"))
+			fez = _apertar_tecla(nome.trim_prefix("aba_"))
 		"o2_menos":
-			missao.mudar_q(-1)
+			fez = missao.mudar_q(-1)
 		"o2_mais":
-			missao.mudar_q(1)
+			fez = missao.mudar_q(1)
 		"tarefa_chemcam", "tarefa_amostra", "tarefa_planta":
-			missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
+			fez = missao.alternar_tarefa(nome.trim_prefix("tarefa_"))
 		"confirmar":
-			missao.confirmar_plano()
+			fez = missao.confirmar_plano()
 		"iniciar_chemcam":
-			missao.iniciar_tarefa("chemcam")
+			fez = missao.iniciar_tarefa("chemcam")
 		"consertar_gerador":
-			missao.iniciar_tarefa("gerador")
-		"encerrar_sol":
-			missao.encerrar_sol()
+			fez = missao.iniciar_tarefa("gerador")
 		"enviar":
-			missao.enviar_a_terra()
+			fez = missao.enviar_a_terra()
 		"reiniciar":
-			missao.reiniciar_sol()
+			fez = missao.reiniciar_sol()
 		"seguir":
-			missao.seguir_em_seguranca()
+			fez = missao.seguir_em_seguranca()
 		"jogar_de_novo":
-			missao.jogar_de_novo()
+			fez = missao.jogar_de_novo()
+	if fez and som != null:
+		som.clique(nome)
 	queue_redraw()
 
 
 ## Apertar a tecla da aba na tela volta à tela própria da fase; apertar outra abre a aba dela.
 ## A aba que a própria fase mostra (tarefas no turno, diário no fim do sol) fica como "".
-func _apertar_tecla(nome: String) -> void:
+func _apertar_tecla(nome: String) -> bool:
 	if not _aba_habilitada(nome):
-		return
+		return false
 	aba = "" if aba_na_tela() == nome else nome
-	if aba == _aba_da_fase(fase_ui):
+	if aba == _aba_da_fase(_fase_tela):
 		aba = ""
+	return true
 
 
 # --- desenho: peças ------------------------------------------------------------
@@ -331,6 +421,7 @@ func _botao(nome: String, r: Rect2, rotulo: String, icone: String = "", habilita
 
 ## Tecla da moldura: ícone em cima, palavra embaixo. Mesmo estilo do botão; a da aba na tela fica apertada.
 func _tecla(a: String, r: Rect2) -> void:
+	_aro(r)
 	var cores := _pintar_botao("aba_" + a, r, _aba_habilitada(a), aba_na_tela() == a)
 	var fundo: Color = cores[0]
 	var cor: Color = cores[1]
@@ -395,39 +486,42 @@ func _draw() -> void:
 		return
 	_versao_vista = missao.versao
 	var card := _card_visivel()
-	_travado = card
-	if aberto:
+	var anima := animando()
+	if _pos > 0.0:
+		# O terminal (e o card, que vem junto) sobe e desce; o botão TERMINAL, embaixo, fica parado.
+		draw_set_transform(Vector2(0.0, roundf((1.0 - suavizar(_pos)) * TELA.size.y)))
+		_travado = card or anima  # o que se clica no terminal só vale parado e sem o card por cima
 		_desenhar_terminal()
+		if card:
+			# O plano fica atrás, escurecido (só o terminal, não a sala); só o "Fechar" se clica.
+			_escurecer_corpos()
+			_travado = anima
+			_desenhar_card()
+		draw_set_transform(Vector2.ZERO)
+	_travado = card
 	var no_jogo := fase_ui == "plano" or fase_ui == "turno"
 	var livre := _fade_estado != "escurecendo"
 	_botao("terminal", BOTAO, tr("TERMINAL"), "terminal", no_jogo and livre and not card, 12, aberto)
-	# O "Encerrar o sol" fica ao lado do botão TERMINAL, em qualquer aba, enquanto valer.
-	if fase_ui == "turno" and livre and not card and missao.pode_encerrar_sol():
-		_botao("encerrar_sol", BOTAO_ENCERRAR, tr("ENCERRAR_O_SOL"), "sol", true, 12)
-	if card:
-		# O plano fica atrás, escurecido; só o "Fechar" se clica.
-		draw_rect(TELA, Color(Desenho.NOITE, 0.6))
-		_travado = false
-		_desenhar_card()
 	if _fade > 0.0:
 		draw_rect(TELA, Color(Desenho.NOITE, _fade))
 	desenhou.emit()
 
 
 func _desenhar_terminal() -> void:
-	if fase_ui == "seguranca":
-		# O modo de segurança é um painel central sobre a sala (no estado modo_seguranca).
+	if _fase_tela == "seguranca":
+		# O modo de segurança é um painel central sobre a sala (no estado modo_seguranca); a faixa de
+		# baixo não tem moldura: a sala aparece em volta dos botões.
 		draw_rect(TELA, Color(Desenho.NOITE, 0.62))
-		draw_rect(Rect2(0, 326, 640, 34), Desenho.MOLDURA)
 		_desenhar_seguranca()
 		return
-	draw_rect(TELA, Desenho.MOLDURA)
-	var tela := TELA_COM_TECLAS if _tem_teclas(fase_ui) else TELA_CHEIA
+	# Sem moldura opaca: só o corpo da tela e o de cada tecla, com um aro fino. A sala aparece nas frestas.
+	var tela := _retangulo_da_tela()
+	_aro(tela)
 	draw_rect(tela, Desenho.FUNDO_TERMINAL)
 	draw_rect(tela, Desenho.BORDA, false, 2.0)
-	if _tem_teclas(fase_ui):
+	if _tem_teclas(_fase_tela):
 		for i in ABAS.size():
-			_tecla(ABAS[i], Rect2(TECLA_X, TECLAS_Y[i], TECLA_W, TECLA_H))
+			_tecla(ABAS[i], _retangulos_das_teclas()[i])
 		match aba_na_tela():
 			"plano":
 				_desenhar_plano()
@@ -440,11 +534,37 @@ func _desenhar_terminal() -> void:
 			"fontes":
 				_desenhar_fontes()
 		return
-	match fase_ui:
+	match _fase_tela:
 		"noite":
 			_desenhar_noite()
 		"relatorio":
 			_desenhar_relatorio()
+
+
+## O corpo da tela do terminal: com as 4 teclas à esquerda, ou cheia.
+func _retangulo_da_tela() -> Rect2:
+	return TELA_COM_TECLAS if _tem_teclas(_fase_tela) else TELA_CHEIA
+
+
+## O corpo de cada tecla, na ordem de ABAS.
+func _retangulos_das_teclas() -> Array:
+	var lista := []
+	for y: float in TECLAS_Y:
+		lista.append(Rect2(TECLA_X, y, TECLA_W, TECLA_H))
+	return lista
+
+
+## Aro fino e escuro de 1 px em volta de um corpo, para ele não se perder na sala que aparece atrás.
+func _aro(r: Rect2) -> void:
+	draw_rect(r.grow(1.0), Desenho.MOLDURA, false, 1.0)
+
+
+## O card da Terra por cima: o plano (a tela e as teclas, sem a sala em volta) fica escurecido.
+func _escurecer_corpos() -> void:
+	var cor := Color(Desenho.NOITE, 0.6)
+	draw_rect(_retangulo_da_tela(), cor)
+	for r: Rect2 in _retangulos_das_teclas():
+		draw_rect(r, cor)
 
 
 # --- cabeçalhos ------------------------------------------------------------------
@@ -462,7 +582,7 @@ func _titulo(icone: String, titulo: String, sub: String) -> float:
 ## no turno, as três barras ao vivo.
 func _cabecalho_aba(a: String, sol_n: int, barras: Dictionary = {}) -> void:
 	_titulo(ICONES_ABA[a], tr(ROTULOS_ABA[a]), tr("CAB_SOL_ABA") % [sol_n, Modelo.N.SOLS])
-	if fase_ui == "plano":
+	if _fase_tela == "plano":
 		_botao("voltar_plano", Rect2(X1 - 140, 8, 140, 28), tr("VOLTAR_AO_PLANO"), "", true, 12)
 	if not barras.is_empty():
 		var x := 284.0
@@ -831,7 +951,7 @@ func _tanque(r: Rect2) -> void:
 
 ## A lista de tarefas do sol, estilo Among Us: ícone, uma palavra, estado. No turno leva as barras ao vivo.
 func _desenhar_tarefas() -> void:
-	_cabecalho_aba("tarefas", missao.sol, missao.barras_na_fase("turno") if fase_ui == "turno" else {})
+	_cabecalho_aba("tarefas", missao.sol, missao.barras_na_fase("turno") if _fase_tela == "turno" else {})
 	var r := Rect2(X0, Y_CORPO, X1 - X0, Y_FIM - Y_CORPO)
 	_caixa(r)
 	var x := r.position.x + 10
@@ -949,7 +1069,7 @@ func _desenhar_diario() -> void:
 		_de_para(bx, by - 1, bw, _numero(a), "%s/12" % _numero(d), Desenho.TEXTO)
 		Desenho.celulas(self, Rect2(bx, by + 17, bw, 6), maxf(0.0, d), 12, Desenho.cor_recurso(k))
 		by += 44
-	if fase_ui == "fim_do_sol":
+	if _fase_tela == "fim_do_sol":
 		_botao("enviar", Rect2(rb.position.x, Y_FIM - 50, rb.size.x, 50), tr("ENVIAR_A_TERRA"), "terra", true, 14)
 
 

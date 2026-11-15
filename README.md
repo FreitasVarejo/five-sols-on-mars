@@ -20,3 +20,5 @@ Exports the `Web` preset to `build/web/` and force-pushes it to the `gh-pages` b
 - The edge-pan camera was inspired by the [Cupcakes Framework](https://github.com/Oplexitie/Cupcakes-Framework) by Oplexitie (MIT). No code was copied.
 - Sound "metal_close_01" from the pack "100 CC0 metal and wood SFX" by rubberduck (CC0), used for the window shutter: https://opengameart.org/content/100-cc0-metal-and-wood-sfx
 - Sound "qubodup-DoorClose07" from "Door Open, Door Close Set" by qubodup (CC0), used for the window shutter: https://opengameart.org/content/door-open-door-close-set
+- Sounds "back_004", "confirmation_001", "bong_001", "maximize_008" and "minimize_008" from "Interface Sounds" by Kenney (CC0), pitched down, used for button clicks and the terminal: https://opengameart.org/content/interface-sounds
+- Sound "Plug-out" from "Plug In, Plug Out" by cleytonkauffman (CC0), pitched down, used for the safe mode: https://opengameart.org/content/sfx-plug-in-plug-out

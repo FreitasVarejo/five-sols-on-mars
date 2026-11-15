@@ -20,9 +20,12 @@ A janela larga do centro não leva vista assada: o vidro sai com alpha 0 no PNG 
 vem do exterior.py, que usa a mesma câmera (OLHO, PANORAMA) deste script.
 
 Além dos PNGs do panorama, grava assets/comodo/regioes.json (retângulos dos botões e telas,
-calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa e glovebox.
-Telas: energia, oxigenio, radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o
-Godot). O terminal não é render: é camada de tela no Godot.
+calculados pela projeção real da câmera sobre os vértices). Botões: abrigo, estufa, glovebox e
+porta (a porta do dormitório, na ponta esquerda: tocá-la encerra o sol). Telas: energia, oxigenio,
+radiacao e comunicacao (a tela da Terra, apagada: quem a acende é o Godot). Desenho: porta_lampada,
+a lâmpada verde da porta, para o Godot acendê-la ou apagá-la por cima do render (o indicador de
+"pode dormir"). Região de desenho é o retângulo do que o passe de índice mostra de fato (justo, sem
+a folga da projeção), porque o Godot a pinta por cima do render. O terminal não é render: é camada de tela no Godot.
 Uma imagem de depuração com os retângulos fica em arte/blender/.render/regioes_debug.png.
 
 Paleta: Apollo, de AdamCYounis (https://lospec.com/palette-list/apollo).
@@ -771,12 +774,19 @@ REGIOES = {
     "radiacao": ["radiacao_tela"],
     "comunicacao": ["comunicacao_tela"],
     "abrigo": ["abrigo_aro", "abrigo_anel", "abrigo_botao"],
+    "porta": ["porta_folha", "porta_moldura_topo", "porta_moldura_tras", "porta_moldura_frente"],
+    "porta_lampada": ["porta_lampada"],
     "estufa": ["estufa_moldura", "estufa_vidro"],
     "glovebox": ["glovebox_moldura", "glovebox_vidro", "glovebox_aro0", "glovebox_aro1"],
     "janela": list(JANELA_OBJS),
 }
 TELAS = ("energia", "oxigenio", "radiacao", "comunicacao")
 BOTOES = ("abrigo", "estufa", "glovebox")
+# A porta é botão, mas fica na ponta esquerda do panorama (x < 60), sob a seta de pan quando o pan está
+# em 0: não segue ZONA_LIVRE_X nem FAIXA_CLIQUE, que valem para os botões do meio da sala. O Godot
+# esconde a seta no limite do pan para a porta se alcançar.
+PORTA = "porta"
+DESENHO = ("porta_lampada",)   # regiões só de desenho: o Godot pinta por cima do render
 FAIXA_CLIQUE = (120, 250)
 LARG_CIENCIA = 70              # estufa e glovebox: largura-alvo no panorama, em px
 ZONA_LIVRE_X = (60, 1220)      # fora das setas de pan (~50 px em cada ponta da tela)
@@ -852,6 +862,14 @@ def validar_regioes(reg):
         checa(r["w"] >= 24 and r["h"] >= 24, f"{n}: tamanho {r['w']}x{r['h']} px (mínimo 24x24)")
         checa(x_min <= r["x"] and r["x"] + r["w"] <= x_max,
               f"{n}: x {r['x']}..{r['x'] + r['w']} fora da zona das setas ({x_min}..{x_max})")
+    r = reg[PORTA]
+    checa(r["w"] >= 24 and r["h"] >= 24, f"{PORTA}: tamanho {r['w']}x{r['h']} px (mínimo 24x24)")
+    checa(r["x"] + r["w"] <= 320, f"{PORTA}: x {r['x']}..{r['x'] + r['w']} dentro de x<320")
+    r, p = reg["porta_lampada"], reg[PORTA]
+    checa(r["w"] >= 4 and r["h"] >= 4, f"porta_lampada: tamanho {r['w']}x{r['h']} px")
+    checa(r["y"] + r["h"] <= p["y"] + 4 and p["x"] - 4 <= r["x"] and r["x"] + r["w"] <= p["x"] + p["w"] + 4,
+          f"porta_lampada: x {r['x']}..{r['x'] + r['w']} y {r['y']}..{r['y'] + r['h']} acima da porta "
+          f"(x {p['x']}..{p['x'] + p['w']}, y {p['y']})")
     for n in ("abrigo", "radiacao"):
         r = reg[n]
         checa(r["x"] + r["w"] <= 320, f"{n}: x {r['x']}..{r['x'] + r['w']} dentro de x<320")
@@ -979,6 +997,14 @@ def main():
         vidro_ok &= (transp.any() == esperado) and fora == 0
     print(f"[comodo] vidro transparente só com a persiana aberta: {'PASSA' if vidro_ok else 'FALHA'}")
 
+    # regiões de desenho: o retângulo visível de fato no passe de índice (o Godot pinta por cima do render)
+    for nome in DESENHO:
+        mask = np.isin(passes[base]["indice"], [INDICE[o] for o in REGIOES[nome]])
+        ys, xs = np.nonzero(mask)
+        reg[nome] = {"x": int(xs.min()), "y": int(ys.min()), "w": int(xs.max() + 1 - xs.min()),
+                     "h": int(ys.max() + 1 - ys.min())}
+        print(f"[comodo] {nome} (visível no passe de índice): {reg[nome]}")
+
     # regiões
     linhas, ok = validar_regioes(reg)
     print("[comodo] regiões (x, y, largura, altura em px do panorama):")
@@ -993,7 +1019,7 @@ def main():
     print(f"[comodo] depuração: {CACHE / 'regioes_debug.png'}")
 
     # tamanho em px dos botões na escala 1x (a região inclui o aro)
-    for nome in BOTOES + ("comunicacao",):
+    for nome in BOTOES + (PORTA, "comunicacao"):
         print(f"[comodo] {nome}: {reg[nome]['w']}x{reg[nome]['h']} px")
     print(f"[comodo] rad_por_px={rad_px:.6f} câmera={a.camera} yaw={a.yaw}")
 
@@ -1004,7 +1030,8 @@ def main():
                      "cor_das_telas_em_branco": "#" + COR_TELA_APAGADA,
                      "arquivos": [f"{e}.png" for e in ESTADOS]},
         "telas": {n: reg[n] for n in TELAS},
-        "botoes": {n: reg[n] for n in BOTOES},
+        "botoes": {n: reg[n] for n in BOTOES + (PORTA,)},
+        "desenho": {n: reg[n] for n in DESENHO},
         "janela": reg["janela"],
         "vista_janela": {
             "arquivos": {"normal": "assets/exterior/vista_janela_normal.png",

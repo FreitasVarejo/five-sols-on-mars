@@ -306,3 +306,37 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 				for k in 9:
 					arco.append(Vector2(xc + cos(k * PI / 8.0) * rx, p.y + s * yb + sin(k * PI / 8.0) * ry))
 				ci.draw_polyline(arco, cor, w)
+		"alto_falante", "alto_falante_mudo":
+			# Corpo e cone do alto-falante; com som, duas ondas; mudo, as ondas somem e um risco corta tudo.
+			ci.draw_rect(Rect2(p.x + s * 0.06, p.y + s * 0.36, s * 0.20, s * 0.28), cor)
+			ci.draw_colored_polygon(PackedVector2Array([
+				p + Vector2(s * 0.26, s * 0.36), p + Vector2(s * 0.56, s * 0.14), p + Vector2(s * 0.56, s * 0.86),
+				p + Vector2(s * 0.26, s * 0.64)]), cor)
+			if nome == "alto_falante":
+				ci.draw_arc(p + Vector2(s * 0.56, s * 0.5), s * 0.20, deg_to_rad(-50), deg_to_rad(50), 8, cor, w)
+				ci.draw_arc(p + Vector2(s * 0.56, s * 0.5), s * 0.38, deg_to_rad(-50), deg_to_rad(50), 8, cor, w)
+			else:
+				ci.draw_line(p + Vector2(s * 0.14, s * 0.92), p + Vector2(s * 0.94, s * 0.08), fundo, w * 3.0)
+				ci.draw_line(p + Vector2(s * 0.14, s * 0.92), p + Vector2(s * 0.94, s * 0.08), cor, maxf(2.0, w * 1.4))
+		"lua":
+			# Lua crescente de verdade (um polígono, sem recorte com a cor de fundo): serve de ícone nos
+			# chips e de indicador por cima da porta, sobre a arte da sala.
+			var ro := s * 0.44
+			var c0 := p + Vector2(s * 0.46, s * 0.52)
+			var c1 := c0 + Vector2(s * 0.22, -s * 0.10)
+			var ri := s * 0.36
+			var vd := c1 - c0
+			var d := vd.length()
+			var theta := vd.angle()
+			var alfa := acos(clampf((ro * ro + d * d - ri * ri) / (2.0 * ro * d), -1.0, 1.0))
+			var beta := acos(clampf((ri * ri + d * d - ro * ro) / (2.0 * ri * d), -1.0, 1.0))
+			var pts := PackedVector2Array()
+			for k in 17:
+				pts.append(c0 + Vector2.from_angle(theta + alfa + (TAU - 2.0 * alfa) * k / 16.0) * ro)
+			var interno := PackedVector2Array()
+			for k in 13:
+				interno.append(c1 + Vector2.from_angle(theta + PI - beta + 2.0 * beta * k / 12.0) * ri)
+			if pts[pts.size() - 1].distance_to(interno[0]) > pts[pts.size() - 1].distance_to(interno[interno.size() - 1]):
+				interno.reverse()
+			pts.append_array(interno)
+			ci.draw_colored_polygon(pts, cor)
