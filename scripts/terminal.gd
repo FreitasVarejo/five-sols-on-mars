@@ -228,12 +228,17 @@ func _definir_aberto(valor: bool) -> void:
 
 
 ## Anda a posição até o alvo; embaixo, o conteúdo atrasado de uma descida passa para a fase atual.
-func _animar(delta: float) -> void:
+## Devolve se algo mudou (a posição ou o conteúdo): o último passo, o que chega ao alvo, também se redesenha.
+func _animar(delta: float) -> bool:
 	var alvo := 1.0 if aberto else 0.0
+	var mudou := false
 	if _pos != alvo:
 		_pos = move_toward(_pos, alvo, minf(delta, 0.1) / duracao)
+		mudou = true
 	if _pos <= 0.0 and _fase_tela != fase_ui:
 		_mostrar_na_tela(fase_ui)
+		mudou = true
+	return mudou
 
 
 func _process(delta: float) -> void:
@@ -258,8 +263,8 @@ func _process(delta: float) -> void:
 			_fade = maxf(0.0, _fade - delta / CLAREAR_S)
 			if _fade <= 0.0:
 				_fade_estado = ""
-	_animar(delta)
-	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animando()
+	var animou := _animar(delta)
+	var precisa := missao.fase == "turno" or _fade_estado != "" or missao.versao != _versao_vista or animou
 	if precisa:
 		queue_redraw()
 

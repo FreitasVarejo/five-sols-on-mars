@@ -20,6 +20,7 @@ func _init() -> void:
 	_easing()
 	_botao_sobe_e_desce()
 	_inverte_no_meio()
+	_ultimo_passo_redesenha()
 	_confirmar_plano_desce_com_o_plano()
 	_fim_do_turno_sobe_depois_do_escurecimento()
 	_cliques_so_quando_a_acao_acontece()
@@ -147,6 +148,29 @@ func _inverte_no_meio() -> void:
 	_igual(t.posicao(), 1.0, "terminou no alto")
 	som.free()
 	t.free()
+
+
+## O passo que chega ao alvo também avisa que mudou: é o quadro que redesenha o terminal já parado (e com
+## os botões do conteúdo de volta a ser clicáveis); sem ele a tela ficava no penúltimo passo.
+func _ultimo_passo_redesenha() -> void:
+	for sobe in [false, true]:
+		var c := _montar()
+		var t: Control = c[0]
+		if sobe:
+			t._acionar("terminal")
+			for i in 200:
+				t._animar(QUADRO)
+		t._acionar("terminal")
+		var alvo := 1.0 if t.aberto else 0.0
+		var chegou_avisando := false
+		for i in 200:
+			var mudou: bool = t._animar(QUADRO)
+			if t._pos == alvo and mudou:
+				chegou_avisando = true
+		_verdade(chegou_avisando, "o passo que chega ao alvo avisa que mudou (alvo %s)" % alvo)
+		_igual(t._animar(QUADRO), false, "parado no alvo, _animar devolve falso")
+		c[2].free()
+		t.free()
 
 
 func _confirmar_plano_desce_com_o_plano() -> void:
