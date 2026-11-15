@@ -31,7 +31,7 @@ y 192..221 (o pato, na quina direita do console, no tampo da rampa de oxigênio)
 `scripts/compor_sala.py --persiana` com os mesmos argumentos (o fluxo completo está no docstring do
 compor_sala.py). Os pilares são as faces cujo tom o render inteiro muda perto dele.
 O pato não muda de um estado para outro: só a luz muda (nenhuma emissão). Ele é um botão do
-regioes.json (`botoes.pato`: o retângulo de todas as partes), clicável para o squeak.
+regioes.json (`botoes.pato`: o retângulo de todas as partes), clicável para o quack.
 
 Arte final, não mais gray-box: o casco tem placas com juntas, meia-parede, friso, rodapé, calha
 em trechos, teto em placas e uma grade de ventilação; a glovebox e a estufa têm miolo com luz
@@ -622,7 +622,7 @@ def _console(i):
 
 
 # O pato de borracha da tripulação: um brinquedo amarelo na quina direita de cima do console, no tampo
-# da rampa da tela de oxigênio, ao lado da grade de ventilação (easter egg: o clique faz squeak).
+# da rampa da tela de oxigênio, ao lado da grade de ventilação (easter egg: o clique faz quack).
 # Objeto de cena, não UI: não acende e é o mesmo em todos os estados. Original, sem nada do FNAF.
 PATO_BASE = (1.22, 1.869, 0.975)     # onde o pato pousa: o tampo da rampa de oxigênio, perto da quina
 PATO_GIRO = 183.0                    # graus em torno de z; o bico aponta para a janela (esquerda) e um pouco para o olho
@@ -1308,7 +1308,7 @@ REGIOES = {
     # a alavanca: a placa e as duas posições do braço com o punho (o retângulo é a união)
     "abrigo": ["abrigo_aro", "abrigo_fenda", "abrigo_pino", "abrigo_braco_cima", "abrigo_punho_cima",
                "abrigo_braco_baixo", "abrigo_punho_baixo"],
-    # o pato de borracha: o retângulo é a caixa de todas as partes (o easter egg do squeak)
+    # o pato de borracha: o retângulo é a caixa de todas as partes (o easter egg do quack)
     "pato": list(PATO_OBJS),
     "porta": ["porta_folha", "porta_moldura_topo", "porta_moldura_tras", "porta_moldura_frente"],
     "porta_lampada": ["porta_lampada"],

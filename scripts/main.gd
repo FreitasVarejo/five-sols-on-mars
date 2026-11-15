@@ -680,8 +680,8 @@ func _ao_clicar(nome: String) -> void:
 	var fez := false
 	match nome:
 		"pato":
-			# O easter egg: só o squeak. Não mexe na missão, nas barras, no relógio nem no diário.
-			_som.squeak()
+			# O easter egg: só o quack. Não mexe na missão, nas barras, no relógio nem no diário.
+			_som.quack()
 		"abrigo":
 			# Abrigar não tem volta no turno: na primeira vez, o card da Terra explica e pede confirmação.
 			if not _missao.abrigado and _terminal.pedir_confirmacao("abrigo", func() -> void: _missao.abrigar()):
@@ -949,7 +949,7 @@ func _estado_da_sonda() -> Dictionary:
 		"aba": _terminal.aba_na_tela(), "card_aberto": _terminal.card_aberto, "card": _terminal.card_id, "relogio_parado": _terminal.segura_o_relogio(), "textos": _terminal.textos(),
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico,
-			"pitches_squeak": _som.pitches_squeak, "simultaneos_squeak": _som.simultaneos_squeak},
+			"pitches_quack": _som.pitches_quack, "simultaneos_quack": _som.simultaneos_quack},
 		"ui": _ui_da_tela(),
 		# O que a peça à vista oferece (alvos, bandeja, encaixe, botões), em px da tela: a da vista de perto (planta,
 		# amostra) quando ela está aberta, senão a do visor do terminal (ChemCam, gerador).
