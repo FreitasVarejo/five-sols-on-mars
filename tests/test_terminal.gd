@@ -45,6 +45,8 @@ func _tudo() -> void:
 	await _frase_com_o_contexto()
 	await _cards_ao_lado_do_controle()
 	await _card_do_aviso_cabe()
+	await _aba_fontes_cabe()
+	await _relatorio_cabe()
 	print("%d verificações, %d falhas" % [total, falhas])
 	quit(1 if falhas > 0 else 0)
 
@@ -831,11 +833,44 @@ func _cards_ao_lado_do_controle() -> void:
 	TranslationServer.set_locale(idioma)
 
 
-## O card do aviso: o texto, a frase do DONKI (do dado atual e do histórico) e o rodapé não se sobrepõem, e o
-## card inteiro cabe na tela do terminal, nos dois idiomas.
+## O retângulo que um texto recortado por textos() ocupa: [texto, x, y, tam, largura, alinhamento, negrito].
+func _rect_do_texto(l: Array) -> Rect2:
+	var tam: int = l[3]
+	var larg: float = l[4]
+	var negrito: bool = l[6]
+	var f: Font = l[7] if l[7] != null else (Desenho.fonte_negrito() if negrito else Desenho.fonte())
+	var w := f.get_multiline_string_size(l[0], HORIZONTAL_ALIGNMENT_LEFT, larg, tam).x
+	var h := f.get_multiline_string_size(l[0], HORIZONTAL_ALIGNMENT_LEFT, larg, tam).y
+	var x: float = l[1]
+	if larg > 0.0 and l[5] == HORIZONTAL_ALIGNMENT_RIGHT:
+		x += larg - w
+	elif larg > 0.0 and l[5] == HORIZONTAL_ALIGNMENT_CENTER:
+		x += (larg - w) / 2.0
+	return Rect2(x, l[2], w, h)
+
+
+## Um retângulo por linha de um texto que quebra (a última linha costuma ser mais curta: a fonte de um fato da aba
+## fontes vai ao lado dela).
+func _rects_das_linhas(l: Array) -> Array:
+	var tam: int = l[3]
+	var f: Font = l[7] if l[7] != null else (Desenho.fonte_negrito() if l[6] else Desenho.fonte())
+	var par := TextParagraph.new()
+	par.add_string(l[0], f, tam)
+	par.width = l[4]
+	var lista: Array = []
+	var altura := f.get_height(tam)
+	for i in par.get_line_count():
+		lista.append(Rect2(l[1], l[2] + i * altura, par.get_line_width(i), altura))
+	return lista
+
+
+## O card do aviso: as três partes (o aviso, a frase do histórico e, com o dado do build, a frase do dado de
+## hoje) e o rodapé não se sobrepõem nem pisam no "Fechar", e o card inteiro cabe na tela do terminal, nos
+## dois idiomas, com o dado atual e só com o histórico.
 func _card_do_aviso_cabe() -> void:
 	var idioma := TranslationServer.get_locale()
 	var real := DadosDonki.carregar()
+	_verdade(not real["historico"], "o dado do build existe (a frase do dado de hoje depende dele)")
 	for loc in ["en", "pt"]:
 		TranslationServer.set_locale(loc)
 		for historico in [true, false]:
@@ -850,30 +885,206 @@ func _card_do_aviso_cabe() -> void:
 			await process_frame
 			await process_frame
 			_igual(t.card_id, "aviso", "%s: o aviso abre" % rotulo)
-			var larg: float = Terminal.CARD.size.x - 28.0
-			var aviso: Array = []
-			var donki_linha: Array = []
-			var rodape: Array = []
+			var f_atual: String = t._frase_donki_atual()
+			_igual(f_atual == "", historico, "%s: a frase do dado de hoje só existe com o dado do build" % rotulo)
+			var partes := {"aviso": t.tr("AVISO_TEMPESTADE"), "hist": t.tr("DONKI_FRASE_HISTORICO")}
+			if not historico:
+				partes["atual"] = f_atual
+			var rects := {}
+			var rodape := Rect2()
+			var tem_rodape := false
 			for linha in t.textos():
-				if linha[0] == t.tr("AVISO_TEMPESTADE"):
-					aviso = linha
-				elif linha[0].begins_with("DONKI") or linha[0].begins_with("O DONKI") or linha[0].begins_with("19 "):
-					if linha[3] == 12:
-						donki_linha = linha
-				elif linha[0].begins_with(t.tr("ENVIADO_DA_TERRA").substr(0, 8)):
-					rodape = linha
-			_verdade(not aviso.is_empty() and not donki_linha.is_empty() and not rodape.is_empty(), "%s: as três partes foram desenhadas" % rotulo)
-			if aviso.is_empty() or donki_linha.is_empty() or rodape.is_empty():
+				for k: String in partes:
+					if linha[0] == partes[k]:
+						rects[k] = _rect_do_texto(linha)
+				if linha[0].begins_with(t.tr("ENVIADO_DA_TERRA").substr(0, 8)):
+					rodape = _rect_do_texto(linha)
+					tem_rodape = true
+				_verdade(not linha[0].begins_with("DONKI_"), "%s: nenhuma chave sem tradução na tela (%s)" % [rotulo, linha[0]])
+				_verdade(linha[0] != t.tr("DONKI_DADO_HISTORICO") and linha[0] != t.tr("DONKI_DADO_DE") % ("14 November 2026" if loc == "en" else "14/11/2026"),
+					"%s: a segunda linha do rodapé saiu" % rotulo)
+			_igual(rects.size(), partes.size(), "%s: as partes do card foram desenhadas" % rotulo)
+			_verdade(tem_rodape, "%s: o rodapé foi desenhado" % rotulo)
+			var fechar_a: Array = t.ui().get("fechar_card", [])
+			_verdade(not fechar_a.is_empty(), "%s: o Fechar está na tela" % rotulo)
+			if rects.size() != partes.size() or not tem_rodape or fechar_a.is_empty():
 				root.remove_child(t)
 				t.free()
 				continue
-			var fim_aviso: float = aviso[2] + Desenho.altura_texto(aviso[0], 14, larg, true)
-			var fim_donki: float = donki_linha[2] + Desenho.altura_texto(donki_linha[0], 12, larg)
-			_verdade(fim_aviso <= donki_linha[2], "%s: o aviso acaba antes da frase do DONKI (%d <= %d)" % [rotulo, fim_aviso, donki_linha[2]])
-			_verdade(fim_donki <= rodape[2], "%s: a frase do DONKI acaba antes do rodapé (%d <= %d)" % [rotulo, fim_donki, rodape[2]])
-			var fechar: Array = t.ui()["fechar_card"]
-			_verdade(fechar[1] >= fim_donki - 2.0 or fechar[0] > aviso[1] + larg - 10.0, "%s: o Fechar não pisa no texto" % rotulo)
-			_verdade(fechar[1] + fechar[3] + 12 <= 314, "%s: o card cabe na tela do terminal (base do Fechar em %d)" % [rotulo, fechar[1] + fechar[3]])
+			var fechar := Rect2(fechar_a[0], fechar_a[1], fechar_a[2], fechar_a[3])
+			var ordem := ["aviso", "hist"] + (["atual"] if not historico else [])
+			for i in ordem.size():
+				var r: Rect2 = rects[ordem[i]]
+				for j in range(i + 1, ordem.size()):
+					_verdade(not r.intersects(rects[ordem[j]]), "%s: %s e %s não se sobrepõem" % [rotulo, ordem[i], ordem[j]])
+				_verdade(not r.intersects(rodape), "%s: %s não pisa no rodapé" % [rotulo, ordem[i]])
+				_verdade(not r.intersects(fechar), "%s: %s não pisa no Fechar (%s, %s)" % [rotulo, ordem[i], str(r), str(fechar)])
+				_verdade(r.end.y + 8.0 <= fechar.position.y, "%s: %s acaba 8 px ou mais acima do Fechar" % [rotulo, ordem[i]])
+			_verdade(not rodape.intersects(fechar), "%s: o rodapé não pisa no Fechar" % rotulo)
+			# O card: do 12 acima do aviso até 12 abaixo do Fechar; dentro do corpo do terminal (42 a 314).
+			var topo: float = rects["aviso"].position.y - 12.0
+			var base := fechar.end.y + 12.0
+			_verdade(topo >= Terminal.Y_CORPO, "%s: o card começa dentro do corpo (topo %d)" % [rotulo, topo])
+			_verdade(base <= Terminal.Y_FIM, "%s: o card cabe na tela do terminal (base %d)" % [rotulo, base])
+			if not historico:
+				# Tudo derivado do dado do build, que o publicar.sh recoleta.
+				_verdade(f_atual.contains(str(real["chegadas_marte"].size())), "%s: a frase traz quantas chegadas há na janela" % rotulo)
+				_verdade(f_atual.contains(DadosDonki.data_texto(str(real["coletado_em"]), loc)), "%s: a data da coleta, no formato do idioma" % rotulo)
+				_verdade(f_atual.contains(" km/s"), "%s: a frase traz a velocidade" % rotulo)
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## A aba fontes com o dado do build (o par do histórico e o do dado de hoje) cabe na caixa da direita, sem
+## sobreposição, nos dois idiomas; e só com o histórico também.
+func _aba_fontes_cabe() -> void:
+	var idioma := TranslationServer.get_locale()
+	var real := DadosDonki.carregar()
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for historico in [true, false]:
+			var dado := real.duplicate()
+			dado["historico"] = historico
+			var rotulo := "fontes, %s, %s" % [loc, "histórico" if historico else "atual"]
+			var m := Missao.new(1)
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, dado)
+			_fechar_fila(t)
+			t._acionar("aba_fontes")
+			root.add_child(t)
+			await process_frame
+			await process_frame
+			_igual(t.aba_na_tela(), "fontes", "%s: a aba abre" % rotulo)
+			var caixa := Rect2(Terminal.X0 + 186.0, Terminal.Y_CORPO, Terminal.X1 - Terminal.X0 - 186.0, Terminal.Y_FIM - Terminal.Y_CORPO)
+			var rects: Array = []
+			var tem_hist := false
+			var tem_atual := false
+			var tam_fato := 0
+			var fim := 0.0
+			for linha in t.textos():
+				var r := _rect_do_texto(linha)
+				if r.position.x < caixa.position.x or r.position.y < Terminal.Y_CORPO or linha[0] == t.tr("TERMINAL"):
+					continue
+				if linha[0] == t.tr("FONTE_DONKI_HIST_FATO"):
+					tem_hist = true
+					tam_fato = linha[3]
+				if linha[0] == t._frase_donki_atual() and linha[0] != "":
+					tem_atual = true
+				rects.append_array(_rects_das_linhas(linha))
+				fim = maxf(fim, r.end.y)
+				_verdade(caixa.encloses(r), "%s: cabe na caixa (%s em %s)" % [rotulo, linha[0].substr(0, 20), str(r)])
+			_verdade(tem_hist, "%s: o par do histórico de maio de 2024 está sempre" % rotulo)
+			_igual(tem_atual, not historico, "%s: o par do dado de hoje só vem com o dado do build" % rotulo)
+			_verdade(not t._pares_fontes().any(func(par): return par[0].contains("%s") or par[0].begins_with("FONTE_")),
+				"%s: os fatos não têm chave nem %%s soltos" % rotulo)
+			for i in rects.size():
+				for j in range(i + 1, rects.size()):
+					_verdade(not rects[i].intersects(rects[j]), "%s: duas linhas da lista não se sobrepõem (%s, %s)" % [rotulo, str(rects[i]), str(rects[j])])
+			if not historico:
+				_verdade(t._pares_fontes().any(func(par): return par[1] == "NASA DONKI (CCMC), WSA-ENLIL."), "%s: a fonte do dado de hoje" % rotulo)
+			root.remove_child(t)
+			t.free()
+	TranslationServer.set_locale(idioma)
+
+
+## Um relatório de fim de missão: `modos` modos de segurança, `ciencia` pontos (espalhados pelos sóis) e, em cada
+## sol, os ícones que mais ocupam a faixa (modo de segurança com tempestade ou poeira).
+func _missao_do_relatorio(modos: int, ciencia: int) -> Missao:
+	var m := Missao.new(1)
+	m.modos = modos
+	m.st = {"E": 6.0, "O": 6.0, "M": 9.0, "P": 1.0, "gerador_quebrado": false}
+	m.ciencia_por_sol = []
+	m.registros = []
+	var resto := ciencia
+	for i in 5:
+		var c := mini(resto, 2 if i < 4 else 3)
+		resto -= c
+		m.ciencia_por_sol.append(c)
+		m.registros.append({"sol": i + 1, "ciencia": c, "seguranca": i < modos, "tempestade": i < 3, "poeira": i >= 3})
+	m.fase = "relatorio"
+	return m
+
+
+## O relatório, nos dois idiomas e em três desfechos: tudo o que ele diz está na tela, nada abaixo de 12 px,
+## nenhum texto se sobrepõe a outro nem ao botão, tudo em x 0 a 640 e y 0 a 320 (a faixa de baixo começa em
+## 328). A linha do que faltou para a estrela seguinte fica na caixa das estrelas, com o texto de cada desfecho.
+func _relatorio_cabe() -> void:
+	var idioma := TranslationServer.get_locale()
+	var tela := Rect2(0, 0, 640, 320)
+	var casos := [[0, 7], [0, 4], [2, 0]]
+	for loc in ["en", "pt"]:
+		TranslationServer.set_locale(loc)
+		for caso in casos:
+			var modos: int = caso[0]
+			var ciencia: int = caso[1]
+			var rotulo := "relatório, %s, %d modos, ciência %d" % [loc, modos, ciencia]
+			var m := _missao_do_relatorio(modos, ciencia)
+			var t: Control = Terminal.new()
+			t.gravar_textos = true
+			t.iniciar(m, {})
+			root.add_child(t)
+			await process_frame
+			await process_frame
+			_igual(t.fase_ui, "relatorio", "%s: a fase" % rotulo)
+			var estrelas := m.estrelas()
+			var faltou_texto: String = {[0, 7]: t.tr("ESTRELAS_MAXIMO"), [0, 4]: t.tr("ESTRELAS_FALTA_CIENCIA") % 1,
+				[2, 0]: t.tr("ESTRELAS_FALTA_MODO")}[caso]
+			_igual(estrelas, {[0, 7]: 3, [0, 4]: 2, [2, 0]: 1}[caso], "%s: estrelas" % rotulo)
+			var esperados := [
+				t.tr("RELATORIO_NAVE"), t.tr("RELATORIO_TITULO"), t.tr("RELATORIO_SUB") % 5,
+				t.tr("N_DE_3_ESTRELAS") % estrelas, t.tr("ESTRELAS_NOTA"), faltou_texto,
+				t.tr("RELATORIO_CIENCIA_ENVIADA") % [ciencia, 7],
+				t.tr("MARGEM_FINAL"), t.tr("N_DE_12") % 9, t.tr("MODOS_SEGURANCA"), str(modos),
+				t.tr("RELATORIO_26_MESES"), t.tr("FONTE_ESCALA_FATO"),
+				t.tr("DE_VERDADE"), t.tr("DE_VERDADE_DATA"), t.tr("DE_VERDADE_TEXTO"), t.tr("JOGAR_DE_NOVO"),
+			]
+			for i in 5:
+				esperados.append(t.tr("SOL_N") % (i + 1))
+				esperados.append("+%d" % m.ciencia_por_sol[i])
+			var textos: Array = []
+			for linha in t.textos():
+				if linha[0] != t.tr("TERMINAL"):  # o botão do terminal é da faixa de baixo, não do relatório
+					textos.append(linha)
+			var desenhados: Array = []
+			for linha in textos:
+				desenhados.append(linha[0])
+			for e: String in esperados:
+				_verdade(desenhados.has(e), "%s: aparece \"%s\"" % [rotulo, e.substr(0, 30)])
+			_verdade(not textos.is_empty() and textos[0][0] == t.tr("RELATORIO_NAVE"), "%s: a manchete é a primeira linha" % rotulo)
+			var botao_a: Array = t.ui().get("jogar_de_novo", [])
+			_verdade(not botao_a.is_empty(), "%s: o botão jogar de novo" % rotulo)
+			var botao := Rect2(botao_a[0], botao_a[1], botao_a[2], botao_a[3]) if not botao_a.is_empty() else Rect2()
+			_verdade(botao.size.x >= 24.0 and botao.size.y >= 24.0 and tela.encloses(botao), "%s: o botão é grande e cabe" % rotulo)
+			var rects: Array = []
+			var nomes: Array = []
+			for linha in textos:
+				_verdade(linha[3] >= 12, "%s: nenhum texto abaixo de 12 px (%s a %d px)" % [rotulo, linha[0].substr(0, 20), linha[3]])
+				var r := _rect_do_texto(linha)
+				_verdade(tela.encloses(r), "%s: cabe em 640x320 (%s em %s)" % [rotulo, linha[0].substr(0, 20), str(r)])
+				_verdade(r.end.y <= Terminal.REL_Y_FIM, "%s: acaba até y 314 (%s, fim %d)" % [rotulo, linha[0].substr(0, 20), r.end.y])
+				if botao.encloses(r):
+					continue  # o rótulo do botão
+				_verdade(not r.intersects(botao), "%s: não pisa no botão (%s)" % [rotulo, linha[0].substr(0, 20)])
+				rects.append(r)
+				nomes.append(linha[0].substr(0, 20))
+			# A linha do que faltou: na caixa das estrelas, numa linha só (o rect dela já entrou na conta da sobreposição).
+			for linha in textos:
+				if linha[0] == faltou_texto:
+					var rf := _rect_do_texto(linha)
+					_verdade(Terminal.REL_ESTRELAS.encloses(rf), "%s: o que faltou fica na caixa das estrelas (%s)" % [rotulo, str(rf)])
+					_verdade(Desenho.largura_texto(faltou_texto, 12, true) <= Terminal.REL_FALTOU.size.x,
+						"%s: o que faltou cabe numa linha (%d de %d px)" % [rotulo, Desenho.largura_texto(faltou_texto, 12, true), Terminal.REL_FALTOU.size.x])
+			for i in rects.size():
+				for j in range(i + 1, rects.size()):
+					_verdade(not rects[i].intersects(rects[j]), "%s: sem sobreposição (%s %s, %s %s)" % [rotulo, nomes[i], str(rects[i]), nomes[j], str(rects[j])])
+			# A faixa dos sóis: o "+N" acaba antes da zona dos ícones (dois ícones de 14 px, a partir de 36 px da borda).
+			for i in 5:
+				for linha in textos:
+					if linha[0] == "+%d" % m.ciencia_por_sol[i] and linha[3] == 14 and absf(linha[2] - (Terminal.REL_Y_SOIS + 2.0)) < 1.0 \
+							and linha[1] > 14 + i * 123 and linha[1] < 14 + (i + 1) * 123:
+						_verdade(_rect_do_texto(linha).end.x <= 14 + i * 123 + 119 - 40, "%s: o +N do sol %d fica antes dos ícones" % [rotulo, i + 1])
 			root.remove_child(t)
 			t.free()
 	TranslationServer.set_locale(idioma)

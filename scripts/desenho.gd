@@ -31,6 +31,7 @@ const OXIGENIO := Color("#5fdcea")  # ciano
 const RADIACAO := Color("#ff7eb6")  # rosa
 
 static var _negrito: FontVariation
+static var _compacta: FontVariation
 
 
 ## Cor do recurso `nome` ("energia", "oxigenio", "radiacao", ou as chaves "E", "O", "M"); qualquer outro é TEXTO.
@@ -49,6 +50,15 @@ static func fonte() -> Font:
 	return ThemeDB.fallback_font
 
 
+## A fonte com 2 px a menos de altura de linha (a lista da aba fontes, em 9 px, quando não cabe com a normal).
+static func fonte_compacta() -> Font:
+	if _compacta == null:
+		_compacta = FontVariation.new()
+		_compacta.base_font = ThemeDB.fallback_font
+		_compacta.spacing_bottom = -2
+	return _compacta
+
+
 static func fonte_negrito() -> Font:
 	if _negrito == null:
 		_negrito = FontVariation.new()
@@ -60,8 +70,8 @@ static func fonte_negrito() -> Font:
 ## Desenha `s` com o canto superior esquerdo em `pos`. Com `largura` > 0, quebra em linhas (alinhado
 ## à esquerda) ou alinha dentro dela. Devolve a altura ocupada.
 static func texto(ci: CanvasItem, s: String, pos: Vector2, tam: int, cor: Color, largura: float = -1.0,
-		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false) -> float:
-	var f := fonte_negrito() if negrito else fonte()
+		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false, fonte_propria: Font = null) -> float:
+	var f := _escolher(negrito, fonte_propria)
 	var base := Vector2(pos.x, pos.y + f.get_ascent(tam))
 	if largura > 0.0:
 		var tamanho := f.get_multiline_string_size(s, alinh, largura, tam)
@@ -71,13 +81,19 @@ static func texto(ci: CanvasItem, s: String, pos: Vector2, tam: int, cor: Color,
 	return f.get_height(tam)
 
 
+static func _escolher(negrito: bool, fonte_propria: Font) -> Font:
+	if fonte_propria != null:
+		return fonte_propria
+	return fonte_negrito() if negrito else fonte()
+
+
 static func largura_texto(s: String, tam: int, negrito: bool = false) -> float:
 	var f := fonte_negrito() if negrito else fonte()
 	return f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, tam).x
 
 
-static func altura_texto(s: String, tam: int, largura: float, negrito: bool = false) -> float:
-	var f := fonte_negrito() if negrito else fonte()
+static func altura_texto(s: String, tam: int, largura: float, negrito: bool = false, fonte_propria: Font = null) -> float:
+	var f := _escolher(negrito, fonte_propria)
 	return f.get_multiline_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, largura, tam).y
 
 

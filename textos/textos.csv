@@ -9,7 +9,8 @@ CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
 SOL_N,Sol %d,Sol %d
 AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in minutes. Watch the radiation meter. If it goes up, go to the shelter.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em minutos. Fique de olho no medidor de radiação. Se ele subir, vá para o abrigo."
-DONKI_FRASE_ATUAL,DONKI predicted this CME arriving at Mars on %s. The simulator replays it.,O DONKI previu esta CME chegando a Marte em %s. O simulador a reencena.
+DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s, at %d km/s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s, a %d km/s%s."
+DONKI_RASPAO,", a glancing blow",", de raspão"
 DONKI_FRASE_HISTORICO,"19 May 2024. DONKI, NASA's forecast, shows 5 storms from the Sun heading to Mars, expected between 19 and 21 May.","19 de maio de 2024. O DONKI, a previsão da NASA, mostra 5 tempestades do Sol a caminho de Marte, previstas para chegar entre 19 e 21 de maio."
 ENVIADO_DA_TERRA,Sent from Earth %d min ago,Enviado da Terra há %d min
 DONKI_DADO_DE,DONKI data from %s,Dados do DONKI de %s
@@ -86,7 +87,10 @@ SEGUIR_NOTA,This sol passes with no science and counts 1 safe mode.,Este sol pas
 RELATORIO_TITULO,Mission report,Relatório da missão
 RELATORIO_SUB,%d sols at Gale crater,%d sóis na cratera Gale
 N_DE_3_ESTRELAS,%d of 3 stars,%d de 3 estrelas
-ESTRELAS_NOTA,Each safe mode counts against.,Cada modo de segurança conta contra.
+ESTRELAS_NOTA,3 stars: no safe mode and 5 or more science. 2 stars: no safe mode. 1 star: the base entered safe mode.,3 estrelas: nenhum modo de segurança e 5 ou mais de ciência. 2 estrelas: nenhum modo de segurança. 1 estrela: a base entrou em modo de segurança.
+ESTRELAS_FALTA_MODO,Next star: finish with no safe mode.,Próxima estrela: termine sem modo de segurança.
+ESTRELAS_FALTA_CIENCIA,Next star: send %d more science.,Próxima estrela: mande mais %d de ciência.
+ESTRELAS_MAXIMO,All 3 stars. Nothing was missing.,As 3 estrelas. Não faltou nada.
 N_PONTOS,%d points,%d pontos
 MARGEM_FINAL,Final margin,Margem final
 N_DE_12,%d of 12,%d de 12
@@ -109,7 +113,7 @@ SEM_CONTAR_TEMPESTADE,Not counting the storm,Sem contar a tempestade
 CAMERAS_VAZIO,No image yet,Sem imagem ainda
 DIARIO_VAZIO,No log yet,Nenhum diário ainda
 FONTE_DONKI_FATO,Storm from the Sun: CME predicted at Mars on %s.,Tempestade do Sol: CME prevista em Marte em %s.
-FONTE_DONKI_FONTE,"NASA DONKI (CCMC), WSA-ENLIL. Data from %s.","NASA DONKI (CCMC), WSA-ENLIL. Dados de %s."
+FONTE_DONKI_FONTE,"NASA DONKI (CCMC), WSA-ENLIL.","NASA DONKI (CCMC), WSA-ENLIL."
 FONTE_DONKI_HIST_FATO,Storm from the Sun: CMEs predicted at Mars in May 2024.,Tempestade do Sol: CMEs previstas em Marte em maio de 2024.
 FONTE_DONKI_HIST_FONTE,"NASA DONKI (CCMC), WSA-ENLIL. Historical data.","NASA DONKI (CCMC), WSA-ENLIL. Dado histórico."
 FONTE_O2_FATO,Each person breathes about 0.9 kg of oxygen per day.,"Cada pessoa respira cerca de 0,9 kg de oxigênio por dia."

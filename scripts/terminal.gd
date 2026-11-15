@@ -162,7 +162,7 @@ func ui() -> Dictionary:
 	return d
 
 
-## Todo texto que o último quadro desenhou: [texto, x, y, tamanho].
+## Todo texto que o último quadro desenhou: [texto, x, y, tamanho, largura (-1 sem quebra), alinhamento, negrito, fonte própria (ou null)].
 func textos() -> Array:
 	return _textos.duplicate()
 
@@ -490,10 +490,10 @@ func _apertar_tecla(nome: String) -> bool:
 # --- desenho: peças ------------------------------------------------------------
 
 func _t(s: String, x: float, y: float, tam: int = 11, cor: Color = Desenho.TEXTO, largura: float = -1.0,
-		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false) -> float:
+		alinh: int = HORIZONTAL_ALIGNMENT_LEFT, negrito: bool = false, fonte_propria: Font = null) -> float:
 	if gravar_textos:
-		_textos.append([s, roundi(x), roundi(y), tam])
-	return Desenho.texto(self, s, Vector2(x, y), tam, cor, largura, alinh, negrito)
+		_textos.append([s, roundi(x), roundi(y), tam, largura, alinh, negrito, fonte_propria])
+	return Desenho.texto(self, s, Vector2(x, y), tam, cor, largura, alinh, negrito, fonte_propria)
 
 
 func _caixa(r: Rect2, fundo: Color = Desenho.FUNDO_TELA, borda: Color = Desenho.BORDA) -> void:
@@ -955,32 +955,60 @@ func _desenhar_card(alvo: Rect2) -> void:
 		_desenhar_card_ao_lado(alvo)
 
 
-## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação.
+## O aviso da Terra por cima do plano: retângulo azul simples, sem destaque, seta nem animação. Três partes
+## de cima para baixo: o aviso (14, negrito), a frase do histórico de maio de 2024 (sempre) e, quando há dado
+## do build, a frase datada do dado de hoje. O rodapé (enviado da Terra) fica ao lado do "Fechar".
 func _desenhar_card_aviso() -> void:
 	var larg := CARD.size.x - 28
-	var frase_donki := tr("DONKI_FRASE_HISTORICO") if donki.get("historico", true) \
-		else tr("DONKI_FRASE_ATUAL") % DadosDonki.data_br(_chegada_mais_recente())
-	# O texto do aviso e a frase do DONKI mandam na altura: o card cresce (centrado) se não couberem entre o
-	# alto e o rodapé, que fica a 12 + 28 px da base.
+	var f_hist := tr("DONKI_FRASE_HISTORICO")
+	var f_atual := _frase_donki_atual()
+	# As três partes mandam na altura: o card cresce (centrado) se não couberem entre o alto e o "Fechar", que
+	# fica a 12 px da base. O texto acaba 10 px acima do "Fechar".
 	var h_aviso := Desenho.altura_texto(tr("AVISO_TEMPESTADE"), 14, larg, true)
-	var h_donki := Desenho.altura_texto(frase_donki, 12, larg)
-	var altura := maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_donki + 10.0 + 28.0 + 12.0)
+	# As frases do DONKI vão em 12 px; se o card (centrado) passaria do alto do corpo do terminal, em 11 px.
+	var tam_donki := 12
+	var altura := 0.0
+	for tentativa in [12, 11]:
+		tam_donki = tentativa
+		var h_hist := Desenho.altura_texto(f_hist, tam_donki, larg)
+		var h_atual := Desenho.altura_texto(f_atual, tam_donki, larg) + 6.0 if f_atual != "" else 0.0
+		altura = maxf(CARD.size.y, 12.0 + h_aviso + 6.0 + h_hist + h_atual + 10.0 + 36.0 + 12.0)
+		if CARD.get_center().y - altura / 2.0 >= Y_CORPO:
+			break
 	var r := Rect2(CARD.position.x, CARD.position.y - (altura - CARD.size.y) / 2.0, CARD.size.x, altura)
 	draw_rect(r, Desenho.AZUL)
 	var x := r.position.x + 14
 	var y := r.position.y + 12
 	y += _t(tr("AVISO_TEMPESTADE"), x, y, 14, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 6
-	_t(frase_donki, x, y, 12, Desenho.TEXTO_ESCURO, larg)
-	var rodape := r.end.y - 12 - 28
+	y += _t(f_hist, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg) + 6
+	if f_atual != "":
+		_t(f_atual, x, y, tam_donki, Desenho.TEXTO_ESCURO, larg)
+	# O rodapé na altura do meio do "Fechar", à esquerda dele.
+	var rodape := r.end.y - 12 - 18 - roundf(Desenho.fonte().get_height(11) / 2.0)
 	var larg_rodape := larg - 134
-	Desenho.icone(self, "terra", Rect2(x, rodape + 1, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
+	Desenho.icone(self, "terra", Rect2(x, rodape + 2, 12, 12), Desenho.TEXTO_ESCURO, Desenho.AZUL)
 	_t(tr("ENVIADO_DA_TERRA") % missao.atraso_min, x + 16, rodape, 11, Desenho.TEXTO_ESCURO, larg_rodape - 16)
-	if donki.get("historico", true):
-		_t(tr("DONKI_DADO_HISTORICO"), x, rodape + 14, 11, Desenho.TEXTO_ESCURO, larg_rodape)
-	else:
-		_t(tr("DONKI_DADO_DE") % DadosDonki.data_br(str(donki.get("coletado_em", ""))), x, rodape + 14, 11,
-			Desenho.TEXTO_ESCURO, larg_rodape)
 	_botao("fechar_card", Rect2(r.end.x - 14 - 120, r.end.y - 12 - 36, 120, 36), tr("FECHAR"), "", true, 13)
+
+
+## A frase do dado do build, datada ("Dados do DONKI de 14/11/2026: 25 chegadas previstas a Marte em 60 dias. A
+## última: ..."), para o card do aviso e a aba fontes. "" quando o dado é o histórico ou não há chegada. A
+## "última" é a mais recente que traz velocidade (o DONKI manda algumas sem ela, e "0 km/s" seria dado falso).
+func _frase_donki_atual() -> String:
+	if donki.get("historico", true):
+		return ""
+	var com_velocidade := []
+	for c in donki.get("chegadas_marte", []):
+		if c is Dictionary and (c.get("velocidade_kms") is float or c.get("velocidade_kms") is int):
+			com_velocidade.append(c)
+	var ultima := DadosDonki.mais_recente({"chegadas_marte": com_velocidade})
+	if ultima.is_empty():
+		return ""
+	var loc := TranslationServer.get_locale()
+	var raspao := tr("DONKI_RASPAO") if ultima.get("raspao", false) == true else ""
+	return tr("DONKI_FRASE_ATUAL") % [DadosDonki.data_texto(str(donki.get("coletado_em", "")), loc),
+		donki["chegadas_marte"].size(), DadosDonki.data_texto(str(ultima["chegada_prevista"]), loc),
+		roundi(float(ultima["velocidade_kms"])), raspao]
 
 
 ## O card ao lado do controle `alvo`, na coluna que não o tem, com uma frase por linha e uma ponta
@@ -1031,16 +1059,6 @@ func _desenhar_card_turno() -> void:
 	for frase: String in frases:
 		yy += _t(frase, r.position.x + 12.0, yy, CARD_TAM, Desenho.TEXTO_ESCURO, larg, HORIZONTAL_ALIGNMENT_LEFT, true) + 4.0
 	_botao("fechar_card", Rect2(r.end.x - 12.0 - 100.0, r.end.y - 12.0 - 36.0, 100, 36), tr("FECHAR"), "", true, 13)
-
-
-## A chegada a Marte com `chegada_prevista` mais recente (dado atual do DONKI).
-func _chegada_mais_recente() -> String:
-	var melhor := ""
-	for c in donki.get("chegadas_marte", []):
-		var quando = c.get("chegada_prevista")
-		if quando is String and quando > melhor:
-			melhor = quando
-	return melhor
 
 
 # --- aba câmeras -----------------------------------------------------------------
@@ -1101,58 +1119,65 @@ func _desenhar_fontes() -> void:
 	y = rr.position.y + 7
 	var pares := _pares_fontes()
 	# O texto usa 10 px; se o idioma não couber na caixa, desce para 9 px, e o espaço entre os fatos
-	# (5 px) encolhe para 2 px quando só assim a lista cabe.
+	# (5 px) encolhe para 2 px quando só assim a lista cabe. Com o dado do build a lista tem um par a mais e nem
+	# assim cabe: aí os 9 px passam à fonte compacta (11 px de passo de linha em vez de 13).
 	var livre := rr.end.y - 7 - y
 	var tam := 10
 	var espaco := 2.0
+	var compacto := false
 	if _altura_pares(pares, w, 10) > livre:
 		tam = 9
-		if _altura_pares(pares, w, 9) + 3.0 * pares.size() <= livre:
+		if _altura_pares(pares, w, 9) > livre:
+			compacto = true
+		if _altura_pares(pares, w, 9, compacto) + 3.0 * pares.size() <= livre:
 			espaco = 5.0
 	for par in pares:
-		y += _par_fonte(x, y, w, par[0], par[1], tam) + espaco
+		y += _par_fonte(x, y, w, par[0], par[1], tam, true, compacto) + espaco
 
 
 ## Um fato (`tam` px) e a fonte dele (9 px, suave). Se a fonte cabe na última linha do fato, vai ali
 ## mesmo, ao lado; senão, embaixo. Assim a lista cabe na tela em inglês e em português.
-## Devolve a altura ocupada. Com `desenhar` falso só mede.
-func _par_fonte(x: float, y: float, w: float, fato: String, fonte: String, tam: int, desenhar: bool = true) -> float:
+## Devolve a altura ocupada. Com `desenhar` falso só mede. Com `compacto`, as linhas ficam 2 px mais juntas.
+func _par_fonte(x: float, y: float, w: float, fato: String, fonte: String, tam: int, desenhar: bool = true,
+		compacto: bool = false) -> float:
+	var f := Desenho.fonte_compacta() if compacto else Desenho.fonte()
 	var par := TextParagraph.new()
-	par.add_string(fato, Desenho.fonte(), tam)
+	par.add_string(fato, f, tam)
 	par.width = w
-	var h_fato := Desenho.altura_texto(fato, tam, w)
+	var h_fato := Desenho.altura_texto(fato, tam, w, false, f)
 	var ao_lado := false
 	var l_ultima := par.get_line_width(par.get_line_count() - 1)
 	if fonte != "":
 		ao_lado = l_ultima + 6.0 + Desenho.largura_texto(fonte, 9) <= w
 	if desenhar:
-		_t(fato, x, y, tam, Desenho.TEXTO, w)
+		_t(fato, x, y, tam, Desenho.TEXTO, w, HORIZONTAL_ALIGNMENT_LEFT, false, f if compacto else null)
 		if ao_lado:
 			# Alinha as linhas de base: a fonte de 9 px fica na base da última linha do fato.
-			var dy := Desenho.fonte().get_ascent(tam) - Desenho.fonte().get_ascent(9)
-			_t(fonte, x + l_ultima + 6.0, y + h_fato - Desenho.fonte().get_height(tam) + dy, 9, Desenho.TEXTO_SUAVE)
+			var dy := f.get_ascent(tam) - f.get_ascent(9)
+			_t(fonte, x + l_ultima + 6.0, y + h_fato - f.get_height(tam) + dy, 9, Desenho.TEXTO_SUAVE, -1.0,
+				HORIZONTAL_ALIGNMENT_LEFT, false, f if compacto else null)
 		elif fonte != "":
-			_t(fonte, x, y + h_fato, 9, Desenho.TEXTO_SUAVE, w)
+			_t(fonte, x, y + h_fato, 9, Desenho.TEXTO_SUAVE, w, HORIZONTAL_ALIGNMENT_LEFT, false, f if compacto else null)
 	if fonte != "" and not ao_lado:
-		h_fato += Desenho.altura_texto(fonte, 9, w)
+		h_fato += Desenho.altura_texto(fonte, 9, w, false, f)
 	return h_fato
 
 
-func _altura_pares(pares: Array, w: float, tam: int) -> float:
+func _altura_pares(pares: Array, w: float, tam: int, compacto: bool = false) -> float:
 	var total := 0.0
 	for par in pares:
-		total += _par_fonte(0.0, 0.0, w, par[0], par[1], tam, false) + 2.0
+		total += _par_fonte(0.0, 0.0, w, par[0], par[1], tam, false, compacto) + 2.0
 	return total
 
 
 ## [fato, fonte] de cada número do jogo; a fonte é "" quando o fato não leva.
 func _pares_fontes() -> Array:
 	var pares := []
-	if donki.get("historico", true):
-		pares.append([tr("FONTE_DONKI_HIST_FATO"), tr("FONTE_DONKI_HIST_FONTE")])
-	else:
-		pares.append([tr("FONTE_DONKI_FATO") % DadosDonki.data_br(_chegada_mais_recente()),
-			tr("FONTE_DONKI_FONTE") % DadosDonki.data_br(str(donki.get("coletado_em", "")))])
+	# O histórico de maio de 2024 (a data da missão) vem sempre; o dado do build, só quando existe.
+	pares.append([tr("FONTE_DONKI_HIST_FATO"), tr("FONTE_DONKI_HIST_FONTE")])
+	var atual := _frase_donki_atual()
+	if atual != "":
+		pares.append([atual, tr("FONTE_DONKI_FONTE")])
 	for k in PARES_FONTES:
 		pares.append([tr("FONTE_%s_FATO" % k), "" if k in SEM_FONTE else tr("FONTE_%s_FONTE" % k)])
 	return pares
@@ -1461,67 +1486,112 @@ func _desenhar_seguranca() -> void:
 
 # --- relatório -------------------------------------------------------------------
 
+## O relatório é a carga da nave: tudo cabe em x 14 a 626 e y 10 a 314 (a faixa de baixo, com o botão do
+## terminal e o mudo, começa em 328), com texto de 12 px ou mais. De cima para baixo: a manchete; o título, as
+## três medidas e a caixa das estrelas (com a nota e a linha reservada para "o que faltou para a próxima
+## estrela", 2.9); a faixa dos sóis; "o que aconteceu de verdade" à esquerda e, à direita, as duas frases do
+## tempo e da escala com o botão no canto.
+const REL_X := 14.0
+const REL_LARG := 612.0
+const REL_Y_MEDIDAS := 38.0
+const REL_ALTURA_MEDIDAS := 110.0
+const REL_MEDIDAS_W := 242.0
+## A caixa das estrelas; a linha "o que faltou" (até 50 caracteres, 12 px) fica reservada na base dela.
+const REL_ESTRELAS := Rect2(264, 38, 362, 110)
+const REL_FALTOU := Rect2(272, 125, 346, 17)
+const REL_Y_SOIS := 153.0
+const REL_ALTURA_SOIS := 24.0
+const REL_Y_BAIXO := 182.0
+const REL_Y_FIM := 314.0
+const REL_VERDADE_W := 372.0
+const REL_BOTAO := Rect2(394, 282, 232, 32)
+
+
+## O que faltou para a estrela seguinte (ou que não faltou nada), pela regra de Modelo.estrelas.
+func _estrelas_faltou(modos: int, ciencia: int) -> String:
+	if modos > 0:
+		return tr("ESTRELAS_FALTA_MODO")
+	if ciencia < Modelo.ciencia_para_3():
+		return tr("ESTRELAS_FALTA_CIENCIA") % (Modelo.ciencia_para_3() - ciencia)
+	return tr("ESTRELAS_MAXIMO")
+
+
 func _desenhar_relatorio() -> void:
-	var x := X_ESQ
-	_t(tr("RELATORIO_TITULO"), x, 12, 16, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	_t(tr("RELATORIO_SUB") % Modelo.N.SOLS, x, 31, 11, Desenho.TEXTO_SUAVE)
-	# Estrelas.
+	var x := REL_X
 	var estrelas := missao.estrelas()
+	# A manchete.
+	_t(tr("RELATORIO_NAVE"), x, 10, 16, Desenho.TEXTO, REL_LARG, HORIZONTAL_ALIGNMENT_LEFT, true)
+
+	# Título, sub e as três medidas, à esquerda.
+	var y := REL_Y_MEDIDAS
+	_t(tr("RELATORIO_TITULO"), x, y, 12, Desenho.TEXTO, REL_MEDIDAS_W, HORIZONTAL_ALIGNMENT_LEFT, true)
+	_t(tr("RELATORIO_SUB") % Modelo.N.SOLS, x, y + 17, 12, Desenho.TEXTO_SUAVE, REL_MEDIDAS_W)
+	var w := REL_MEDIDAS_W
+	var ry := y + 38.0
+	var r0 := Rect2(x, ry, w, 22)
+	var r1 := Rect2(x, ry + 25, w, 22)
+	var r2 := Rect2(x, ry + 50, w, 22)
+	_caixa(r0)
+	Desenho.icone(self, "ciencia", Rect2(r0.position.x + 6, ry + 4, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	_t(tr("RELATORIO_CIENCIA_ENVIADA") % [missao.ciencia_total(), Modelo.N.TEORICO], r0.position.x + 26, ry + 2, 12,
+		Desenho.TEXTO, w - 32, HORIZONTAL_ALIGNMENT_LEFT, true)
+	_caixa(r1)
+	Desenho.icone(self, "radiacao", Rect2(r1.position.x + 6, r1.position.y + 4, 14, 14), Desenho.RADIACAO, Desenho.FUNDO_TELA)
+	var rotulo_margem := tr("MARGEM_FINAL")
+	_t(rotulo_margem, r1.position.x + 26, r1.position.y + 2, 12, Desenho.TEXTO_SUAVE)
+	_t(tr("N_DE_12") % roundi(missao.st["M"]), r1.position.x + 34 + Desenho.largura_texto(rotulo_margem, 12),
+		r1.position.y + 2, 13, Desenho.TEXTO, 52, HORIZONTAL_ALIGNMENT_LEFT, true)
+	Desenho.celulas(self, Rect2(r1.end.x - 70, r1.position.y + 7, 64, 8), missao.st["M"], 12, Desenho.RADIACAO)
+	_caixa(r2)
+	Desenho.icone(self, "alerta", Rect2(r2.position.x + 6, r2.position.y + 4, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
+	_t(tr("MODOS_SEGURANCA"), r2.position.x + 26, r2.position.y + 2, 12, Desenho.TEXTO_SUAVE, w - 70)
+	_t(str(missao.modos), r2.end.x - 46, r2.position.y + 2, 13, Desenho.TEXTO, 40, HORIZONTAL_ALIGNMENT_RIGHT, true)
+
+	# A caixa das estrelas: os três ícones, "N de 3", a nota e, na base, a linha reservada (2.9).
+	var re := REL_ESTRELAS
+	_caixa(re)
 	for i in 3:
-		Desenho.icone(self, "estrela" if i < estrelas else "estrela_vazia", Rect2(544 + i * 27, 11, 22, 22),
-			Desenho.TEXTO, Desenho.FUNDO_TERMINAL)
-	_t(tr("N_DE_3_ESTRELAS") % estrelas, 280, 11, 14, Desenho.TEXTO, 254, HORIZONTAL_ALIGNMENT_RIGHT, true)
-	_t(tr("ESTRELAS_NOTA"), 280, 34, 10, Desenho.TEXTO_SUAVE, 346, HORIZONTAL_ALIGNMENT_RIGHT)
-
-	# Três blocos.
-	var y := 52.0
-	var bw := 196.0
-	var rects := [Rect2(x, y, bw, 52), Rect2(x + bw + 12, y, bw, 52), Rect2(x + 2 * (bw + 12), y, bw, 52)]
-	_caixa(rects[0])
-	Desenho.icone(self, "ciencia", Rect2(rects[0].position.x + 10, y + 14, 22, 22), Desenho.TEXTO, Desenho.FUNDO_TELA)
-	_t(tr("CIENCIA"), rects[0].position.x + 42, y + 8, 11, Desenho.TEXTO_SUAVE)
-	_t(tr("N_PONTOS") % missao.ciencia_total(), rects[0].position.x + 42, y + 22, 18, Desenho.TEXTO, bw - 50,
+		Desenho.icone(self, "estrela" if i < estrelas else "estrela_vazia", Rect2(re.position.x + 10 + i * 27, re.position.y + 6, 22, 22),
+			Desenho.TEXTO, Desenho.FUNDO_TELA)
+	_t(tr("N_DE_3_ESTRELAS") % estrelas, re.position.x + 99, re.position.y + 7, 14, Desenho.TEXTO, -1.0,
 		HORIZONTAL_ALIGNMENT_LEFT, true)
-	_caixa(rects[1])
-	Desenho.icone(self, "radiacao", Rect2(rects[1].position.x + 10, y + 14, 22, 22), Desenho.RADIACAO, Desenho.FUNDO_TELA)
-	_t(tr("MARGEM_FINAL"), rects[1].position.x + 42, y + 8, 11, Desenho.TEXTO_SUAVE)
-	_t(tr("N_DE_12") % roundi(missao.st["M"]), rects[1].position.x + 42, y + 22, 18, Desenho.TEXTO, 90,
-		HORIZONTAL_ALIGNMENT_LEFT, true)
-	Desenho.celulas(self, Rect2(rects[1].position.x + 118, y + 28, 68, 8), missao.st["M"], 12, Desenho.RADIACAO)
-	_caixa(rects[2])
-	Desenho.icone(self, "alerta", Rect2(rects[2].position.x + 10, y + 14, 22, 22), Desenho.TEXTO, Desenho.FUNDO_TELA)
-	_t(tr("MODOS_SEGURANCA"), rects[2].position.x + 42, y + 8, 11, Desenho.TEXTO_SUAVE, bw - 50)
-	_t(str(missao.modos), rects[2].position.x + 42, y + 22, 18, Desenho.TEXTO, 60, HORIZONTAL_ALIGNMENT_LEFT, true)
+	_t(tr("ESTRELAS_NOTA"), re.position.x + 8, re.position.y + 32, 12, Desenho.TEXTO_SUAVE, re.size.x - 16)
+	_t(_estrelas_faltou(missao.modos, missao.ciencia_total()), REL_FALTOU.position.x, REL_FALTOU.position.y, 12,
+		Desenho.TEXTO, REL_FALTOU.size.x, HORIZONTAL_ALIGNMENT_LEFT, true)
 
-	# A faixa dos 5 sóis.
-	y = 114.0
-	var sw := 116.0
+	# A faixa dos 5 sóis, baixa: o sol, a ciência do sol e o que houve nele.
+	y = REL_Y_SOIS
+	var sw := 119.0
 	for i in missao.registros.size():
 		var reg: Dictionary = missao.registros[i]
-		var rs := Rect2(x + i * (sw + 8), y, sw, 40)
+		var rs := Rect2(x + i * (sw + 4), y, sw, REL_ALTURA_SOIS)
 		_caixa(rs)
-		Desenho.icone(self, "sol", Rect2(rs.position.x + 8, y + 8, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
-		_t(tr("SOL_N") % reg["sol"], rs.position.x + 26, y + 6, 11, Desenho.TEXTO_SUAVE)
-		_t("+%d" % reg["ciencia"], rs.position.x + 8, y + 22, 14, Desenho.TEXTO, 60, HORIZONTAL_ALIGNMENT_LEFT, true)
-		var xi := rs.end.x - 22
+		Desenho.icone(self, "sol", Rect2(rs.position.x + 5, y + 6, 12, 12), Desenho.TEXTO, Desenho.FUNDO_TELA)
+		var rotulo_sol := tr("SOL_N") % reg["sol"]
+		_t(rotulo_sol, rs.position.x + 20, y + 3, 12, Desenho.TEXTO_SUAVE)
+		_t("+%d" % reg["ciencia"], rs.position.x + 26 + Desenho.largura_texto(rotulo_sol, 12), y + 2, 14, Desenho.TEXTO, 30,
+			HORIZONTAL_ALIGNMENT_LEFT, true)
+		var xi := rs.end.x - 20
 		if reg["seguranca"]:
-			Desenho.icone(self, "alerta", Rect2(xi, y + 20, 16, 16), Desenho.AMARELO, Desenho.FUNDO_TELA)
-			xi -= 20
+			Desenho.icone(self, "alerta", Rect2(xi, y + 5, 14, 14), Desenho.AMARELO, Desenho.FUNDO_TELA)
+			xi -= 16
 		if reg["tempestade"]:
-			Desenho.icone(self, "tempestade", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
-			xi -= 20
+			Desenho.icone(self, "tempestade", Rect2(xi, y + 5, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
+			xi -= 16
 		if reg["poeira"]:
-			Desenho.icone(self, "poeira", Rect2(xi, y + 20, 16, 16), Desenho.TEXTO, Desenho.FUNDO_TELA)
+			Desenho.icone(self, "poeira", Rect2(xi, y + 5, 14, 14), Desenho.TEXTO, Desenho.FUNDO_TELA)
 
-	# O que aconteceu de verdade.
-	# O quadro vai até 274, logo acima do botão: o texto vai em 13 px se couber; senão, em 12 px (o
-	# português de 15/11 tem 4 linhas).
-	y = 158.0
+	# O que aconteceu de verdade, à esquerda: o título com a data na mesma linha e o texto em 12 px.
+	y = REL_Y_BAIXO
 	_t(tr("DE_VERDADE"), x, y, 13, Desenho.TEXTO, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	var rv := Rect2(x, y + 20, 612, 96)
+	_t(tr("DE_VERDADE_DATA"), x, y + 1, 12, Desenho.TEXTO_SUAVE, REL_VERDADE_W, HORIZONTAL_ALIGNMENT_RIGHT, true)
+	var rv := Rect2(x, y + 20, REL_VERDADE_W, REL_Y_FIM - y - 20)
 	_caixa(rv)
-	_t(tr("DE_VERDADE_DATA"), rv.position.x + 10, rv.position.y + 7, 11, Desenho.TEXTO_SUAVE, -1.0, HORIZONTAL_ALIGNMENT_LEFT, true)
-	var de_verdade := tr("DE_VERDADE_TEXTO")
-	var tam_dv := 13 if Desenho.altura_texto(de_verdade, 13, rv.size.x - 20) <= rv.size.y - 26 else 12
-	_t(de_verdade, rv.position.x + 10, rv.position.y + 24, tam_dv, Desenho.TEXTO, rv.size.x - 20)
-	_botao("jogar_de_novo", Rect2(220, 276, 200, 40), tr("JOGAR_DE_NOVO"), "", true, 14)
+	_t(tr("DE_VERDADE_TEXTO"), rv.position.x + 8, rv.position.y + 6, 12, Desenho.TEXTO, rv.size.x - 16)
+
+	# À direita: o tempo (26 meses), a escala da radiação e o botão no canto.
+	var xd := x + REL_VERDADE_W + 8.0
+	var wd := X_ESQ + REL_LARG - xd
+	y += _t(tr("RELATORIO_26_MESES"), xd, y, 12, Desenho.TEXTO, wd) + 5.0
+	_t(tr("FONTE_ESCALA_FATO"), xd, y, 12, Desenho.TEXTO, wd)
+	_botao("jogar_de_novo", REL_BOTAO, tr("JOGAR_DE_NOVO"), "", true, 14)
