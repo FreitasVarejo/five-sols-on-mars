@@ -131,7 +131,7 @@ func _fluxo_com_o_botao_final() -> void:
 	var m: Control = await _nova_main()
 	_igual(m.tela_atual(), "inicio", "o jogo abre na tela inicial")
 	_verdade(m.sobreposicao() is Inicio, "a sobreposição é a tela inicial")
-	_verdade(m._terminal.card_aberto, "o plano do sol 1 já está montado por baixo (com o aviso)")
+	_igual(m._terminal.aba_na_tela(), "inicio", "o terminal já está montado por baixo, na tela inicial dele")
 	_igual(m._terminal.is_processing_input(), false, "o terminal não recebe entrada por baixo da tela inicial")
 	_igual(m._missao.sol, 1, "sol 1")
 	# O relógio não corre, e o clique na sala não faz nada.
@@ -191,7 +191,9 @@ func _fluxo_com_o_botao_final() -> void:
 	_igual(m._missao.fase, "plano", "plano")
 	_igual(m._missao.sol, 1, "do sol 1")
 	_verdade(m._terminal.aberto, "com o terminal no alto")
-	_verdade(m._terminal.card_aberto, "e o card do aviso ainda lá")
+	_igual(m._terminal.aba_na_tela(), "inicio", "e o terminal abre na tela inicial, com o aviso esperando")
+	m._terminal._acionar("inicio_fase")
+	_verdade(m._terminal.card_aberto, "o bloco da fase leva ao plano, onde o card do aviso abre")
 	m.queue_free()
 	await process_frame
 

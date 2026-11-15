@@ -53,6 +53,7 @@ func _esperar_terminal() -> void:
 
 ## Fecha os cards do plano, um por vez.
 func _fechar_fila() -> void:
+	_main._terminal._acionar("inicio_fase")  # o plano abre na tela inicial do Painel: a fase leva ao plano
 	var n := 0
 	while _main._terminal.card_aberto and n < 20:
 		_main._terminal._acionar("fechar_card")
@@ -84,8 +85,13 @@ func _tudo() -> void:
 	root.add_child(_main)
 	await _quadros(3)
 	_main.sobreposicao().acionar("jogar")
-	_main.sobreposicao().concluida.emit()
+	_main.sobreposicao().concluida.emit()  # a viagem
+	_main.sobreposicao().concluida.emit()  # a abertura
 	await _quadros(2)
+	if _main.tela_atual() == "pagina":
+		_main.sobreposicao().avancar(1.0)
+		_main.sobreposicao().acionar("continuar")
+		await _quadros(2)
 	var t = _main._terminal
 	var m = _main._missao
 	t.gravar_textos = true

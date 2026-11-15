@@ -114,6 +114,7 @@ var _tela := "jogo"  # "inicio", "viagem", "abertura", "pagina" ou "jogo" (a son
 func _ready() -> void:
 	_parametros = _parametros_da_url()
 	_sondar = _parametros.get("sonda") == "1"
+	_terminal.com_inicio = true
 	_terminal.gravar_textos = _sondar
 	_terminal.com_pagina = true
 	_botao_mudo.som = _som

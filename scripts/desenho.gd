@@ -235,12 +235,14 @@ static func icone(ci: CanvasItem, nome: String, r: Rect2, cor: Color, fundo: Col
 			ci.draw_arc(p + Vector2(s * 0.5, s * 0.42), s * 0.28, deg_to_rad(-60), deg_to_rad(60), 8, cor, w)
 			ci.draw_arc(p + Vector2(s * 0.5, s * 0.42), s * 0.46, deg_to_rad(125), deg_to_rad(235), 8, cor, w)
 			ci.draw_arc(p + Vector2(s * 0.5, s * 0.42), s * 0.46, deg_to_rad(-55), deg_to_rad(55), 8, cor, w)
-		"terminal":
-			ci.draw_rect(Rect2(p.x + s * 0.04, p.y + s * 0.12, s * 0.92, s * 0.66), cor, false, w)
-			ci.draw_polyline(PackedVector2Array([
-				p + Vector2(s * 0.22, s * 0.30), p + Vector2(s * 0.40, s * 0.45), p + Vector2(s * 0.22, s * 0.60)]), cor, w)
-			ci.draw_line(p + Vector2(s * 0.50, s * 0.62), p + Vector2(s * 0.74, s * 0.62), cor, w)
-			ci.draw_line(p + Vector2(s * 0.32, s * 0.92), p + Vector2(s * 0.68, s * 0.92), cor, w)
+		"triangulo_cima", "triangulo_baixo":
+			# Os triângulos da faixa do Painel (desenhados: a fonte do build Web não tem o glifo "▲").
+			# Cheios, mais largos que altos, centrados no quadrado.
+			var cima := nome == "triangulo_cima"
+			var ponta := s * (0.22 if cima else 0.78)
+			var base := s * (0.78 if cima else 0.22)
+			ci.draw_colored_polygon(PackedVector2Array([
+				Vector2(p.x + s * 0.04, p.y + base), Vector2(p.x + s * 0.96, p.y + base), Vector2(c.x, p.y + ponta)]), cor)
 		"check":
 			ci.draw_polyline(PackedVector2Array([
 				p + Vector2(s * 0.12, s * 0.54), p + Vector2(s * 0.40, s * 0.80), p + Vector2(s * 0.90, s * 0.22)]),

@@ -52,6 +52,7 @@ func _esperar_terminal() -> void:
 ## Fecha os cards do plano, um por vez, e devolve quantos fechou.
 func _fechar_fila() -> int:
 	var n := 0
+	_main._terminal._acionar("inicio_fase")  # o plano abre na tela inicial do terminal: a fase leva ao plano
 	while _main._terminal.card_aberto and n < 20:
 		_main._terminal._acionar("fechar_card")
 		n += 1

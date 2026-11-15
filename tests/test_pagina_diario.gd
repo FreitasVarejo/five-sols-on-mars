@@ -406,10 +406,12 @@ func _jogo(lang: String) -> void:
 	var m = main._missao
 	var r := lang + ": "
 
-	# A tela inicial e a abertura vêm antes; a página do sol 1 só depois da abertura.
+	# A tela inicial, a viagem e a abertura vêm antes; a página do sol 1 só depois da abertura.
 	_igual(main.tela_atual(), "inicio", r + "o jogo abre na tela inicial")
 	_igual(t.sol_da_pagina(), 1, r + "o plano do sol 1 já está montado com a página na vez")
 	main.sobreposicao().acionar("jogar")
+	_igual(main.tela_atual(), "viagem", r + "a viagem vem antes da abertura")
+	main.sobreposicao().concluida.emit()
 	_igual(main.tela_atual(), "abertura", r + "a abertura vem antes da página")
 	main.sobreposicao().concluida.emit()
 	await process_frame
@@ -453,7 +455,14 @@ func _jogo(lang: String) -> void:
 	_igual(main._som.total, som_antes + 1, r + "um clique só")
 	_verdade(t.is_processing_input(), r + "o terminal volta a receber entrada")
 	_igual(t.sol_da_pagina(), 0, r + "a página saiu da vez")
+	_igual(t.aba_na_tela(), "inicio", r + "depois da página vem a tela inicial do terminal")
+	_igual(t.card_id, "", r + "os cards esperam a tela inicial")
+	t._acionar("inicio_fase")
 	_igual(t.card_id, "aviso", r + "o primeiro card do plano abre depois da página")
+	var espera := 0
+	while not main._ui_da_tela().has("fechar_card") and espera < 300:
+		await process_frame
+		espera += 1
 	_verdade(main._ui_da_tela().has("fechar_card"), r + "o Fechar do card está na tela")
 	var cards := 0
 	while t.card_aberto and cards < 20:

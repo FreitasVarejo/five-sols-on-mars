@@ -1,12 +1,29 @@
 keys,en,pt
-TERMINAL,Terminal,Terminal
+TERMINAL,Panel,Painel
 ENERGIA,Energy,Energia
+PRANCHA_SELO,SHEET 01 · GALE · SOL %d,PRANCHA 01 · GALE · SOL %d
 OXIGENIO,Oxygen,Oxigênio
 MARGEM,Margin,Margem
 CIENCIA,Science,Ciência
 MEDIDOR,Radiation,Radiação
 CAB_SOL,Sol %d of %d,Sol %d de %d
 CAB_PLANO,· Plan,· Plano
+INICIO_TITULO,PANEL — where you control the base,PAINEL — onde você controla a base
+INICIO_FASE_PLANO,Plan sol %d,Planejar o sol %d
+INICIO_FASE_FIM,Wrap up sol %d,Fechar o sol %d
+INICIO_DICA_FASE_PLANO,Split the oxygen and pick the tasks.,Divida o oxigênio e escolha as tarefas.
+INICIO_DICA_FASE_FIM,Read the log and send it to Earth.,Leia o diário e envie à Terra.
+INICIO_DICA_CAMERAS,See the base and the Mars landscape.,Veja a base e a paisagem de Marte.
+INICIO_DICA_TAREFAS,What to do on today's shift.,O que fazer no turno de hoje.
+INICIO_DICA_DIARIO,The story and summary of each sol.,A história e o resumo de cada sol.
+INICIO_DICA_FONTES,Where each number comes from.,De onde vem cada número do jogo.
+INICIO_ST_POEIRA,Dust in the air today,Poeira no ar hoje
+INICIO_ST_LIMPO,Clear sky today,Céu limpo hoje
+INICIO_ST_TAREFAS_PLANO,%d in today's plan,%d no plano de hoje
+INICIO_ST_TAREFAS_FIM,%d of %d done,%d de %d feitas
+INICIO_ST_DIARIO,%d of %d sols in the log,%d de %d sóis no diário
+INICIO_ST_FONTES_ATUAL,With recent NASA data,Com dado recente da NASA
+INICIO_ST_FONTES_HIST,Data from May 2024,Dados de maio de 2024
 SOL_N,Sol %d,Sol %d
 AVISO_TEMPESTADE,"The Sun is very active this week. A new explosion can send fast particles. They can arrive in minutes. Watch the radiation meter. If it goes up, go to the shelter.","O Sol está muito agitado nesta semana. Uma explosão nova pode mandar partículas rápidas. Elas podem chegar em minutos. Fique de olho no medidor de radiação. Se ele subir, vá para o abrigo."
 DONKI_FRASE_ATUAL,"DONKI data from %s: %d predicted arrivals at Mars in 60 days. Latest: %s, at %d km/s%s.","Dados do DONKI de %s: %d chegadas previstas a Marte em 60 dias. A última: %s, a %d km/s%s."
@@ -145,7 +162,7 @@ FONTE_UNIDADES_FATO,Bars and costs are in simulator units.,Barras e custos estã
 CREDITOS,"Credits: Godot (MIT); Open Sans font (OFL-1.1); shader by b en (CC0); sounds by Kenney, rubberduck, qubodup and cleytonkauffman (CC0, OpenGameArt).","Créditos: Godot (MIT); fonte Open Sans (OFL-1.1); shader de b en (CC0); sons de Kenney, rubberduck, qubodup e cleytonkauffman (CC0, OpenGameArt)."
 CREDITOS_README,Full list in the README.,Lista completa no README.
 CAUSA_POEIRA,"Dust blocked the Sun. The panel made almost no power, and the generator made no oxygen. Next time, save power in the battery.","A poeira tapou o Sol. O painel quase não fez energia, e o gerador não fez oxigênio. Da próxima vez, guarde energia na bateria."
-CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Terminal, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Terminal, aperte Câmeras e depois MOXIE."
+CAUSA_GERADOR,"The generator was broken, and nobody fixed it. In the Panel, press Cameras, then MOXIE.","O gerador estava quebrado, e ninguém consertou. No Painel, aperte Câmeras e depois MOXIE."
 FONTE_ABRIGO_FATO,"Orion's storm shelter cuts the peak of a giant solar storm about 4 times (simulation). In the game, 5 times.","O abrigo da Orion corta cerca de 4 vezes o pico de uma tempestade solar gigante (simulação). No jogo, 5 vezes."
 FONTE_ABRIGO_FONTE,"George et al., Nature (2024).","George et al., Nature (2024)."
 RELATORIO_CIENCIA_ENVIADA,Science sent home: %d of %d,Ciência enviada: %d de %d
@@ -202,9 +219,9 @@ VIAGEM_P7,Parachutes open,Paraquedas abertos
 SOL1_CARD_O2,Give energy to the oxygen machine here.,Dê energia à máquina de oxigênio aqui.
 SOL1_CARD_CIENCIA,Earth's requests are here. Each one gives science.,Os pedidos da Terra ficam aqui. Cada um dá ciência.
 SOL1_CARD_CONFIRMAR,The bars show your plan's result. Then press Confirm plan.,"As barras mostram o resultado do plano. Depois, aperte Confirmar plano."
-SOL1_CARD_TURNO,Your tasks are in the Terminal. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Terminal. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
+SOL1_CARD_TURNO,Your tasks are in the Panel. Shelter and bedroom are on the left. Use the arrow to turn the room.,Suas tarefas ficam no Painel. O abrigo e o dormitório ficam à esquerda. Use a seta para virar a sala.
 CARD_POEIRA,Dust is hiding the Sun. The panels make little energy. Use your battery.,A poeira está tapando o Sol. Os painéis fazem pouca energia. Use a bateria.
-CARD_GERADOR,"The generator broke! In the Terminal, press Cameras, then MOXIE.","O gerador quebrou! No Terminal, aperte Câmeras e depois MOXIE."
+CARD_GERADOR,"The generator broke! In the Panel, press Cameras, then MOXIE.","O gerador quebrou! No Painel, aperte Câmeras e depois MOXIE."
 RELATORIO_NAVE,The ship has landed! It carries your science home.,A nave pousou! Ela leva sua ciência para casa.
 ENVIADO_PACOTE_DA_MANHA,Sent from Earth in the morning packet,Enviado da Terra no pacote da manhã
 CONFIRMA_DORMIR,Going to sleep ends the sol. The rest of the sol passes fast. Nothing is lost.,Ir dormir encerra o sol. O resto do sol passa rápido. Nada se perde.
