@@ -20,7 +20,7 @@ The game runs in the browser with no download, no account and no tracking, in En
 
 ## Demo link
 
-TODO(owner): public video link, no login required.
+https://www.youtube.com/watch?v=j6XIBQj4m2U
 
 ## Final project link
 
