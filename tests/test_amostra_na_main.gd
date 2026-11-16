@@ -1,7 +1,7 @@
 extends SceneTree
 ## Teste headless da amostra na cena principal (main.tscn): tocar a glovebox na sala começa a tarefa, faz o zoom e abre
 ## a vista de perto (scripts/vista_de_perto.gd) com a peça "Selar a amostra", com o relógio do turno correndo, o
-## terminal fechado e bloqueado e o HUD do turno por cima; os três passos, pelo viewport, terminam a tarefa (e só
+## terminal fechado e bloqueado e o HUD do turno por cima; os três passos (golpes na broca, três toques no tubo, a tampa), pelo viewport, terminam a tarefa (e só
 ## eles: o relógio não) e a vista volta sozinha; a barra da glovebox na sala é a da peça; voltar no meio mantém a
 ## tarefa e a peça (escondida), e tocar a glovebox de novo traz a MESMA instância; abrigo e fim do turno liberam a
 ## peça; a sonda tem "minigame" no formato de sempre, "perto" e "voltar".
@@ -36,6 +36,14 @@ func _igual(obtido, esperado, nome: String) -> void:
 
 func _verdade(cond: bool, nome: String) -> void:
 	_igual(cond, true, nome)
+
+
+## Anda a peça, à mão, até a agulha entrar na faixa (e a broca estar pronta).
+func _esperar_agulha(peca: Control, faixa: int) -> void:
+	var t := 0.0
+	while t < 10.0 and not (peca.pronta() and peca.faixa_da_agulha() == faixa):
+		peca.avancar(1.0 / 60.0)
+		t += 1.0 / 60.0
 
 
 func _quadros(n: int) -> void:
@@ -197,19 +205,23 @@ func _tudo() -> void:
 	_m.avancar(_m.tarefa_s + 1.0)
 	_igual(_m.tarefas["amostra"], "rodando", "o relógio não termina a amostra")
 
-	# Passo 1: segura a broca, pelo viewport, até a barra encher.
+	# Passo 1: golpes na broca, pelo viewport. Um golpe cinza racha um quarto; o perfeito quebra o resto.
 	var c := _centro(mg["alvo"])
+	_esperar_agulha(peca, Amostra.Faixa.CINZA)
 	root.push_input(_botao(c, true), true)
-	_verdade(peca.segurando(), "o toque na baia da broca a segura")
-	peca.avancar(1.0)
+	root.push_input(_botao(c, false), true)
+	_igual(peca.profundidade(), 0.25, "o golpe cinza na baia da broca racha um quarto")
+	_igual(peca.passo(), 0, "e segue no 1º passo")
 	_igual(_t._progresso_da_linha("amostra"), peca.progresso(), "a barra da linha é a da peça")
 	await _quadros(2)
-	# Os quadros reais também andam a peça (segurando): a barra da sala acompanha a dela, não o relógio.
+	# Os quadros reais também andam a peça: a barra da sala acompanha a dela, não o relógio.
 	_verdade(absf(float(_main._estacoes.progresso.get("amostra", -1.0)) - peca.progresso()) < 0.02, "a barra da glovebox na sala é a da peça")
 	_verdade(_m.progresso_tarefa("amostra") > 0.9, "enquanto o relógio da missão já passou da duração")
-	peca.avancar(1.2)
+	peca.avancar(Amostra.T_GOLPE + 0.05)
+	_esperar_agulha(peca, Amostra.Faixa.PERFEITA)
+	root.push_input(_botao(c, true), true)
 	root.push_input(_botao(c, false), true)
-	_igual(peca.passo(), 1, "a broca cheia passa ao tubo")
+	_igual(peca.passo(), 1, "o golpe perfeito quebra a rocha e passa ao tubo")
 
 	# Passo 2: três toques no tubo.
 	for k in 3:
