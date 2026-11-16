@@ -35,6 +35,7 @@ const IndicadorPorta := preload("res://scripts/indicador_porta.gd")
 const Persiana := preload("res://scripts/persiana.gd")
 const Janela := preload("res://scripts/janela.gd")
 const Som := preload("res://scripts/som.gd")
+const Musica := preload("res://scripts/musica.gd")
 const Terminal := preload("res://scripts/terminal.gd")
 const Inicio := preload("res://scripts/inicio.gd")
 const Abertura := preload("res://scripts/abertura/abertura.gd")
@@ -77,6 +78,8 @@ const SEM_REALCE := ["pato"]
 @onready var _terminal: Control = $Terminal
 @onready var _perto: VistaDePerto = $VistaDePerto
 @onready var _som: Som = $Som
+var _musica: Musica  # a trilha (criada no _ready, irmã do Som)
+var _turno_tenso := false  # o turno na tela já teve tempestade em curso ou a criança abrigada
 @onready var _botao_mudo: Control = $BotaoMudo
 
 var _botoes := {}  # nome -> Rect2 no panorama (o que se clica)
@@ -130,6 +133,9 @@ func _ready() -> void:
 	_terminal.com_pagina = true
 	_botao_mudo.som = _som
 	_terminal.som = _som
+	_musica = Musica.new()
+	_musica.name = "Musica"
+	add_child(_musica)
 	_terminal.duracao = Terminal.duracao_da_url(_parametros.get("terminal"))
 	_aplicar_stretch_da_url()
 	# Inglês por padrão; ?lang=pt (ou en) é a escolha inicial. O idioma do navegador não conta.
@@ -352,6 +358,13 @@ func _atualizar_sala() -> void:
 			estado = "tempestade"
 	if estado != _estado:
 		_definir_estado(estado)
+	# A tensão vale até o fim do turno na tela: quando o turno acaba, a missão já não está em "turno" (a tempestade
+	# deixa de estar em curso) mas o terminal ainda mostra o turno durante o fade; sem isso a trilha voltaria ao "turno".
+	if fase_ui != "turno":
+		_turno_tenso = false
+	elif _missao.tempestade_em_curso() or _missao.abrigado:
+		_turno_tenso = true
+	_musica.pedir(Musica.faixa_do_estado(_tela, fase_ui, _turno_tenso, _turno_tenso))
 	_vista_janela.acompanhar(fase_ui, _missao.relogio(), _missao.turno_s, _missao.eh_poeira())
 	# Na vista de perto o HUD do turno fica por cima dela (o relógio do turno e o alerta do medidor seguem à vista).
 	_hud_turno.visible = fase_ui == "turno" and (_perto.aberta() or (not _terminal.aberto and _terminal.posicao() <= 0.0))
@@ -885,9 +898,9 @@ func _dados_persiana() -> Dictionary:
 func _sonda_se_mudou() -> void:
 	if not _sondar:
 		return
-	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%d|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
+	var chave := "%s|%d|%s|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d|%s|%s|%s|%s|%d|%s|%s|%s|%s" % [_missao.fase, _missao.versao, _terminal.aberto, _terminal.fase_ui,
 		_pan_inteiro, _estado, _hover, _depurar, _seta_esq.visible, JSON.stringify(_terminal.ui()),
-		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _terminal.tapa_a_sala(), _terminal.animando(),
+		_terminal.aba_na_tela(), _terminal.card_aberto, _som.esta_mudo(), _som.total, _musica.atual, _terminal.tapa_a_sala(), _terminal.animando(),
 		_tela, _quadro_da_abertura(), TranslationServer.get_locale(), _terminal.card_id, JSON.stringify(_terminal.rolagem_fontes()), _perto.fase]
 	# Os retângulos da sobreposição andam com a rolagem da abertura: a sonda os relê a cada mudança.
 	if _sobreposicao != null:
@@ -950,6 +963,7 @@ func _estado_da_sonda() -> Dictionary:
 		"idioma": TranslationServer.get_locale(), "tela": _tela, "abertura_quadro": _quadro_da_abertura(),
 		"som": {"mudo": _som.esta_mudo(), "total": _som.total, "tocados": _som.historico,
 			"pitches_quack": _som.pitches_quack, "simultaneos_quack": _som.simultaneos_quack},
+		"musica": _musica.estado(),
 		"ui": _ui_da_tela(),
 		# O que a peça à vista oferece (alvos, bandeja, encaixe, botões), em px da tela: a da vista de perto (planta,
 		# amostra) quando ela está aberta, senão a do visor do terminal (ChemCam, gerador).
