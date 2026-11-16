@@ -1,10 +1,14 @@
 extends Control
 ## Minigame "Selar a amostra": três passos, sempre na mesma ordem, cada um com um botão grande.
-##   1. segurar a broca até a barra de profundidade encher (T_BROCA segurando; soltar não perde o que já furou);
+##   1. a broca: uma agulha vai e volta numa barra de mira, sempre na mesma velocidade, e cada toque na baia da
+##      broca é um golpe. A zona boa é fixa, no centro; o dano depende de onde a agulha está (perfeito quebra a
+##      rocha num golpe, verde dá metade, o resto dá um quarto). Errar não falha nem tira o que já rachou: só pede
+##      mais golpes (no pior caso, 4). Cada golpe tem um tempo de recuperação (T_GOLPE) em que o toque é ignorado;
 ##   2. tocar o tubo para receber o pó (3 degraus, um por toque);
 ##   3. tocar a tampa para selar (a tampa desce e o selo de "lacrado" aparece).
 ## Sem texto, sem falha e sem sorteio: tocar fora do botão do passo não faz nada, e a peça termina só quando
-## a criança termina o 3º passo. Para um adulto leva menos de 6 s.
+## a criança termina o 3º passo. Para um adulto leva menos de 6 s. O golpe perfeito se reconhece sem cor: a
+## baia treme mais e uma estrela brilha no ponto do impacto.
 ##
 ## Base real: 43 tubos de amostra no Perseverance; a primeira coleta saiu vazia, e por isso o tubo se confere.
 ##
@@ -16,7 +20,15 @@ signal concluido
 
 const Desenho := preload("res://scripts/desenho.gd")
 
-const T_BROCA := 2.0   # segurando, a barra enche em 2 s
+const T_TRAVESSIA := 1.2   # a agulha cruza a barra, de ponta a ponta, em 1,2 s (velocidade constante)
+const ZONA_PERFEITA := 0.05  # meia-largura do perfeito, em fração da barra a partir do centro (10% da barra)
+const ZONA_VERDE := 0.15     # meia-largura do verde (30% da barra); fora dela, cinza
+const DANO_PERFEITO := 1.0   # a rocha quebra num golpe
+const DANO_VERDE := 0.5
+const DANO_CINZA := 0.25     # no pior caso, 4 golpes
+const T_GOLPE := 0.45        # duração do golpe e recuperação: toque durante ela é ignorado
+const T_IMPACTO := 0.18      # instante do golpe em que a broca bate: aí o dano aparece
+const T_QUEBRA := 0.35       # a rocha se parte em duas
 const GRAUS := 3       # degraus do tubo, um por toque
 const T_NIVEL := 0.2   # o pó sobe um degrau em 0,2 s
 const T_PO := 0.35     # o pó cai no tubo depois do toque
@@ -25,11 +37,33 @@ const T_SELO := 0.3    # o selo aparece
 const T_FIM := 0.5     # o selo fica à vista antes de a peça terminar
 
 enum Passo { BROCA, TUBO, TAMPA, SELANDO, CONCLUIDO }
+enum Faixa { PERFEITA, VERDE, CINZA }
+
+## Rachaduras da rocha, em segmentos [início, fim] na ordem em que aparecem. Coordenadas na rocha: x de -0.5 a 0.5
+## da largura, a partir do centro; y de 0 (topo) a 1 (base).
+const RACHADURAS := [
+	Vector2(0.0, 0.0), Vector2(-0.04, 0.22),
+	Vector2(-0.04, 0.22), Vector2(0.05, 0.42),
+	Vector2(-0.04, 0.22), Vector2(-0.17, 0.30),
+	Vector2(0.05, 0.42), Vector2(0.18, 0.50),
+	Vector2(0.05, 0.42), Vector2(-0.03, 0.62),
+	Vector2(-0.17, 0.30), Vector2(-0.30, 0.38),
+	Vector2(0.18, 0.50), Vector2(0.31, 0.60),
+	Vector2(-0.03, 0.62), Vector2(-0.16, 0.72),
+	Vector2(-0.03, 0.62), Vector2(0.03, 0.82),
+	Vector2(-0.16, 0.72), Vector2(-0.27, 0.84),
+	Vector2(0.03, 0.82), Vector2(0.15, 0.88),
+	Vector2(0.03, 0.82), Vector2(0.0, 1.0),
+	Vector2(0.15, 0.88), Vector2(0.24, 0.98),
+]
 
 var _poeira := false
 var _passo := Passo.BROCA
-var _prof := 0.0          # 0 a 1: profundidade do furo
-var _segurando := false
+var _dano := 0.0          # 0 a 1: dano acumulado na rocha (lógica)
+var _dano_vis := 0.0      # o mesmo, como aparece: só sobe quando a broca bate
+var _t_agulha := 0.0      # a agulha é função só deste tempo (começa na ponta esquerda)
+var _t_golpe := 99.0      # desde o último golpe
+var _ultima := Faixa.CINZA  # a faixa do último golpe
 var _graus := 0           # degraus já dados (lógica)
 var _nivel := 0.0         # o mesmo, suavizado para o desenho
 var _t := 0.0             # tempo de animação (só o avancar anda)
@@ -62,7 +96,7 @@ func configurar(area: Rect2, _duracao_s: float, poeira: bool) -> void:
 func progresso() -> float:
 	match _passo:
 		Passo.BROCA:
-			return _prof / 3.0
+			return _dano / 3.0
 		Passo.TUBO, Passo.TAMPA:
 			return (1.0 + float(_graus) / GRAUS) / 3.0
 		Passo.SELANDO:
@@ -73,15 +107,13 @@ func progresso() -> float:
 ## Toda a lógica de tempo. `_process` só chama isto; o teste anda o tempo à mão.
 func avancar(delta: float) -> void:
 	_t += delta
+	_t_agulha += delta
 	_t_toque += delta
+	_t_golpe = minf(_t_golpe + delta, 99.0)
+	if _dano_vis < _dano and _t_golpe >= T_IMPACTO:
+		_dano_vis = _dano
 	_nivel = move_toward(_nivel, float(_graus), delta / T_NIVEL)
 	match _passo:
-		Passo.BROCA:
-			if _segurando:
-				_prof = minf(1.0, _prof + delta / T_BROCA)
-				if _prof >= 1.0:
-					_segurando = false
-					_passo = Passo.TUBO
 		Passo.SELANDO:
 			_t_tampa += delta
 			if _t_tampa >= T_TAMPA + T_SELO + T_FIM:
@@ -96,16 +128,32 @@ func passo() -> int:
 	return _passo
 
 
+## O dano acumulado na rocha, de 0 a 1 (a barra de profundidade).
 func profundidade() -> float:
-	return _prof
+	return _dano
+
+
+## Onde está a agulha na barra, de 0 (esquerda) a 1 (direita). Vai e volta em velocidade constante.
+func agulha() -> float:
+	var p := fposmod(_t_agulha / T_TRAVESSIA, 2.0)
+	return p if p <= 1.0 else 2.0 - p
+
+
+## A faixa em que a agulha está agora: o toque desta hora daria este dano.
+func faixa_da_agulha() -> int:
+	var d := absf(agulha() - 0.5)
+	if d <= ZONA_PERFEITA:
+		return Faixa.PERFEITA
+	return Faixa.VERDE if d <= ZONA_VERDE else Faixa.CINZA
+
+
+## Dá para golpear agora (o golpe anterior já acabou).
+func pronta() -> bool:
+	return _t_golpe >= T_GOLPE
 
 
 func graus() -> int:
 	return _graus
-
-
-func segurando() -> bool:
-	return _segurando
 
 
 func concluida() -> bool:
@@ -132,13 +180,19 @@ func _notification(what: int) -> void:
 		NOTIFICATION_RESIZED:
 			_calcular_layout()
 		NOTIFICATION_VISIBILITY_CHANGED, NOTIFICATION_WM_WINDOW_FOCUS_OUT, NOTIFICATION_APPLICATION_FOCUS_OUT:
-			_segurando = false  # o dedo some sem soltar: a broca para, o que já furou fica
+			# A criança sai e volta: a agulha recomeça da ponta e o golpe em curso acaba, o que já rachou fica.
+			_t_agulha = 0.0
+			_t_golpe = 99.0
+			_dano_vis = _dano
 
 
 func _reiniciar() -> void:
 	_passo = Passo.BROCA
-	_prof = 0.0
-	_segurando = false
+	_dano = 0.0
+	_dano_vis = 0.0
+	_t_agulha = 0.0
+	_t_golpe = 99.0
+	_ultima = Faixa.CINZA
 	_graus = 0
 	_nivel = 0.0
 	_t = 0.0
@@ -150,11 +204,8 @@ func _reiniciar() -> void:
 # --- toque ---------------------------------------------------------------------
 
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if event.pressed:
-			_pressionar(event.position)
-		else:
-			_segurando = false
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_pressionar(event.position)
 
 
 func _pressionar(p: Vector2) -> void:
@@ -162,7 +213,7 @@ func _pressionar(p: Vector2) -> void:
 		return
 	match _passo:
 		Passo.BROCA:
-			_segurando = true
+			_golpear()
 		Passo.TUBO:
 			_graus += 1
 			_t_toque = 0.0
@@ -171,6 +222,24 @@ func _pressionar(p: Vector2) -> void:
 		Passo.TAMPA:
 			_passo = Passo.SELANDO
 			_t_tampa = 0.0
+
+
+## Um golpe da broca: o dano é o da faixa em que a agulha está. Durante a recuperação, o toque não conta.
+func _golpear() -> void:
+	if not pronta():
+		return
+	_ultima = faixa_da_agulha()
+	_t_golpe = 0.0
+	match _ultima:
+		Faixa.PERFEITA:
+			_dano += DANO_PERFEITO
+		Faixa.VERDE:
+			_dano += DANO_VERDE
+		_:
+			_dano += DANO_CINZA
+	if _dano >= 1.0 - 0.0001:
+		_dano = 1.0
+		_passo = Passo.TUBO
 
 
 # --- layout --------------------------------------------------------------------
@@ -247,7 +316,7 @@ func _desenhar_baia(i: int) -> void:
 	if futuro:
 		draw_rect(r, Color(Desenho.FUNDO_TERMINAL, 0.6))
 	if feito:
-		var c := Rect2(r.end.x - 20.0, r.position.y + 5.0, 15.0, 15.0)
+		var c := Rect2(r.end.x - 20.0, r.position.y + (30.0 if i == 0 else 5.0), 15.0, 15.0)  # a da broca fica abaixo da barra de mira
 		draw_circle(c.get_center(), 10.0, Desenho.FUNDO_TELA)
 		Desenho.icone(self, "check", c, Desenho.TEXTO, Desenho.FUNDO_TELA)
 	if ativo:
@@ -265,46 +334,129 @@ func _cantoneiras(r: Rect2) -> void:
 		draw_rect(Rect2(canto.x if sx > 0 else canto.x - traco, canto.y if sy > 0 else canto.y - braco, traco, braco), Desenho.VERDE)
 
 
-## Onda que cresce de `c`: diz "toque aqui" sem palavra. Segurando, vira um anel fixo.
-func _ondas(c: Vector2, raio: float, segura: bool) -> void:
-	if segura:
-		draw_arc(c, raio * 0.55, 0.0, TAU, 28, Color(Desenho.TEXTO, 0.9), 2.0)
-		return
+## Onda que cresce de `c`: diz "toque aqui" sem palavra.
+func _ondas(c: Vector2, raio: float) -> void:
 	var f := fposmod(_t * 1.1, 1.0)
 	draw_arc(c, raio * (0.25 + 0.5 * f), 0.0, TAU, 28, Color(Desenho.TEXTO, 1.0 - f), 2.0)
 
 
 # --- passo 1: a broca ------------------------------------------------------------
 
+## A barra de mira, nas coordenadas da peça (no alto da baia da broca; a agulha corre nela).
+func retangulo_da_barra() -> Rect2:
+	return _barra_em(_baias[0])
+
+
+func _barra_em(r: Rect2) -> Rect2:
+	return Rect2(r.position.x + 5.0, r.position.y + 10.0, r.size.x - 10.0, clampf(r.size.y * 0.07, 8.0, 12.0))
+
+
+## Gradiente do verde (centro) ao cinza (bordas), com o perfeito mais claro, um entalhe embaixo dele e um risco
+## onde o verde acaba. Sem vermelho nem amarelo.
+func _barra_de_mira(r: Rect2) -> void:
+	var b := _barra_em(r)
+	draw_rect(b.grow(1.0), Desenho.MOLDURA)
+	var n := maxi(int(b.size.x), 8)
+	var cw := b.size.x / n
+	for i in n:
+		var off := absf((i + 0.5) / n - 0.5)
+		var cor := Desenho.CELULA_VAZIA
+		if off <= ZONA_PERFEITA:
+			cor = Desenho.VERDE_CLARO
+		elif off <= ZONA_VERDE:
+			cor = Desenho.VERDE.lerp(Desenho.CELULA_VAZIA, (off - ZONA_PERFEITA) / (ZONA_VERDE - ZONA_PERFEITA))
+		draw_rect(Rect2(b.position.x + i * cw, b.position.y, cw + 0.5, b.size.y), cor)
+	for lado in [-1.0, 1.0]:
+		var xl := roundf(b.position.x + b.size.x * (0.5 + lado * ZONA_VERDE))
+		draw_line(Vector2(xl, b.position.y), Vector2(xl, b.end.y), Desenho.MOLDURA, 1.0)
+	# O entalhe do perfeito: triângulo apontando para o centro da barra, por baixo.
+	var cx := b.get_center().x
+	var ent := PackedVector2Array([Vector2(cx - 4.0, b.end.y + 7.0), Vector2(cx + 4.0, b.end.y + 7.0), Vector2(cx, b.end.y + 1.0)])
+	draw_colored_polygon(ent, Desenho.VERDE_CLARO)
+	draw_polyline(PackedVector2Array([ent[0], ent[1], ent[2], ent[0]]), Desenho.MOLDURA, 1.0)
+	# A agulha: haste de 3 px com ponta triangular por cima; esmaece durante a recuperação do golpe.
+	var nx := roundf(b.position.x + b.size.x * agulha())
+	var a := 1.0 if pronta() else 0.5
+	draw_rect(Rect2(nx - 2.5, b.position.y - 1.0, 5.0, b.size.y + 2.0), Color(Desenho.MOLDURA, a))
+	draw_rect(Rect2(nx - 1.5, b.position.y - 1.0, 3.0, b.size.y + 2.0), Color(Desenho.TEXTO, a))
+	var ponta := PackedVector2Array([Vector2(nx - 5.0, b.position.y - 7.0), Vector2(nx + 5.0, b.position.y - 7.0), Vector2(nx, b.position.y - 1.0)])
+	draw_colored_polygon(ponta, Color(Desenho.TEXTO, a))
+	draw_polyline(PackedVector2Array([ponta[0], ponta[1], ponta[2], ponta[0]]), Color(Desenho.MOLDURA, a), 1.0)
+
+
 func _cena_broca(r: Rect2) -> void:
 	var cx := r.get_center().x
-	var topo_rocha := r.position.y + r.size.y * 0.52
-	var base_rocha := r.end.y - 22.0
+	var topo := r.position.y + r.size.y * 0.60
+	var base := r.end.y - 22.0
 	var larg := r.size.x * 0.84
 	var x0 := cx - larg / 2.0
+	var alt := maxf(base - topo, 12.0)
+	var apos := _t_golpe - T_IMPACTO    # tempo desde o impacto (negativo antes dele)
+	var quebrada := _dano_vis >= 1.0
+	var kq := clampf(apos / T_QUEBRA, 0.0, 1.0)
+	var perfeito := _ultima == Faixa.PERFEITA
+	# O impacto sacode a baia, e o perfeito sacode bem mais.
+	var tremor := Vector2.ZERO
+	if apos >= 0.0 and apos < 0.3:
+		var amp := (3.5 if perfeito else 1.0) * (1.0 - apos / 0.3)
+		tremor = Vector2(sin(apos * 90.0) * amp, cos(apos * 70.0) * amp * 0.6)
+	draw_set_transform(tremor)
 	# A rocha: perfil irregular em cima, camadas por dentro.
-	var pts := PackedVector2Array([
-		Vector2(x0, base_rocha), Vector2(x0, topo_rocha + 5.0), Vector2(x0 + larg * 0.18, topo_rocha - 2.0),
-		Vector2(x0 + larg * 0.38, topo_rocha + 2.0), Vector2(x0 + larg * 0.62, topo_rocha),
-		Vector2(x0 + larg * 0.82, topo_rocha - 3.0), Vector2(x0 + larg, topo_rocha + 4.0), Vector2(x0 + larg, base_rocha)])
-	draw_colored_polygon(pts, Desenho.BORDA)
-	var alt := base_rocha - topo_rocha
-	for k in 3:
-		var yk := topo_rocha + alt * (0.38 + 0.26 * k)
-		draw_line(Vector2(x0 + 3.0, yk), Vector2(x0 + larg - 3.0, yk), Desenho.TEXTO_SUAVE.darkened(0.35), 1.0)
-	# O furo, mais fundo a cada instante.
-	var fundo_max := alt * 0.78
-	var furo := _prof * fundo_max
-	var lf := maxf(5.0, r.size.x * 0.1)
-	if furo > 0.0:
-		draw_rect(Rect2(cx - lf / 2.0, topo_rocha, lf, furo), Desenho.MOLDURA)
-	# A broca: haste com espiral, ponta e carro no mastro. Treme enquanto fura.
-	var tremor := sin(_t * 70.0) * 1.2 if _segurando else 0.0
-	var ponta := topo_rocha - 5.0 + (furo if _passo == Passo.BROCA else 0.0)
-	var hh := r.size.y * 0.34
-	var x := cx + tremor
-	var lh := maxf(5.0, lf * 0.9)
-	draw_line(Vector2(cx, r.position.y), Vector2(cx, ponta - hh - 10.0), Desenho.BORDA, 2.0)
+	var perfil: Array[Vector2] = [
+		Vector2(x0, topo + 5.0), Vector2(x0 + larg * 0.18, topo - 2.0), Vector2(x0 + larg * 0.38, topo + 2.0),
+		Vector2(cx, topo + 1.0), Vector2(x0 + larg * 0.62, topo), Vector2(x0 + larg * 0.82, topo - 3.0), Vector2(x0 + larg, topo + 4.0)]
+	var cor_camada := Desenho.TEXTO_SUAVE.darkened(0.35)
+	if not quebrada:
+		var pts := PackedVector2Array([Vector2(x0, base)])
+		pts.append_array(perfil)
+		pts.append(Vector2(x0 + larg, base))
+		draw_colored_polygon(pts, Desenho.BORDA)
+		for k in 3:
+			var yk := topo + alt * (0.38 + 0.26 * k)
+			draw_line(Vector2(x0 + 3.0, yk), Vector2(x0 + larg - 3.0, yk), cor_camada, 1.0)
+		_rachaduras(Vector2(cx, topo + 1.0), larg, alt)
+		if _dano_vis > 0.0:  # a cratera do primeiro golpe
+			var fd := minf(alt * 0.3, 4.0 + 6.0 * _dano_vis)
+			var lc := larg * 0.06
+			draw_colored_polygon(PackedVector2Array([Vector2(cx - lc, topo + 1.0), Vector2(cx + lc, topo + 1.0), Vector2(cx, topo + 1.0 + fd)]), Desenho.MOLDURA)
+	else:
+		# Quebrada: duas metades se afastam, com um vão escuro entre elas e lascas que saltam.
+		var s := smoothstep(0.0, 1.0, kq)
+		var d := 5.0 * s
+		draw_rect(Rect2(cx - d - 1.0, topo + 1.0, 2.0 * d + 2.0, base - topo - 1.0), Desenho.MOLDURA)
+		var esq := PackedVector2Array([Vector2(x0, base)])
+		esq.append_array(perfil.slice(0, 4))
+		esq.append(Vector2(cx, base))
+		var dir := PackedVector2Array([Vector2(cx, base)])
+		dir.append_array(perfil.slice(3))
+		dir.append(Vector2(x0 + larg, base))
+		draw_set_transform(tremor + Vector2(-d, 1.5 * s))
+		draw_colored_polygon(esq, Desenho.BORDA)
+		for k in 3:
+			var yk := topo + alt * (0.38 + 0.26 * k)
+			draw_line(Vector2(x0 + 3.0, yk), Vector2(cx - 1.0, yk), cor_camada, 1.0)
+		draw_set_transform(tremor + Vector2(d, 1.5 * s))
+		draw_colored_polygon(dir, Desenho.BORDA)
+		for k in 3:
+			var yk := topo + alt * (0.38 + 0.26 * k)
+			draw_line(Vector2(cx + 1.0, yk), Vector2(x0 + larg - 3.0, yk), cor_camada, 1.0)
+		draw_set_transform(tremor)
+		if kq < 1.0:
+			for j in 6:
+				var v := Vector2(lerpf(-34.0, 34.0, j / 5.0), -(22.0 + (j % 3) * 9.0))
+				var pj := Vector2(cx, topo) + v * kq + Vector2(0.0, 46.0 * kq * kq)
+				draw_rect(Rect2(pj - Vector2(1.5, 1.5), Vector2(3.0, 3.0)), Color(Desenho.TEXTO_SUAVE, 1.0 - kq))
+	# A broca: haste com espiral, ponta e carro no mastro. Desce, bate no instante do impacto e volta.
+	var hh := clampf(r.size.y * 0.17, 14.0, 30.0)
+	var repouso := maxf(topo - 14.0, r.position.y + 28.0 + 12.0 + hh)
+	var bate := topo + 2.0 + minf(alt * 0.35, 8.0) * _dano_vis
+	var u := clampf(_t_golpe / T_GOLPE, 0.0, 1.0)
+	var u_imp := T_IMPACTO / T_GOLPE
+	var queda := pow(u / u_imp, 2.0) if u < u_imp else 1.0 - smoothstep(u_imp, 1.0, u)
+	var ponta := lerpf(repouso, bate, queda)
+	var lh := maxf(5.0, larg * 0.1)
+	var x := cx
+	draw_line(Vector2(cx, r.position.y + 28.0), Vector2(cx, ponta - hh - 10.0), Desenho.BORDA, 2.0)
 	var carro := Rect2(x - lh * 1.4, ponta - hh - 12.0, lh * 2.8, 12.0)
 	draw_rect(carro, Desenho.MOLDURA)
 	draw_rect(carro.grow(-1.0), Desenho.TEXTO_SUAVE)
@@ -315,17 +467,49 @@ func _cena_broca(r: Rect2) -> void:
 		k += 6.0
 	draw_colored_polygon(PackedVector2Array([Vector2(x - lh / 2.0, ponta - 5.0), Vector2(x + lh / 2.0, ponta - 5.0),
 		Vector2(x, ponta + 3.0)]), Desenho.TEXTO)
-	# Poeira saltando do furo enquanto fura.
-	if _segurando:
+	# Poeira saltando do impacto; no perfeito, uma estrela.
+	if apos >= 0.0 and apos < 0.4:
+		var c := Vector2(cx, topo - 2.0)
+		var f := apos / 0.4
 		for j in 5:
-			var u := fposmod(_t * 2.2 + j * 0.2, 1.0)
 			var lado := -1.0 if j % 2 == 0 else 1.0
-			draw_circle(Vector2(cx + lado * (lf * 0.6 + u * 14.0 * (0.6 + 0.2 * j)), topo_rocha - 2.0 - sin(u * PI) * 12.0),
-				1.5, Color(Desenho.TEXTO, 1.0 - u))
-	# A barra de profundidade, embaixo.
-	Desenho.celulas(self, Rect2(r.position.x + r.size.x * 0.1, r.end.y - 16.0, r.size.x * 0.8, 9.0), _prof * 8.0, 8, Desenho.TEXTO)
-	if _passo == Passo.BROCA:
-		_ondas(Vector2(cx, topo_rocha - hh * 0.4), minf(r.size.x, r.size.y) * 0.7, _segurando)
+			draw_circle(c + Vector2(lado * (larg * 0.07 + f * 14.0 * (0.6 + 0.2 * j)), -sin(f * PI) * (6.0 + 3.0 * j)),
+				1.5, Color(Desenho.TEXTO, 1.0 - f))
+		if perfeito:
+			_estrela(c + Vector2(0.0, -6.0), f)
+	draw_set_transform(Vector2.ZERO)
+	# A barra de mira, em cima, e a de profundidade (o dano), embaixo: nenhuma treme.
+	_barra_de_mira(r)
+	Desenho.celulas(self, Rect2(r.position.x + r.size.x * 0.1, r.end.y - 16.0, r.size.x * 0.8, 9.0), _dano_vis * 8.0, 8, Desenho.TEXTO)
+	if _passo == Passo.BROCA and pronta():
+		_ondas(Vector2(cx, topo - 6.0), minf(r.size.x, r.size.y) * 0.7)
+
+
+## Rachaduras que crescem com o dano visível, na ordem de RACHADURAS, a partir do ponto de impacto `o`.
+func _rachaduras(o: Vector2, larg: float, alt: float) -> void:
+	var n := RACHADURAS.size() / 2
+	var feito := _dano_vis * n
+	for i in n:
+		var t := clampf(feito - i, 0.0, 1.0)
+		if t <= 0.0:
+			break
+		var a: Vector2 = RACHADURAS[2 * i]
+		var b: Vector2 = RACHADURAS[2 * i + 1]
+		draw_line(o + Vector2(a.x * larg, a.y * alt), o + Vector2(a.lerp(b, t).x * larg, a.lerp(b, t).y * alt), Desenho.MOLDURA, 1.0)
+
+
+## A estrela do golpe perfeito: oito raios que crescem e somem, e um brilho de quatro pontas no meio. `f` de 0 a 1.
+func _estrela(c: Vector2, f: float) -> void:
+	var crescer := clampf(f * 3.0, 0.0, 1.0)
+	var cor := Color(Desenho.TEXTO, 1.0 - f * f)
+	for k in 8:
+		var dir := Vector2.from_angle(k * PI / 4.0)
+		var comp := (27.0 if k % 2 == 0 else 15.0) * (0.4 + 0.6 * crescer)
+		draw_line(c + dir * 5.0, c + dir * comp, cor, 2.0)
+	var s := 8.0 * (1.0 - f * 0.5)
+	draw_colored_polygon(PackedVector2Array([c + Vector2(0, -s), c + Vector2(s * 0.3, -s * 0.3), c + Vector2(s, 0),
+		c + Vector2(s * 0.3, s * 0.3), c + Vector2(0, s), c + Vector2(-s * 0.3, s * 0.3), c + Vector2(-s, 0),
+		c + Vector2(-s * 0.3, -s * 0.3)]), cor)
 
 
 # --- passo 2: o tubo -------------------------------------------------------------
@@ -380,7 +564,7 @@ func _cena_tubo(r: Rect2) -> void:
 	Desenho.celulas(self, Rect2(r.position.x + r.size.x * 0.1, r.end.y - 16.0, r.size.x * 0.8, 9.0), float(_graus), GRAUS, Desenho.TEXTO)
 	if _passo == Passo.TUBO:
 		var cx2: float = g[0]
-		_ondas(Vector2(cx2, (float(g[1]) + float(g[2])) / 2.0), minf(r.size.x, r.size.y) * 0.7, false)
+		_ondas(Vector2(cx2, (float(g[1]) + float(g[2])) / 2.0), minf(r.size.x, r.size.y) * 0.7)
 
 
 # --- passo 3: a tampa ------------------------------------------------------------
@@ -418,7 +602,7 @@ func _cena_tampa(r: Rect2) -> void:
 			draw_circle(c + Vector2(1.0, 2.0), raio, Color(0, 0, 0, 0.35 * k))
 			_selo(c, raio, Desenho.TEXTO, Desenho.FUNDO_TERMINAL, k)
 	elif _passo == Passo.TAMPA:
-		_ondas(Vector2(cx, topo - paira * 0.4), minf(r.size.x, r.size.y) * 0.7, false)
+		_ondas(Vector2(cx, topo - paira * 0.4), minf(r.size.x, r.size.y) * 0.7)
 
 
 # --- desenhos pequenos --------------------------------------------------------------
