@@ -1,13 +1,13 @@
 {
   "fonte": "NASA DONKI (CCMC), simulações WSA-ENLIL",
-  "url": "https://ccmc.gsfc.nasa.gov/DONKI/WS/get/WSAEnlilSimulations?startDate=2026-09-15&endDate=2026-11-14",
-  "coletado_em": "2026-11-14",
+  "url": "https://ccmc.gsfc.nasa.gov/DONKI/WS/get/WSAEnlilSimulations?startDate=2026-09-17&endDate=2026-11-16",
+  "coletado_em": "2026-11-16",
   "janela": {
-    "inicio": "2026-09-15",
-    "fim": "2026-11-14"
+    "inicio": "2026-09-17",
+    "fim": "2026-11-16"
   },
   "historico": false,
-  "simulacoes_na_janela": 110,
+  "simulacoes_na_janela": 116,
   "chegadas_marte": [
     {
       "cme_inicio": "2026-09-24T14:45:00Z",
