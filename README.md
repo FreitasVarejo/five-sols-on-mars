@@ -200,7 +200,7 @@ The game uses no NASA insignia.
 - Cupcakes Framework by Oplexitie (MIT) inspired the edge-pan camera; no code was copied: https://github.com/Oplexitie/Cupcakes-Framework
 - Font Open Sans SemiBold (SIL Open Font License 1.1), bundled with Godot.
 - Palette Apollo by AdamCYounis: https://lospec.com/palette-list/apollo
-- Sounds, all CC0: "metal_close_01" from "100 CC0 metal and wood SFX" by rubberduck (https://opengameart.org/content/100-cc0-metal-and-wood-sfx); "qubodup-DoorClose07" from "Door Open, Door Close Set" by qubodup (https://opengameart.org/content/door-open-door-close-set); "back_004", "confirmation_001", "bong_001", "maximize_008" and "minimize_008" from "Interface Sounds" by Kenney (https://opengameart.org/content/interface-sounds); "Plug-out" from "Plug In, Plug Out" by cleytonkauffman (https://opengameart.org/content/sfx-plug-in-plug-out). The radiation alarm, the trip sounds and the greenhouse sounds are synthesized by the team's own scripts, with no third-party sample.
+- Sounds, all CC0: "metal_close_01" from "100 CC0 metal and wood SFX" by rubberduck (https://opengameart.org/content/100-cc0-metal-and-wood-sfx); "qubodup-DoorClose07" from "Door Open, Door Close Set" by qubodup (https://opengameart.org/content/door-open-door-close-set); "back_004", "confirmation_001", "bong_001", "maximize_008" and "minimize_008" from "Interface Sounds" by Kenney (https://opengameart.org/content/interface-sounds); "Plug-out" from "Plug In, Plug Out" by cleytonkauffman (https://opengameart.org/content/sfx-plug-in-plug-out). Music, all CC0: "Rain in Space" by Tsorthan Grove (https://opengameart.org/content/rain-in-space); "resonating very far away" by burning-mir (https://freesound.org/people/burning-mir/sounds/149069/); "2020-06-20 Synth 2" by Doctor_Dreamchip (https://freesound.org/people/Doctor_Dreamchip/sounds/524622/); "Victory (short sting)" by xkeril (https://freesound.org/people/xkeril/sounds/706753/). The radiation alarm, the trip sounds and the greenhouse sounds are synthesized by the team's own scripts, with no third-party sample.
 
 **Other sources cited in the game or used in the design**
 
@@ -276,6 +276,11 @@ Code and the repository are MIT. The game shows a short version of this list at 
 - Sound "qubodup-DoorClose07" from "Door Open, Door Close Set" by qubodup (CC0), used for the window shutter: https://opengameart.org/content/door-open-door-close-set
 - Sounds "back_004", "confirmation_001", "bong_001", "maximize_008" and "minimize_008" from "Interface Sounds" by Kenney (CC0), pitched down, used for button clicks and the terminal: https://opengameart.org/content/interface-sounds
 - Sound "Plug-out" from "Plug In, Plug Out" by cleytonkauffman (CC0), pitched down, used for the safe mode: https://opengameart.org/content/sfx-plug-in-plug-out
+- Music (`assets/musica/`), all CC0. The loops were spliced to repeat without a seam, the report sting was trimmed of its trailing silence, and the volume was leveled to the same loudness; nothing else was changed:
+  - Calm track: "Rain in Space" by Tsorthan Grove (CC0), from the file `rain_in_space_loop.wav`: https://opengameart.org/content/rain-in-space
+  - Tense track: "resonating very far away" by burning-mir (CC0): https://freesound.org/people/burning-mir/sounds/149069/
+  - Turn track: "2020-06-20 Synth 2" by Doctor_Dreamchip (CC0): https://freesound.org/people/Doctor_Dreamchip/sounds/524622/
+  - Report sting: "Victory (short sting)" by xkeril (CC0): https://freesound.org/people/xkeril/sounds/706753/
 - The radiation alarm (`assets/sons/alarme.ogg`) was made by the team with `scripts/gerar_alarme.py`: synthesized tones, no third-party sample.
 - The trip sounds (`assets/sons/viagem_ignicao.ogg` and `assets/sons/viagem_pouso.ogg`) were made by the team with `scripts/gerar_som_viagem.py`: synthesized, no third-party sample.
 - The greenhouse sounds (`assets/sons/estufa_*.ogg`) were made by the team with `scripts/gerar_som_estufa.py`: synthesized, no third-party sample.

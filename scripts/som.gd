@@ -1,8 +1,9 @@
 extends Node
-## Som do jogo: o barramento SFX, o volume geral, o mudo e os sons do terminal e dos cliques.
+## Som do jogo: os barramentos SFX e Musica, o volume, o mudo e os sons do terminal e dos cliques.
 ##
 ## Todo player de som do jogo toca no barramento SFX (a persiana inclusive, que mantém o -4 dB
-## relativo dela). O volume geral é VOLUME_GERAL_DB, aplicado ao barramento; o mudo é o mute dele.
+## relativo dela); a trilha (scripts/musica.gd) toca no Musica. O volume geral é VOLUME_GERAL_DB e o da
+## música VOLUME_MUSICA_DB, cada um aplicado ao seu barramento; o mudo é o mute dos dois.
 ##
 ## O mudo fica guardado no navegador (localStorage, só no Web). Fora do Web, ou se o acesso falhar,
 ## o jogo segue sem mudo guardado: vale só na sessão.
@@ -11,7 +12,9 @@ extends Node
 ## sala (clique_da_acao). O botão do terminal, as setas e o mudo não fazem clique.
 
 const BARRAMENTO := &"SFX"
-const VOLUME_GERAL_DB := 0.0   # o único botão de volume do jogo; a persiana tem o -4 dB dela por cima
+const VOLUME_GERAL_DB := -6.0  # o único botão de volume do jogo; a persiana tem o -4 dB dela por cima
+const BARRAMENTO_MUSICA := &"Musica"
+const VOLUME_MUSICA_DB := -6.0  # o botão de volume da trilha; com os arquivos a -24 LUFS, fica uns 12 LU abaixo do alarme
 const CHAVE_MUDO := "five-sols-on-mars.mudo"
 const MAX_HISTORICO := 40
 
@@ -68,18 +71,24 @@ var _playback: AudioStreamPlaybackPolyphonic
 var _ids_quack: Array = []  # os quacks que ainda podem estar tocando (ids do playback polifônico)
 
 
-## Aplica o volume geral ao barramento SFX e devolve o índice dele. O barramento vem do
+## Aplica o volume geral ao barramento SFX (e o da música ao Musica) e devolve o índice do SFX. Os barramentos vêm do
 ## default_bus_layout.tres: criado só em tempo de execução, o Web (modo sample) perde o caminho até a
 ## saída e fica mudo. A criação aqui é só a rede de segurança dos testes. Todo play_stream passa o
 ## barramento na chamada (ver tocar()).
 static func garantir_barramento() -> int:
-	var i := AudioServer.get_bus_index(BARRAMENTO)
+	var i := _garantir(BARRAMENTO, VOLUME_GERAL_DB)
+	_garantir(BARRAMENTO_MUSICA, VOLUME_MUSICA_DB)
+	return i
+
+
+static func _garantir(nome: StringName, volume_db: float) -> int:
+	var i := AudioServer.get_bus_index(nome)
 	if i == -1:
 		AudioServer.add_bus()
 		i = AudioServer.bus_count - 1
-		AudioServer.set_bus_name(i, BARRAMENTO)
+		AudioServer.set_bus_name(i, nome)
 		AudioServer.set_bus_send(i, &"Master")
-	AudioServer.set_bus_volume_db(i, VOLUME_GERAL_DB)
+	AudioServer.set_bus_volume_db(i, volume_db)
 	return i
 
 
@@ -95,7 +104,9 @@ static func mudo_de_texto(texto: Variant) -> bool:
 
 func _ready() -> void:
 	var i := garantir_barramento()
-	AudioServer.set_bus_mute(i, _ler_guardado())
+	var mudo := _ler_guardado()
+	AudioServer.set_bus_mute(i, mudo)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index(BARRAMENTO_MUSICA), mudo)
 	_tocador = AudioStreamPlayer.new()
 	_tocador.bus = BARRAMENTO
 	_tocador.stream = AudioStreamPolyphonic.new()
@@ -112,6 +123,7 @@ func esta_mudo() -> bool:
 
 func definir_mudo(mudo: bool) -> void:
 	AudioServer.set_bus_mute(garantir_barramento(), mudo)
+	AudioServer.set_bus_mute(AudioServer.get_bus_index(BARRAMENTO_MUSICA), mudo)  # o mudo cala a música também
 	_guardar(mudo)
 
 
